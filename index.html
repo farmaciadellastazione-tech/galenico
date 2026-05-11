@@ -375,6 +375,36 @@
     <div class="card-title">Altri costi materie prime (netto IVA)</div>
     <div class="field-row" id="tt-row-et"><span class="field-label">Etanolo 96° (€/ml)</span><input type="number" id="t-et" value="" step="0.00001" min="0" oninput="calcTariff()"><span class="field-note">prezzo acquisto</span></div>
     <div class="field-row"><span class="field-label">Flacone / recipiente (€ cad.)</span><input type="number" id="t-fl" value="" step="0.01" min="0" oninput="calcTariff()"><span class="field-note">al costo, All. B nota 2</span></div>
+    <div style="margin-top:0.75rem;border-top:1px solid var(--border);padding-top:0.75rem">
+      <div class="tariff-group-title">Componenti extra non in All. A (Art. 5) — fino a 3</div>
+      <div id="tt-extra-rows">
+        <div class="tt-extra-row" style="display:flex;gap:8px;align-items:center;padding:4px 0">
+          <input type="text" placeholder="Nome sostanza" style="flex:2;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)" class="t-extra-nome" oninput="calcTariff()">
+          <input type="number" placeholder="g o ml" step="0.001" min="0" style="width:80px;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);text-align:right" class="t-extra-qty" oninput="calcTariff()">
+          <select style="font-family:var(--mono);font-size:12px;padding:4px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)" class="t-extra-unit" onchange="calcTariff()">
+            <option value="g">g</option><option value="ml">ml</option>
+          </select>
+          <input type="number" placeholder="€/g o €/ml" step="0.0001" min="0" style="width:110px;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);text-align:right" class="t-extra-prezzo" oninput="calcTariff()">
+        </div>
+        <div class="tt-extra-row" style="display:flex;gap:8px;align-items:center;padding:4px 0">
+          <input type="text" placeholder="Nome sostanza" style="flex:2;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)" class="t-extra-nome" oninput="calcTariff()">
+          <input type="number" placeholder="g o ml" step="0.001" min="0" style="width:80px;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);text-align:right" class="t-extra-qty" oninput="calcTariff()">
+          <select style="font-family:var(--mono);font-size:12px;padding:4px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)" class="t-extra-unit" onchange="calcTariff()">
+            <option value="g">g</option><option value="ml">ml</option>
+          </select>
+          <input type="number" placeholder="€/g o €/ml" step="0.0001" min="0" style="width:110px;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);text-align:right" class="t-extra-prezzo" oninput="calcTariff()">
+        </div>
+        <div class="tt-extra-row" style="display:flex;gap:8px;align-items:center;padding:4px 0">
+          <input type="text" placeholder="Nome sostanza" style="flex:2;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)" class="t-extra-nome" oninput="calcTariff()">
+          <input type="number" placeholder="g o ml" step="0.001" min="0" style="width:80px;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);text-align:right" class="t-extra-qty" oninput="calcTariff()">
+          <select style="font-family:var(--mono);font-size:12px;padding:4px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)" class="t-extra-unit" onchange="calcTariff()">
+            <option value="g">g</option><option value="ml">ml</option>
+          </select>
+          <input type="number" placeholder="€/g o €/ml" step="0.0001" min="0" style="width:110px;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);text-align:right" class="t-extra-prezzo" oninput="calcTariff()">
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text-faint);font-family:var(--mono);margin-top:4px">Lascia vuoto se non serve. Inserisci quantità usata nella preparazione × prezzo di acquisto per unità.</div>
+    </div>
   </div>
 
   <div class="card">
@@ -404,12 +434,35 @@
   <p class="subtitle">Compilare i dati e stampare — oppure salva come PDF dal browser</p>
 
   <div class="card" id="scheda-inputs">
+    <div class="card-title">Tipo di preparazione</div>
+    <div class="seg" style="margin-bottom:1rem">
+      <button class="seg-btn active" onclick="setTipoScheda('soluzione',this)">Soluzione</button>
+      <button class="seg-btn" onclick="setTipoScheda('unguento',this)">Unguento / crema</button>
+      <button class="seg-btn" onclick="setTipoScheda('capsule',this)">Capsule</button>
+      <button class="seg-btn" onclick="setTipoScheda('polvere',this)">Polvere</button>
+      <button class="seg-btn" onclick="setTipoScheda('sospensione',this)">Sospensione</button>
+    </div>
     <div class="card-title">Dati della preparazione</div>
     <div class="field-row"><span class="field-label">N° scheda</span><input type="text" id="s-num" value="" oninput="aggiornaScheda()" style="width:120px;"></div>
     <div class="field-row"><span class="field-label">Preparazione</span><input type="text" id="s-prep" value="" oninput="aggiornaScheda()"></div>
-    <div class="field-row"><span class="field-label">Quantità (ml)</span><input type="number" id="s-qt" value="" min="10" oninput="aggiornaScheda()"></div>
-    <div class="field-row"><span class="field-label">Concentrazione PA (%)</span><input type="number" id="s-conc" value="" step="0.5" min="0.1" oninput="aggiornaScheda()"></div>
-    <div class="field-row"><span class="field-label">Etanolo (% v/v)</span><input type="number" id="s-et" value="" step="5" min="0" max="96" oninput="aggiornaScheda()"></div>
+    <!-- campi soluzione/sospensione/unguento/polvere -->
+    <div id="s-row-qt-ml"><div class="field-row"><span class="field-label" id="s-lbl-qt">Quantità (ml)</span><input type="number" id="s-qt" value="" min="10" oninput="aggiornaScheda()"></div></div>
+    <div id="s-row-conc"><div class="field-row"><span class="field-label" id="s-lbl-conc">Concentrazione PA (%)</span><input type="number" id="s-conc" value="" step="0.5" min="0.1" oninput="aggiornaScheda()"></div></div>
+    <div id="s-row-et"><div class="field-row"><span class="field-label">Etanolo (% v/v)</span><input type="number" id="s-et" value="" step="5" min="0" max="96" oninput="aggiornaScheda()"></div></div>
+    <!-- campi capsule -->
+    <div id="s-row-ncaps" style="display:none"><div class="field-row"><span class="field-label">Numero capsule</span><input type="number" id="s-ncaps" value="" min="1" step="1" oninput="aggiornaScheda()"></div></div>
+    <div id="s-row-mgpa" style="display:none"><div class="field-row"><span class="field-label">Dosaggio PA (mg/cps)</span><input type="number" id="s-mgpa" value="" step="0.1" min="0" oninput="aggiornaScheda()"></div></div>
+    <div id="s-row-taglia" style="display:none"><div class="field-row"><span class="field-label">Taglia capsula</span>
+      <select id="s-taglia" onchange="aggiornaScheda()">
+        <option value="0">0 — 680 mg</option>
+        <option value="1">1 — 500 mg</option>
+        <option value="2">2 — 380 mg</option>
+        <option value="3">3 — 280 mg</option>
+        <option value="4">4 — 200 mg</option>
+      </select></div></div>
+    <div id="s-row-eccip" style="display:none"><div class="field-row"><span class="field-label">Eccipiente</span><input type="text" id="s-eccip" value="" placeholder="es. Lattosio monoidrato" style="width:220px;" oninput="aggiornaScheda()"></div></div>
+    <!-- comuni -->
+    <div class="field-row"><span class="field-label">Principio attivo (nome)</span><input type="text" id="s-pa-nome" value="" placeholder="es. Acido salicilico" style="width:220px;" oninput="aggiornaScheda()"></div>
     <div class="field-row"><span class="field-label">Paziente</span><input type="text" id="s-paz" value="" oninput="aggiornaScheda()"></div>
     <div class="field-row"><span class="field-label">Farmacista preparatore</span><input type="text" id="s-farm" value="" oninput="aggiornaScheda()"></div>
     <div class="field-row"><span class="field-label">Data preparazione</span><input type="date" id="s-data" oninput="aggiornaScheda()"></div>
@@ -417,8 +470,9 @@
     <div class="field-row"><span class="field-label">Prezzo al pubblico (€)</span><input type="number" id="s-prezzo" value="" step="0.01" min="0" oninput="aggiornaScheda()"><span class="field-note">da Tariffazione</span></div>
     <div class="card-title" style="margin-top:1rem;">Lotti materie prime</div>
     <div class="field-row"><span class="field-label">Lotto PA</span><input type="text" id="s-lotto-as" value="" oninput="aggiornaScheda()" style="width:120px;"></div>
-    <div class="field-row"><span class="field-label">Lotto etanolo 96°</span><input type="text" id="s-lotto-et" value="" oninput="aggiornaScheda()" style="width:120px;"></div>
-    <div class="field-row"><span class="field-label">Lotto acqua purificata</span><input type="text" id="s-lotto-ac" value="" oninput="aggiornaScheda()" style="width:120px;"></div>
+    <div id="s-row-lotto-et"><div class="field-row"><span class="field-label">Lotto etanolo 96°</span><input type="text" id="s-lotto-et" value="" oninput="aggiornaScheda()" style="width:120px;"></div></div>
+    <div id="s-row-lotto-ac"><div class="field-row"><span class="field-label">Lotto acqua purificata</span><input type="text" id="s-lotto-ac" value="" oninput="aggiornaScheda()" style="width:120px;"></div></div>
+    <div id="s-row-lotto-eccip" style="display:none"><div class="field-row"><span class="field-label" id="s-lbl-lotto-eccip">Lotto eccipiente</span><input type="text" id="s-lotto-eccip" value="" oninput="aggiornaScheda()" style="width:120px;"></div></div>
   </div>
 
   <button class="print-btn" onclick="window.print()">&#128438;&nbsp; Stampa / Salva PDF</button>
@@ -1310,6 +1364,19 @@ function calcTariff() {
 
     netto = costoPA + costoET + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte;
 
+    // ── componenti extra (Art. 5) ──
+    const extraRowsT = document.querySelectorAll('#tt-extra-rows .tt-extra-row');
+    let extraRowsArr = [];
+    extraRowsT.forEach(row => {
+      const nome  = row.querySelector('.t-extra-nome').value.trim();
+      const qty   = parseFloat(row.querySelector('.t-extra-qty').value)||0;
+      const unit  = row.querySelector('.t-extra-unit').value;
+      const prez  = parseFloat(row.querySelector('.t-extra-prezzo').value)||0;
+      if (nome && qty>0 && prez>0) extraRowsArr.push({nome,qty,unit,prez,costo:qty*prez});
+    });
+    const costoExtraT = extraRowsArr.reduce((s,e)=>s+e.costo,0);
+    netto += costoExtraT;
+
     const nomeVoce = {
       liquida:    'Soluzioni (voce 1)',
       sospensione:'Emulsioni/sospensioni (voce 3)',
@@ -1325,6 +1392,7 @@ function calcTariff() {
       {group:'Materie prime'},
       {name:'Principio attivo — '+fmt(grPA,2)+' g × '+fmtE(pPA)+'/g', val:costoPA},
       ...(mlET>0?[{name:'Etanolo 96° — '+fmt(mlET,1)+' ml × '+fmtE(pET)+'/ml', val:costoET}]:[]),
+      ...extraRowsArr.map(e=>({name:e.nome+' — '+fmt(e.qty,3)+' '+e.unit+' × '+fmtE(e.prez)+'/'+e.unit+' (Art. 5)', val:e.costo})),
       {group:'Costi di preparazione — All. B '+nomeVoce+' (D.M. 22/09/2017)'},
       {name:baseDesc, val:baseB},
       ...(comp>0?[{name:'Componenti aggiuntivi: '+comp+' × €0,60', val:addComp}]:[]),
@@ -1358,109 +1426,307 @@ function calcTariff() {
     '<div class="totale-item main"><div class="totale-label">Prezzo al pubblico</div><div class="totale-num">'+fmtE(totale)+'</div></div>';
 }
 
+function setTipoScheda(t, btn) {
+  tipoScheda = t;
+  document.querySelectorAll('#scheda-inputs .seg-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  const isSol  = t === 'soluzione' || t === 'sospensione';
+  const isSemi = t === 'unguento';
+  const isCaps = t === 'capsule';
+  const isPol  = t === 'polvere';
+
+  // quantità + concentrazione sempre visibili; label cambia
+  document.getElementById('s-lbl-qt').textContent = isCaps ? 'Quantità (pz capsule)' : (isSol ? 'Quantità (ml)' : 'Quantità (g)');
+  document.getElementById('s-lbl-conc').textContent = isCaps ? 'Dosaggio PA (mg/cps)' : 'Concentrazione PA (%)';
+
+  // etanolo solo soluzione
+  document.getElementById('s-row-et').style.display = isSol ? '' : 'none';
+
+  // campi specifici capsule
+  document.getElementById('s-row-ncaps').style.display  = isCaps ? '' : 'none';
+  document.getElementById('s-row-mgpa').style.display   = isCaps ? '' : 'none';
+  document.getElementById('s-row-taglia').style.display = isCaps ? '' : 'none';
+  document.getElementById('s-row-eccip').style.display  = (isCaps || isPol || isSemi) ? '' : 'none';
+
+  // lotti
+  document.getElementById('s-row-lotto-et').style.display = isSol ? '' : 'none';
+  document.getElementById('s-row-lotto-ac').style.display = (isSol || t === 'sospensione') ? '' : 'none';
+  document.getElementById('s-row-lotto-eccip').style.display = (isCaps || isPol || isSemi) ? '' : 'none';
+  const lblEccip = {capsule:'Lotto eccipiente', polvere:'Lotto eccipiente', unguento:'Lotto base (vaselina/cera)'};
+  if (lblEccip[t]) document.getElementById('s-lbl-lotto-eccip').textContent = lblEccip[t];
+
+  // sincronizza tipoTariff
+  const mapT = {soluzione:'liquida', sospensione:'sospensione', unguento:'semisolida', polvere:'polvere', capsule:'capsule'};
+  if (mapT[t]) {
+    tipoTariff = mapT[t];
+    // aggiorna bottone attivo in tariffazione
+    document.querySelectorAll('#page-tariffazione .seg-btn').forEach(b => b.classList.remove('active'));
+    const tarBtns = document.querySelectorAll('#page-tariffazione .seg-btn');
+    const mapIdx  = {liquida:0, sospensione:1, semisolida:2, polvere:3, capsule:4};
+    const idx = mapIdx[tipoTariff];
+    if (tarBtns[idx]) tarBtns[idx].classList.add('active');
+    // aggiorna visibilità campi tariff
+    const isLiquida = tipoTariff === 'liquida' || tipoTariff === 'sospensione' || tipoTariff === 'semisolida' || tipoTariff === 'polvere';
+    document.getElementById('tt-liquida').style.display  = isLiquida ? '' : 'none';
+    document.getElementById('tt-capsule').style.display  = tipoTariff === 'capsule' ? '' : 'none';
+    document.getElementById('tt-row-et').style.display   = tipoTariff === 'liquida' ? '' : 'none';
+  }
+
+  aggiornaScheda();
+}
+
 function aggiornaScheda() {
   const num    = document.getElementById('s-num').value||'';
   const prep   = document.getElementById('s-prep').value||'Preparazione galenica';
-  const qt     = parseFloat(document.getElementById('s-qt').value)||0;
-  const conc   = parseFloat(document.getElementById('s-conc').value)||2;
-  const percEt = parseFloat(document.getElementById('s-et').value)||70;
   const paz    = document.getElementById('s-paz').value||'\u2014';
   const farm   = document.getElementById('s-farm').value||'\u2014';
   const dataVal= document.getElementById('s-data').value;
   const mesi   = parseInt(document.getElementById('s-mesi').value)||2;
   const prezzo = parseFloat(document.getElementById('s-prezzo').value)||0;
   const lottoAS= document.getElementById('s-lotto-as').value||'\u2014';
-  const lottoET= document.getElementById('s-lotto-et').value||'\u2014';
-  const lottoAC= document.getElementById('s-lotto-ac').value||'\u2014';
+  const nomePA = (document.getElementById('s-pa-nome') && document.getElementById('s-pa-nome').value.trim())
+               || (document.getElementById('t-pa-nome') && document.getElementById('t-pa-nome').value.trim())
+               || 'Principio attivo';
 
-  const grPA = qt*conc/100, mlET = qt*percEt/100;
-  const nFlac = Math.ceil(qt/100);
   const scadenza = addMesi(dataVal, mesi);
 
-  const proc = [
-    'Pesare <strong>'+fmt(grPA,2)+' g</strong> di principio attivo su bilancia analitica.',
-    'Sciogliere in <strong>'+fmt(mlET,1)+' ml</strong> di etanolo '+percEt+'\xb0.',
-    'Trasferire in matraccio tarato da <strong>'+qt+' ml</strong>.',
-    'Portare a volume con acqua purificata q.b. a '+qt+' ml, mescolando.',
-    'Verificare limpidezza. Filtrare su carta da filtro se necessario.',
-    'Trasferire in flacone ambrato, chiudere ed etichettare.',
-  ];
+  // ── legge prezzi da tariffazione ──
+  const pPA   = parseFloat(document.getElementById('t-pa').value)||0;
+  const pFL   = parseFloat(document.getElementById('t-fl').value)||0;
 
-  const pPA = parseFloat(document.getElementById('t-pa').value)||0;
-  const pET = parseFloat(document.getElementById('t-et').value)||0;
-  const pFL = parseFloat(document.getElementById('t-fl').value)||0;
-  const nomePA = (document.getElementById('t-pa-nome').value.trim()||'Principio attivo');
-
-  // calcolo costi in base al tipo tariff corrente
-  let costoPA=0, costoET=0, costoFL_s=0, baseB=6.65, nomeVoceB='Preparazione';
-  if (tipoTariff === 'capsule') {
-    const nCaps   = parseInt(document.getElementById('t-ncaps').value)||0;
-    const mgPAcps = parseFloat(document.getElementById('t-mgpa').value)||0;
-    costoPA = (mgPAcps*nCaps/1000)*pPA;
-    const diff10 = Math.ceil(Math.abs(nCaps-120)/10);
-    baseB = 22.00 + (nCaps>120 ? diff10*2 : nCaps<120 ? -diff10*1 : 0);
-    baseB = Math.max(0,baseB);
-    nomeVoceB = 'Capsule/bustine';
-    costoFL_s = pFL;
-  } else {
-    const grPA   = qt*conc/100;
-    const mlET   = tipoTariff==='liquida' ? qt*(parseFloat(document.getElementById('t-et-perc')?.value)||0)/100 : 0;
-    costoPA  = grPA*pPA;
-    costoET  = mlET*pET;
-    costoFL_s = Math.ceil(qt/100)*pFL;
-    const cfg = { liquida:{base:6.65,rif:null,stepP:null,cP:0,ce:0.80}, sospensione:{base:13.30,rif:250,stepP:100,cP:0.70,ce:0.70}, semisolida:{base:13.30,rif:50,stepP:50,cP:0.75,ce:0.75}, polvere:{base:6.65,rif:null,stepP:null,cP:0,ce:0.75} };
-    const c = cfg[tipoTariff]||cfg.liquida;
-    if (c.rif && qt>c.rif) baseB=c.base+Math.ceil((qt-c.rif)/c.stepP)*c.cP;
-    else baseB=c.base;
-    nomeVoceB={liquida:'Soluzioni (voce 1)',sospensione:'Emulsioni/sospensioni (voce 3)',semisolida:'Semisolide (voce 4)',polvere:'Polveri (voce 5)'}[tipoTariff]||'Preparazione';
+  // ── extra componenti ──
+  function getExtra() {
+    const rows = document.querySelectorAll('#tt-extra-rows .tt-extra-row');
+    const out = [];
+    rows.forEach(row => {
+      const nome  = row.querySelector('.t-extra-nome').value.trim();
+      const qty   = parseFloat(row.querySelector('.t-extra-qty').value)||0;
+      const unit  = row.querySelector('.t-extra-unit').value;
+      const prez  = parseFloat(row.querySelector('.t-extra-prezzo').value)||0;
+      if (nome && qty > 0 && prez > 0) out.push({nome, qty, unit, prez, costo: qty*prez});
+    });
+    return out;
   }
-  const suppH=2.50, inc40=baseB*0.40;
-  const netto=costoPA+costoET+baseB+inc40+suppH+costoFL_s;
-  const iva=netto*0.10;
-  const totale=prezzo>0?prezzo:netto+iva;
-  const tariffRows=[
-    {n:nomePA+' '+fmt(costoPA>0?(tipoTariff==='capsule'?parseFloat(document.getElementById('t-mgpa').value||0)*parseInt(document.getElementById('t-ncaps').value||0)/1000:qt*(parseFloat(document.getElementById('s-conc').value)||0)/100):0,3)+' g × '+fmtE(pPA)+'/g', v:costoPA},
-    ...(costoET>0?[{n:'Etanolo 96° × '+fmtE(pET)+'/ml', v:costoET}]:[]),
+  const extra = getExtra();
+  const costoExtra = extra.reduce((s,e)=>s+e.costo,0);
+
+  let formulaItems = [], proc = [], lottiItems = [], alertHtml = '';
+  let costoPA = 0, costoET = 0, costoFL_s = 0, baseB = 0, nomeVoceB = '';
+
+  // ═══════════ SOLUZIONE ═══════════
+  if (tipoScheda === 'soluzione') {
+    const qt     = parseFloat(document.getElementById('s-qt').value)||0;
+    const conc   = parseFloat(document.getElementById('s-conc').value)||0;
+    const percEt = parseFloat(document.getElementById('s-et').value)||0;
+    const grPA   = qt*conc/100;
+    const mlET   = qt*percEt/100;
+    const nFlac  = Math.ceil(qt/100);
+    const pET    = parseFloat(document.getElementById('t-et').value)||0;
+
+    formulaItems = [
+      {nome:nomePA, val:fmt(grPA,2), unit:'g'},
+      {nome:'Etanolo '+percEt+'°', val:fmt(mlET,1), unit:'ml'},
+      {nome:'Acqua purificata', val:'q.b. a '+qt, unit:'ml'},
+      {nome:'Flacone ambrato', val:String(nFlac), unit:'pz'},
+    ];
+    proc = [
+      'Pesare <strong>'+fmt(grPA,2)+' g</strong> di '+nomePA+' su bilancia analitica.',
+      'Sciogliere in <strong>'+fmt(mlET,1)+' ml</strong> di etanolo '+percEt+'°.',
+      'Trasferire in matraccio tarato da <strong>'+qt+' ml</strong>.',
+      'Portare a volume con acqua purificata q.b. a '+qt+' ml, mescolando.',
+      'Verificare limpidezza. Filtrare su carta da filtro se necessario.',
+      'Trasferire in flacone ambrato, chiudere ed etichettare.',
+    ];
+    lottiItems = [
+      {nome:nomePA, lotto:lottoAS},
+      {nome:'Etanolo 96°', lotto:document.getElementById('s-lotto-et').value||'—'},
+      {nome:'Acqua purificata', lotto:document.getElementById('s-lotto-ac').value||'—'},
+    ];
+    costoPA = grPA*pPA; costoET = mlET*pET;
+    costoFL_s = nFlac*pFL; baseB = 6.65; nomeVoceB = 'Soluzioni (voce 1)';
+
+  // ═══════════ SOSPENSIONE ═══════════
+  } else if (tipoScheda === 'sospensione') {
+    const qt   = parseFloat(document.getElementById('s-qt').value)||0;
+    const conc = parseFloat(document.getElementById('s-conc').value)||0;
+    const grPA = qt*conc/100;
+    const nFlac= Math.ceil(qt/100);
+
+    formulaItems = [
+      {nome:nomePA, val:fmt(grPA,2), unit:'g'},
+      {nome:'Agente sospendente', val:'q.b.', unit:''},
+      {nome:'Acqua purificata', val:'q.b. a '+qt, unit:'ml'},
+      {nome:'Flacone ambrato', val:String(nFlac), unit:'pz'},
+    ];
+    proc = [
+      'Pesare <strong>'+fmt(grPA,2)+' g</strong> di '+nomePA+' finemente polverizzato.',
+      'Preparare il veicolo: sciogliere l\'agente sospendente in parte dell\'acqua purificata.',
+      'Aggiungere il PA al veicolo in piccole porzioni, agitando costantemente.',
+      'Portare a volume con acqua purificata q.b. a '+qt+' ml.',
+      'Agitare energicamente. Verificare omogeneità e assenza di aggregati.',
+      'Trasferire in flacone ambrato. Etichettare con "AGITARE PRIMA DELL\'USO".',
+    ];
+    lottiItems = [
+      {nome:nomePA, lotto:lottoAS},
+      {nome:'Acqua purificata', lotto:document.getElementById('s-lotto-ac').value||'—'},
+    ];
+    costoPA = grPA*pPA; costoFL_s = nFlac*pFL;
+    const diff = qt>250 ? Math.ceil((qt-250)/100)*0.70 : 0;
+    baseB = 13.30+diff; nomeVoceB = 'Emulsioni/sospensioni (voce 3)';
+    alertHtml = '<div class="scheda-note" style="margin-top:0.5rem;color:var(--warn)">⚠ Agitare prima dell\'uso. Verificare stabilità fisica a 24h e 48h.</div>';
+
+  // ═══════════ UNGUENTO / CREMA ═══════════
+  } else if (tipoScheda === 'unguento') {
+    const qt   = parseFloat(document.getElementById('s-qt').value)||0;
+    const conc = parseFloat(document.getElementById('s-conc').value)||0;
+    const grPA = qt*conc/100;
+    const eccip= document.getElementById('s-eccip').value.trim()||'Base unguentosa';
+    const grBase = qt - grPA;
+
+    formulaItems = [
+      {nome:nomePA, val:fmt(grPA,2), unit:'g'},
+      {nome:eccip, val:fmt(grBase,1), unit:'g'},
+      {nome:'Totale', val:fmt(qt,0), unit:'g'},
+    ];
+    proc = [
+      'Pesare <strong>'+fmt(grPA,2)+' g</strong> di '+nomePA+' su bilancia analitica.',
+      'Pesare <strong>'+fmt(grBase,1)+' g</strong> di '+eccip+'. Fondere a bagnomaria se necessario.',
+      'Incorporare il PA alla base con triturazione progressiva (spatola/mortaio).',
+      'Mescolare durante il raffreddamento per evitare ricristallizzazione.',
+      'Invasare in barattolo opaco da '+qt+' g. Etichettare con "USO ESTERNO", data e scadenza.',
+    ];
+    lottiItems = [
+      {nome:nomePA, lotto:lottoAS},
+      {nome:eccip, lotto:document.getElementById('s-lotto-eccip').value||'—'},
+    ];
+    costoPA = grPA*pPA; costoFL_s = pFL;
+    const diff = qt>50 ? Math.ceil((qt-50)/50)*0.75 : 0;
+    baseB = 13.30+diff; nomeVoceB = 'Semisolide (voce 4)';
+
+  // ═══════════ POLVERE ═══════════
+  } else if (tipoScheda === 'polvere') {
+    const qt   = parseFloat(document.getElementById('s-qt').value)||0;
+    const conc = parseFloat(document.getElementById('s-conc').value)||0;
+    const grPA = qt*conc/100;
+    const eccip= document.getElementById('s-eccip').value.trim()||'Eccipiente';
+    const grEccip = qt - grPA;
+
+    formulaItems = [
+      {nome:nomePA, val:fmt(grPA,2), unit:'g'},
+      {nome:eccip, val:fmt(grEccip,2), unit:'g'},
+      {nome:'Totale polvere', val:fmt(qt,0), unit:'g'},
+    ];
+    proc = [
+      'Pesare <strong>'+fmt(grPA,2)+' g</strong> di '+nomePA+' su bilancia analitica.',
+      'Pesare <strong>'+fmt(grEccip,2)+' g</strong> di '+eccip+'.',
+      'Passare al setaccio n° 355 µm per omogeneizzare la granulometria.',
+      'Miscelare per geometria (porzioni successive) per almeno 5 minuti.',
+      'Trasferire in flacone/bustine. Etichettare con nome, concentrazione, data e scadenza.',
+    ];
+    lottiItems = [
+      {nome:nomePA, lotto:lottoAS},
+      {nome:eccip, lotto:document.getElementById('s-lotto-eccip').value||'—'},
+    ];
+    costoPA = grPA*pPA; costoFL_s = pFL;
+    baseB = 6.65; nomeVoceB = 'Polveri (voce 5)';
+
+  // ═══════════ CAPSULE ═══════════
+  } else if (tipoScheda === 'capsule') {
+    const nCaps   = parseInt(document.getElementById('s-ncaps').value)||0;
+    const mgPAcps = parseFloat(document.getElementById('s-mgpa').value)||0;
+    const taglia  = document.getElementById('s-taglia').value;
+    const capVol  = {0:680,1:500,2:380,3:280,4:200}[taglia]||680;
+    const eccip   = document.getElementById('s-eccip').value.trim()||'Eccipiente';
+    const mgEccipcps = Math.max(0, capVol - mgPAcps);
+    const grPA    = (mgPAcps * nCaps)/1000;
+    const grEccip = (mgEccipcps * nCaps)/1000;
+
+    formulaItems = [
+      {nome:nomePA+' (totale)', val:fmt(grPA,3), unit:'g'},
+      {nome:eccip+' (totale)', val:fmt(grEccip,2), unit:'g'},
+      {nome:'Capsule taglia '+taglia, val:String(nCaps), unit:'pz'},
+      {nome:'PA per capsula', val:fmt(mgPAcps,2), unit:'mg'},
+      {nome:'Eccipiente per capsula', val:fmt(mgEccipcps,1), unit:'mg'},
+      {nome:'Peso totale/capsula', val:fmt(capVol,0), unit:'mg'},
+    ];
+    proc = [
+      'Pesare <strong>'+fmt(grPA,3)+' g</strong> di '+nomePA+' su bilancia analitica.',
+      'Eseguire prova volumetrica: inserire il PA nel cilindro dell\'opercolatrice da '+nCaps+' capsule taglia '+taglia+', aggiungere '+eccip+' fino a volume.',
+      'Determinare il peso di '+eccip+' necessario (peso cilindro − tara − peso PA).',
+      'Pesare l\'eccipiente calcolato (indicativamente <strong>'+fmt(grEccip,2)+' g</strong>).',
+      'Miscelare PA ed eccipiente per almeno 5 minuti fino ad omogeneità.',
+      'Riempire le capsule con l\'opercolatrice. Controllare peso di almeno 5 capsule (±5%).',
+      'Chiudere le capsule. Conservare in flacone ambrato ben chiuso.',
+      'Etichettare: '+nomePA+' '+fmt(mgPAcps,2)+' mg/cps — N° '+nCaps+' capsule taglia '+taglia+' — data e scadenza.',
+    ];
+    lottiItems = [
+      {nome:nomePA, lotto:lottoAS},
+      {nome:eccip, lotto:document.getElementById('s-lotto-eccip').value||'—'},
+    ];
+    if (mgPAcps > capVol) alertHtml = '<div class="scheda-note" style="color:var(--warn)">⚠ Dosaggio PA ('+fmt(mgPAcps,1)+' mg) supera la capacità taglia '+taglia+' ('+capVol+' mg). Considerare taglia più grande.</div>';
+    costoPA = grPA*pPA; costoFL_s = pFL;
+    const diff10 = Math.ceil(Math.abs(nCaps-120)/10);
+    baseB = 22.00 + (nCaps>120?diff10*2:nCaps<120?-diff10*1:0);
+    baseB = Math.max(0,baseB); nomeVoceB = 'Capsule/bustine (voce 7)';
+  }
+
+  // ═══════ calcolo tariff ═══════
+  const suppH  = 2.50;
+  const inc40  = baseB * 0.40;
+  const netto  = costoPA + costoET + baseB + inc40 + suppH + costoFL_s + costoExtra;
+  const iva    = netto * 0.10;
+  const totale = prezzo > 0 ? prezzo : netto + iva;
+
+  let tariffRows = [
+    {n: nomePA + ' — ' + fmt(costoPA/Math.max(pPA,0.0001),3) + ' g × ' + fmtE(pPA) + '/g', v: costoPA},
+  ];
+  if (costoET > 0) tariffRows.push({n:'Etanolo 96° × '+fmtE(parseFloat(document.getElementById('t-et').value)||0)+'/ml', v:costoET});
+  extra.forEach(e => tariffRows.push({n:e.nome+' '+fmt(e.qty,3)+' '+e.unit+' × '+fmtE(e.prez)+'/'+e.unit, v:e.costo}));
+  tariffRows.push(
     {n:'All. B — '+nomeVoceB, v:baseB},
     {n:'Incremento 40% (Art. 7)', v:inc40},
     {n:'Suppl. H — PA pericoloso (Art. 8a)', v:suppH},
     {n:'Recipiente', v:costoFL_s},
-  ];
+  );
+
+  // ═══════ HTML scheda ═══════
+  const qtLabel = tipoScheda==='capsule' ? (document.getElementById('s-ncaps').value||'—')+' pz'
+                : tipoScheda==='soluzione'||tipoScheda==='sospensione' ? (document.getElementById('s-qt').value||'—')+' ml'
+                : (document.getElementById('s-qt').value||'—')+' g';
 
   document.getElementById('scheda-preview').innerHTML =
     '<div class="scheda-header">' +
       '<div class="scheda-farmacia"><strong>Farmacia della Stazione</strong>Via Fiume 75 \u2014 La Spezia<br>Farmacista: '+farm+'</div>' +
-      '<div class="scheda-title"><h2>Scheda n. '+num+'</h2><p>Preparato magistrale \xb7 Uso esterno</p></div>' +
+      '<div class="scheda-title"><h2>Scheda n. '+num+'</h2><p>Preparato magistrale \xb7 '+
+        {soluzione:'Soluzione idroalcolica',sospensione:'Sospensione',unguento:'Unguento/crema',polvere:'Polvere',capsule:'Capsule'}[tipoScheda]+
+      '</p></div>' +
     '</div>' +
     '<div class="scheda-meta">' +
       '<div class="scheda-meta-item"><div class="lbl">Preparazione</div><div class="val">'+prep+'</div></div>' +
       '<div class="scheda-meta-item"><div class="lbl">Paziente</div><div class="val">'+paz+'</div></div>' +
       '<div class="scheda-meta-item"><div class="lbl">Data</div><div class="val">'+fmtData(dataVal)+'</div></div>' +
-      '<div class="scheda-meta-item"><div class="lbl">Quantit\xe0</div><div class="val">'+qt+' ml</div></div>' +
-      '<div class="scheda-meta-item"><div class="lbl">Concentrazione</div><div class="val">'+fmt(conc,1)+'% p/v</div></div>' +
+      '<div class="scheda-meta-item"><div class="lbl">Quantità</div><div class="val">'+qtLabel+'</div></div>' +
+      (tipoScheda!=='capsule' ? '<div class="scheda-meta-item"><div class="lbl">Concentrazione</div><div class="val">'+fmt(parseFloat(document.getElementById('s-conc').value)||0,1)+'% p/v</div></div>' : '') +
       '<div class="scheda-meta-item"><div class="lbl">Scadenza</div><div class="val">'+scadenza+'</div></div>' +
     '</div>' +
     '<div class="scheda-section">' +
       '<div class="scheda-section-title">Formula</div>' +
-      '<div class="scheda-formula">' +
-        '<div class="scheda-formula-item"><div class="nome">Principio attivo</div><div class="qty">'+fmt(grPA,2)+'<span class="unit"> g</span></div></div>' +
-        '<div class="scheda-formula-item"><div class="nome">Etanolo '+percEt+'\xb0</div><div class="qty">'+fmt(mlET,1)+'<span class="unit"> ml</span></div></div>' +
-        '<div class="scheda-formula-item"><div class="nome">Acqua purificata</div><div class="qty">q.b. a<span class="unit"> '+qt+' ml</span></div></div>' +
-        '<div class="scheda-formula-item"><div class="nome">Flacone ambrato</div><div class="qty">'+nFlac+'<span class="unit"> pz</span></div></div>' +
+      '<div class="scheda-formula" style="grid-template-columns:repeat('+Math.min(formulaItems.length,4)+',1fr)">' +
+        formulaItems.map(i=>'<div class="scheda-formula-item"><div class="nome">'+i.nome+'</div><div class="qty">'+i.val+'<span class="unit"> '+i.unit+'</span></div></div>').join('') +
       '</div>' +
     '</div>' +
     '<div class="scheda-section">' +
       '<div class="scheda-section-title">Lotti materie prime</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">' +
-        '<div class="scheda-formula-item"><div class="nome">'+nomePA+'</div><div class="qty" style="font-size:13px;">Lotto '+lottoAS+'</div></div>' +
-        '<div class="scheda-formula-item"><div class="nome">Etanolo 96\xb0</div><div class="qty" style="font-size:13px;">Lotto '+lottoET+'</div></div>' +
-        '<div class="scheda-formula-item"><div class="nome">Acqua purificata</div><div class="qty" style="font-size:13px;">Lotto '+lottoAC+'</div></div>' +
+      '<div style="display:grid;grid-template-columns:repeat('+Math.min(lottiItems.length,4)+',1fr);gap:8px;">' +
+        lottiItems.map(i=>'<div class="scheda-formula-item"><div class="nome">'+i.nome+'</div><div class="qty" style="font-size:13px;">Lotto '+i.lotto+'</div></div>').join('') +
       '</div>' +
     '</div>' +
     '<div class="scheda-section">' +
       '<div class="scheda-section-title">Procedura</div>' +
       '<ul class="scheda-proc">'+proc.map(p=>'<li>'+p+'</li>').join('')+'</ul>' +
     '</div>' +
+    alertHtml +
     '<div class="scheda-section">' +
       '<div class="scheda-section-title">Tariffazione \u2014 D.M. 22/09/2017</div>' +
       tariffRows.map(r=>'<div class="scheda-tariff-row"><span class="tn">'+r.n+'</span><span class="tv">'+fmtE(r.v)+'</span></div>').join('') +
@@ -1468,7 +1734,7 @@ function aggiornaScheda() {
       '<div class="scheda-tariff-row"><span class="tn">IVA 10%</span><span class="tv">'+fmtE(iva)+'</span></div>' +
       '<div class="scheda-prezzo-finale"><span class="etichetta">Prezzo al pubblico (IVA inclusa)</span><span class="cifra">'+fmtE(totale)+'</span></div>' +
     '</div>' +
-    '<div class="scheda-note"><strong>Conservazione:</strong> al riparo dalla luce e dal calore, T\xb0 ambiente.&nbsp;&nbsp;|&nbsp;&nbsp;<strong>Uso:</strong> esterno.&nbsp;&nbsp;|&nbsp;&nbsp;<strong>Rif.:</strong> D.M. 22/09/2017 All. B voce 1 \u2014 FU XII</div>' +
+    '<div class="scheda-note"><strong>Conservazione:</strong> al riparo dalla luce e dal calore, T\xb0 ambiente.&nbsp;&nbsp;|&nbsp;&nbsp;<strong>Rif.:</strong> D.M. 22/09/2017 All. B \u2014 FU XII</div>' +
     '<div class="scheda-firma"><div><div class="linea"></div>Firma farmacista preparatore</div><div><div class="linea"></div>Firma farmacista verificatore</div></div>';
 }
 
@@ -1519,28 +1785,55 @@ function compilaScheda() {
   const numScheda = getNextNumScheda();
   document.getElementById('s-num').value = numScheda;
 
-  // 2. Dati da Preparazione
+  // 2. Sincronizza tipo da Preparazione → Scheda
+  const mapTipoPrep = {soluzione:'soluzione', unguento:'unguento', capsule:'capsule', polvere:'polvere', sospensione:'sospensione'};
+  if (mapTipoPrep[tipoPrep]) {
+    tipoScheda = mapTipoPrep[tipoPrep];
+    // clicca il bottone corrispondente nella Scheda
+    const sBtn = document.querySelectorAll('#scheda-inputs .seg-btn');
+    const mapIdx = {soluzione:0,unguento:1,capsule:2,polvere:3,sospensione:4};
+    setTipoScheda(tipoScheda, sBtn[mapIdx[tipoScheda]]);
+  }
+
+  // 3. Dati da Preparazione
   const nomePAraw = document.getElementById('prep-pa-nome') ?
     document.getElementById('prep-pa-nome').value.trim() : '';
-  const prepNome = nomePAraw ?
-    (nomePAraw + ' ' + document.getElementById('conc').value + '%') :
-    (document.getElementById('conc').value + '% ' +
-     (tipoPrep === 'soluzione' ? 'Soluzione idroalcolica' :
-      tipoPrep === 'unguento' ? 'Unguento' :
-      tipoPrep === 'capsule' ? 'Capsule' :
-      tipoPrep === 'polvere' ? 'Polvere' : 'Sospensione'));
+  const nomePA_tar = document.getElementById('t-pa-nome') ?
+    document.getElementById('t-pa-nome').value.trim() : '';
+  const nomePA = nomePAraw || nomePA_tar || '';
 
-  const qt   = document.getElementById('qt').value;
-  const conc = document.getElementById('conc').value;
-  const et   = document.getElementById('perc-et') ?
-    document.getElementById('perc-et').value : '70';
+  if (document.getElementById('s-pa-nome')) document.getElementById('s-pa-nome').value = nomePA;
 
-  document.getElementById('s-prep').value  = prepNome;
-  document.getElementById('s-qt').value    = qt;
-  document.getElementById('s-conc').value  = conc;
-  if (document.getElementById('s-et')) document.getElementById('s-et').value = et;
+  if (tipoPrep === 'capsule') {
+    const nCaps   = document.getElementById('n-caps') ? document.getElementById('n-caps').value : '';
+    const mgPAcps = document.getElementById('mg-pa-cps') ? document.getElementById('mg-pa-cps').value : '';
+    const taglia  = document.getElementById('taglia-caps') ? document.getElementById('taglia-caps').value : '0';
+    const eccip   = document.getElementById('eccip-nome') ? document.getElementById('eccip-nome').value : '';
+    if (document.getElementById('s-ncaps')) document.getElementById('s-ncaps').value = nCaps;
+    if (document.getElementById('s-mgpa'))  document.getElementById('s-mgpa').value  = mgPAcps;
+    if (document.getElementById('s-taglia'))document.getElementById('s-taglia').value = taglia;
+    if (document.getElementById('s-eccip')) document.getElementById('s-eccip').value  = eccip;
+    const prepNome = nomePA ? nomePA+' '+mgPAcps+' mg/cps capsule' : 'Capsule';
+    document.getElementById('s-prep').value = prepNome;
+  } else {
+    const prepNome = nomePAraw ?
+      (nomePAraw + ' ' + document.getElementById('conc').value + '%') :
+      (document.getElementById('conc').value + '% ' +
+       (tipoPrep === 'soluzione' ? 'Soluzione idroalcolica' :
+        tipoPrep === 'unguento' ? 'Unguento' :
+        tipoPrep === 'polvere' ? 'Polvere' : 'Sospensione'));
+    document.getElementById('s-prep').value  = prepNome;
+    const qt   = document.getElementById('qt').value;
+    const conc = document.getElementById('conc').value;
+    const et   = document.getElementById('perc-et') ? document.getElementById('perc-et').value : '0';
+    document.getElementById('s-qt').value    = qt;
+    document.getElementById('s-conc').value  = conc;
+    if (document.getElementById('s-et')) document.getElementById('s-et').value = et;
+    const eccip = document.getElementById('eccip-nome') ? document.getElementById('eccip-nome').value : '';
+    if (document.getElementById('s-eccip')) document.getElementById('s-eccip').value = eccip;
+  }
 
-  // 3. Prezzo da Tariffazione (legge il totale già calcolato)
+  // 4. Prezzo da Tariffazione (legge il totale già calcolato)
   const totEl = document.getElementById('tariff-totale');
   if (totEl && totEl.textContent) {
     const match = totEl.textContent.match(/[\d,]+/);
@@ -1550,33 +1843,37 @@ function compilaScheda() {
     }
   }
 
-  // 4. Lotti da Inventario — prende le sostanze pertinenti
+  // 5. Lotti da Inventario
   const inv = invLoad();
-  const oggi = new Date();
 
   function trovaCognomeLotto(keywords) {
     const match = inv.find(item =>
       keywords.some(k => item.nome.toLowerCase().includes(k))
-      && (!item.dataCh) // non chiusa
+      && (!item.dataCh)
     );
     return match ? (match.lottoInt || match.lotto || '—') : '—';
   }
 
-  const lottoAS = trovaCognomeLotto(['salicilico', 'acido salicilico']);
-  const lottoET = trovaCognomeLotto(['etanolo', 'alcool etilico']);
-  const lottoAC = trovaCognomeLotto(['acqua']);
-  const lottoMIN = trovaCognomeLotto(['minoxidil']);
-  const lottoGLIC = trovaCognomeLotto(['glicole propilenico', 'glicole']);
+  const paNome = nomePA.toLowerCase();
+  const lottoPA  = paNome ? trovaCognomeLotto([paNome, paNome.split(' ')[0]]) : '—';
+  const lottoET  = trovaCognomeLotto(['etanolo', 'alcool etilico']);
+  const lottoAC  = trovaCognomeLotto(['acqua']);
+  const lottoEC  = trovaCognomeLotto(
+    (document.getElementById('s-eccip') && document.getElementById('s-eccip').value)
+    ? [document.getElementById('s-eccip').value.toLowerCase().split(' ')[0]]
+    : ['lattosio','cellulosa','amido','talco']
+  );
 
-  if (document.getElementById('s-lotto-as')) document.getElementById('s-lotto-as').value = lottoAS;
+  if (document.getElementById('s-lotto-as')) document.getElementById('s-lotto-as').value = lottoPA;
   if (document.getElementById('s-lotto-et')) document.getElementById('s-lotto-et').value = lottoET;
   if (document.getElementById('s-lotto-ac')) document.getElementById('s-lotto-ac').value = lottoAC;
+  if (document.getElementById('s-lotto-eccip')) document.getElementById('s-lotto-eccip').value = lottoEC;
 
-  // 5. Data odierna
+  // 6. Data odierna
   const oggi_str = new Date().toISOString().split('T')[0];
   if (document.getElementById('s-data')) document.getElementById('s-data').value = oggi_str;
 
-  // 6. Aggiorna la scheda e naviga
+  // 7. Aggiorna la scheda e naviga
   aggiornaScheda();
   const navBtns = document.querySelectorAll('.nav-btn');
   showPage('scheda', navBtns[2]);
@@ -2150,6 +2447,7 @@ function salvaInArchivio() {
     id: Date.now(),
     num:    document.getElementById('s-num').value,
     prep:   document.getElementById('s-prep').value,
+    tipo:   tipoScheda,
     qt:     document.getElementById('s-qt').value,
     conc:   document.getElementById('s-conc').value,
     paz:    document.getElementById('s-paz').value,
@@ -2157,9 +2455,15 @@ function salvaInArchivio() {
     data:   document.getElementById('s-data').value,
     mesi:   document.getElementById('s-mesi').value,
     prezzo: document.getElementById('s-prezzo').value,
+    ncaps:  document.getElementById('s-ncaps') ? document.getElementById('s-ncaps').value : '',
+    mgpa:   document.getElementById('s-mgpa') ? document.getElementById('s-mgpa').value : '',
+    taglia: document.getElementById('s-taglia') ? document.getElementById('s-taglia').value : '',
+    eccip:  document.getElementById('s-eccip') ? document.getElementById('s-eccip').value : '',
+    paNome: document.getElementById('s-pa-nome') ? document.getElementById('s-pa-nome').value : '',
     lottoAS: document.getElementById('s-lotto-as') ? document.getElementById('s-lotto-as').value : '',
     lottoET: document.getElementById('s-lotto-et') ? document.getElementById('s-lotto-et').value : '',
     lottoAC: document.getElementById('s-lotto-ac') ? document.getElementById('s-lotto-ac').value : '',
+    lottoEC: document.getElementById('s-lotto-eccip') ? document.getElementById('s-lotto-eccip').value : '',
     salvata: new Date().toISOString()
   };
 
@@ -2231,6 +2535,14 @@ function archRiapri(id) {
   const arch = archLoad();
   const s = arch.find(s => s.id === id);
   if (!s) return;
+
+  // ripristina tipo
+  if (s.tipo) {
+    const sBtn = document.querySelectorAll('#scheda-inputs .seg-btn');
+    const mapIdx = {soluzione:0,unguento:1,capsule:2,polvere:3,sospensione:4};
+    setTipoScheda(s.tipo, sBtn[mapIdx[s.tipo]||0]);
+  }
+
   document.getElementById('s-num').value    = s.num || '';
   document.getElementById('s-prep').value   = s.prep || '';
   document.getElementById('s-qt').value     = s.qt || '';
@@ -2240,9 +2552,15 @@ function archRiapri(id) {
   document.getElementById('s-data').value   = s.data || '';
   document.getElementById('s-mesi').value   = s.mesi || '';
   document.getElementById('s-prezzo').value = s.prezzo || '';
+  if (document.getElementById('s-pa-nome'))  document.getElementById('s-pa-nome').value  = s.paNome || '';
+  if (document.getElementById('s-ncaps'))    document.getElementById('s-ncaps').value    = s.ncaps || '';
+  if (document.getElementById('s-mgpa'))     document.getElementById('s-mgpa').value     = s.mgpa || '';
+  if (document.getElementById('s-taglia'))   document.getElementById('s-taglia').value   = s.taglia || '0';
+  if (document.getElementById('s-eccip'))    document.getElementById('s-eccip').value    = s.eccip || '';
   if (document.getElementById('s-lotto-as')) document.getElementById('s-lotto-as').value = s.lottoAS || '';
   if (document.getElementById('s-lotto-et')) document.getElementById('s-lotto-et').value = s.lottoET || '';
   if (document.getElementById('s-lotto-ac')) document.getElementById('s-lotto-ac').value = s.lottoAC || '';
+  if (document.getElementById('s-lotto-eccip')) document.getElementById('s-lotto-eccip').value = s.lottoEC || '';
   aggiornaScheda();
   const navBtns = document.querySelectorAll('.nav-btn');
   showPage('scheda', navBtns[2]);
