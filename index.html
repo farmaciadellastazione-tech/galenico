@@ -147,6 +147,16 @@
   .ai-formula-box.visible { display:block; }
   .ai-actions { display:flex; gap:8px; margin-top:0.75rem; flex-wrap:wrap; }
 
+  /* ARCHIVIO */
+  .arch-row { display:grid; grid-template-columns:100px 1fr 120px 80px auto; gap:8px; align-items:center; padding:8px 10px; border:1px solid var(--border); border-radius:var(--radius); margin-bottom:6px; background:var(--surface); font-size:13px; }
+  .arch-num { font-family:var(--mono); font-size:12px; font-weight:600; color:var(--accent); }
+  .arch-prep { font-weight:500; }
+  .arch-sub { font-size:11px; color:var(--text-faint); font-family:var(--mono); }
+  .arch-data { font-family:var(--mono); font-size:11px; color:var(--text-muted); }
+  .arch-prezzo { font-family:var(--mono); font-size:12px; text-align:right; }
+  .arch-btns { display:flex; gap:4px; justify-content:flex-end; }
+  @media(max-width:600px) { .arch-row { grid-template-columns:80px 1fr auto; } .arch-data,.arch-prezzo { display:none; } }
+
   /* INVENTARIO */
   .inv-table { width:100%; border-collapse:collapse; font-size:13px; }
   .inv-table th { text-align:left; font-size:11px; font-family:var(--mono); color:var(--text-faint); text-transform:uppercase; letter-spacing:0.07em; padding:6px 8px; border-bottom:2px solid var(--border); }
@@ -223,9 +233,10 @@
     <button class="nav-btn active" onclick="showPage('preparazione',this)">Preparazione</button>
     <button class="nav-btn" onclick="showPage('tariffazione',this)">Tariffazione</button>
     <button class="nav-btn" onclick="showPage('scheda',this)">Scheda</button>
+    <button class="nav-btn" onclick="showPage('archivio',this)">Archivio</button>
     <button class="nav-btn" onclick="showPage('inventario',this)">Inventario</button>
     <button class="nav-btn" onclick="showPage('etichette',this)">Etichette</button>
-    <button class="nav-btn" onclick="showPage('formulario',this)">🤖 Formulario AI</button>
+    <button class="nav-btn" onclick="showPage('formulario',this)">🤖 AI</button>
   </nav>
 </header>
 
@@ -368,6 +379,7 @@
   </div>
 
   <button class="print-btn" onclick="window.print()">&#128438;&nbsp; Stampa / Salva PDF</button>
+  <button class="print-btn" onclick="salvaInArchivio()" style="background:var(--accent-mid,#2d8a3e);margin-left:8px">📁&nbsp; Salva in archivio</button>
 
   <div id="scheda-preview"></div>
 </div>
@@ -655,6 +667,25 @@
       <button class="btn-add" style="font-size:12px;padding:5px 14px" onclick="aiEsportaScheda()">→ Usa in Scheda</button>
       <button style="font-family:var(--sans);font-size:12px;padding:5px 12px;background:none;border:1px solid var(--border-strong);color:var(--text-muted);border-radius:var(--radius);cursor:pointer" onclick="aiReset()">↺ Nuova conversazione</button>
     </div>
+  </div>
+</div>
+
+<!-- ARCHIVIO SCHEDE -->
+<div class="page" id="page-archivio">
+  <h1>Archivio schede di lavorazione</h1>
+  <p class="subtitle">Conservazione obbligatoria — D.M. 22/09/2017</p>
+
+  <div id="archivio-alerts"></div>
+
+  <div class="card">
+    <div class="card-title">Schede salvate</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+      <input type="text" id="archivio-search" placeholder="Cerca per numero, preparazione, paziente..." 
+        oninput="archivioRender(this.value)"
+        style="flex:1;min-width:200px;font-family:var(--mono);font-size:13px;padding:5px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text)">
+      <span id="archivio-count" style="font-size:12px;font-family:var(--mono);color:var(--text-faint)"></span>
+    </div>
+    <div id="archivio-lista"></div>
   </div>
 </div>
 
@@ -1880,6 +1911,128 @@ function aiReset() {
 }
 
 aiCaricaKey();
+
+// ═══════════════════════════════════════════
+// ARCHIVIO SCHEDE
+// ═══════════════════════════════════════════
+
+const ARCH_KEY = 'gal_archivio_schede_v1';
+
+function archLoad() {
+  try { return JSON.parse(localStorage.getItem(ARCH_KEY) || '[]'); } catch { return []; }
+}
+
+function archSave(d) { localStorage.setItem(ARCH_KEY, JSON.stringify(d)); }
+
+function salvaInArchivio() {
+  const scheda = {
+    id: Date.now(),
+    num:    document.getElementById('s-num').value,
+    prep:   document.getElementById('s-prep').value,
+    qt:     document.getElementById('s-qt').value,
+    conc:   document.getElementById('s-conc').value,
+    paz:    document.getElementById('s-paz').value,
+    farm:   document.getElementById('s-farm').value,
+    data:   document.getElementById('s-data').value,
+    mesi:   document.getElementById('s-mesi').value,
+    prezzo: document.getElementById('s-prezzo').value,
+    lottoAS: document.getElementById('s-lotto-as') ? document.getElementById('s-lotto-as').value : '',
+    lottoET: document.getElementById('s-lotto-et') ? document.getElementById('s-lotto-et').value : '',
+    lottoAC: document.getElementById('s-lotto-ac') ? document.getElementById('s-lotto-ac').value : '',
+    salvata: new Date().toISOString()
+  };
+
+  if (!scheda.prep || !scheda.num) {
+    alert('Compila almeno numero scheda e nome preparazione prima di salvare.');
+    return;
+  }
+
+  const arch = archLoad();
+  // Controlla duplicati per numero scheda
+  const dup = arch.findIndex(s => s.num === scheda.num);
+  if (dup >= 0) {
+    if (!confirm('Esiste già una scheda ' + scheda.num + '. Sovrascrivere?')) return;
+    arch[dup] = scheda;
+  } else {
+    arch.unshift(scheda); // più recente in cima
+  }
+  archSave(arch);
+  alert('Scheda ' + scheda.num + ' salvata in archivio.');
+}
+
+function archivioRender(filtro) {
+  filtro = (filtro || '').toLowerCase();
+  const arch = archLoad();
+  const lista = document.getElementById('archivio-lista');
+  const count = document.getElementById('archivio-count');
+
+  const filtered = filtro
+    ? arch.filter(s =>
+        (s.num||'').toLowerCase().includes(filtro) ||
+        (s.prep||'').toLowerCase().includes(filtro) ||
+        (s.paz||'').toLowerCase().includes(filtro))
+    : arch;
+
+  count.textContent = filtered.length + ' scheda' + (filtered.length !== 1 ? 'e' : '');
+
+  if (!filtered.length) {
+    lista.innerHTML = '<div style="text-align:center;color:var(--text-faint);font-size:13px;padding:2rem">Nessuna scheda in archivio</div>';
+    return;
+  }
+
+  lista.innerHTML = filtered.map(s => {
+    const dataFmt = s.data ? s.data.split('-').reverse().join('/') : '—';
+    const prezzoFmt = s.prezzo ? '€ ' + parseFloat(s.prezzo).toFixed(2) : '—';
+    return '<div class="arch-row">' +
+      '<div><div class="arch-num">' + (s.num||'—') + '</div><div class="arch-sub">' + dataFmt + '</div></div>' +
+      '<div><div class="arch-prep">' + (s.prep||'—') + '</div><div class="arch-sub">' + (s.paz||'') + (s.conc ? ' · ' + s.conc + '%' : '') + (s.qt ? ' · ' + s.qt + ' ml' : '') + '</div></div>' +
+      '<div class="arch-data">' + (s.farm||'') + '</div>' +
+      '<div class="arch-prezzo">' + prezzoFmt + '</div>' +
+      '<div class="arch-btns">' +
+        '<button onclick="archRiapri(' + s.id + ')" title="Riapri scheda" style="font-size:12px;padding:3px 8px;border:1px solid var(--border-strong);border-radius:4px;background:none;cursor:pointer;color:var(--accent)">↩</button>' +
+        '<button onclick="archElimina(' + s.id + ')" title="Elimina" style="font-size:12px;padding:3px 8px;border:1px solid #e0a0a0;border-radius:4px;background:none;cursor:pointer;color:var(--red,#8b1a1a)">✕</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function archElimina(id) {
+  const arch = archLoad();
+  const scheda = arch.find(s => s.id === id);
+  if (!scheda) return;
+  if (!confirm('Eliminare la scheda ' + scheda.num + ' — ' + scheda.prep + '?\n\nAttenzione: questa operazione è irreversibile.')) return;
+  if (!confirm('Sei proprio sicuro di voler eliminare la scheda ' + scheda.num + '?')) return;
+  archSave(arch.filter(s => s.id !== id));
+  archivioRender(document.getElementById('archivio-search').value);
+}
+
+function archRiapri(id) {
+  const arch = archLoad();
+  const s = arch.find(s => s.id === id);
+  if (!s) return;
+  document.getElementById('s-num').value    = s.num || '';
+  document.getElementById('s-prep').value   = s.prep || '';
+  document.getElementById('s-qt').value     = s.qt || '';
+  document.getElementById('s-conc').value   = s.conc || '';
+  document.getElementById('s-paz').value    = s.paz || '';
+  document.getElementById('s-farm').value   = s.farm || '';
+  document.getElementById('s-data').value   = s.data || '';
+  document.getElementById('s-mesi').value   = s.mesi || '';
+  document.getElementById('s-prezzo').value = s.prezzo || '';
+  if (document.getElementById('s-lotto-as')) document.getElementById('s-lotto-as').value = s.lottoAS || '';
+  if (document.getElementById('s-lotto-et')) document.getElementById('s-lotto-et').value = s.lottoET || '';
+  if (document.getElementById('s-lotto-ac')) document.getElementById('s-lotto-ac').value = s.lottoAC || '';
+  aggiornaScheda();
+  const navBtns = document.querySelectorAll('.nav-btn');
+  showPage('scheda', navBtns[2]);
+}
+
+// Render archivio quando si apre la pagina
+const _origShowPage = showPage;
+showPage = function(id, btn) {
+  _origShowPage(id, btn);
+  if (id === 'archivio') archivioRender('');
+};
 </script>
 </body>
 </html>
