@@ -588,9 +588,11 @@
   <div class="card">
     <div class="card-title">Chiave API Groq</div>
     <div class="ai-key-row">
-      <input type="password" id="ai-groq-key" placeholder="gsk_..." oninput="aiSalvaKey()">
+      <input type="text" id="ai-groq-key" placeholder="gsk_..." autocomplete="off" spellcheck="false">
       <button onclick="aiSalvaKey()">✓ Salva</button>
+      <button onclick="aiMostraKey()" style="background:var(--text-muted)">👁</button>
     </div>
+    <div id="ai-key-status" style="font-size:11px;font-family:var(--mono);color:var(--text-faint);margin-top:4px"></div>
     <div style="font-size:11px;color:var(--text-faint);font-family:var(--mono)">
       Chiave gratuita su <a href="https://console.groq.com" target="_blank" style="color:var(--accent)">console.groq.com</a> — salvata in localStorage, mai inviata altrove
     </div>
@@ -1738,13 +1740,32 @@ let aiHistory = [];
 function aiCaricaKey() {
   const k = localStorage.getItem(AI_KEY_LS) || '';
   const el = document.getElementById('ai-groq-key');
-  if (el) el.value = k;
+  if (el && k) {
+    el.value = k;
+    document.getElementById('ai-key-status').innerHTML =
+      '<span style="color:var(--accent)">✓ Chiave caricata — ' + k.substring(0,8) + '...</span>';
+  }
   return k;
 }
 
 function aiSalvaKey() {
   const k = document.getElementById('ai-groq-key').value.trim();
+  const status = document.getElementById('ai-key-status');
+  if (!k) {
+    status.innerHTML = '<span style="color:var(--warn)">⚠ Chiave vuota</span>';
+    return;
+  }
+  if (!k.startsWith('gsk_')) {
+    status.innerHTML = '<span style="color:var(--warn)">⚠ La chiave Groq deve iniziare con gsk_</span>';
+    return;
+  }
   localStorage.setItem(AI_KEY_LS, k);
+  status.innerHTML = '<span style="color:var(--accent)">✓ Salvata — ' + k.substring(0,8) + '...</span>';
+}
+
+function aiMostraKey() {
+  const el = document.getElementById('ai-groq-key');
+  el.type = el.type === 'password' ? 'text' : 'password';
 }
 
 function aiGetKey() {
