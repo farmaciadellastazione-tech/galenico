@@ -288,6 +288,9 @@
     <ul class="procedure-list" id="procedura"></ul>
   </div>
   <div class="alert alert-warn"><span class="alert-icon">!</span><span>Verificare sempre la compatibilità con FU XII e Codex. Etichettare <strong>USO ESTERNO</strong>. Conservazione al riparo dalla luce, T° ambiente.</span></div>
+  <div style="text-align:right;margin-top:0.5rem">
+    <button class="btn-add" onclick="compilaScheda()">→ Compila scheda di lavorazione</button>
+  </div>
   <div class="alert alert-info"><span class="alert-icon">i</span><span>% espressa <strong>p/v</strong>: g di PA per 100 ml di preparato. Per sol. idroalcolica (d≈0,886 g/ml): 2% p/v ≠ 2% p/p (≈2,26% p/p).</span></div>
 </div>
 
@@ -336,6 +339,9 @@
     <div class="ref-note">Rif.: D.M. 22/09/2017 All. B voce 1 — Preparazioni liquide</div>
   </div>
   <div class="alert alert-warn"><span class="alert-icon">!</span><span>I prezzi così determinati <strong>non possono essere incrementati in alcun caso</strong> (Art. 10). Sconto 16% ammesso per enti pubblici (Art. 11).</span></div>
+  <div style="text-align:right;margin-top:0.5rem">
+    <button class="btn-add" onclick="compilaScheda()">→ Compila scheda di lavorazione</button>
+  </div>
 </div>
 
 <!-- SCHEDA -->
@@ -1218,6 +1224,109 @@ const oggi=new Date(), pad=n=>String(n).padStart(2,'0');
 document.getElementById('s-data').value=oggi.getFullYear()+'-'+pad(oggi.getMonth()+1)+'-'+pad(oggi.getDate());
 
 calcPrep(); calcTariff(); aggiornaScheda();
+
+// ═══════════════════════════════════════════
+// NUMERAZIONE SCHEDE
+// ═══════════════════════════════════════════
+
+function getNextNumScheda() {
+  const anno = new Date().getFullYear();
+  const key = 'gal_scheda_counter_' + anno;
+  const n = parseInt(localStorage.getItem(key) || '0') + 1;
+  localStorage.setItem(key, n);
+  return anno + '/' + String(n).padStart(3, '0');
+}
+
+function getLastNumScheda() {
+  const anno = new Date().getFullYear();
+  const key = 'gal_scheda_counter_' + anno;
+  const n = parseInt(localStorage.getItem(key) || '0');
+  return anno + '/' + String(n).padStart(3, '0');
+}
+
+// Imposta il numero scheda iniziale al valore corretto (2026/002)
+(function initNumScheda() {
+  const anno = new Date().getFullYear();
+  const key = 'gal_scheda_counter_' + anno;
+  if (!localStorage.getItem(key)) {
+    localStorage.setItem(key, '1'); // prima scheda = 001
+  }
+  // Aggiorna il campo s-num con il prossimo numero disponibile
+  const n = parseInt(localStorage.getItem(key));
+  const el = document.getElementById('s-num');
+  if (el) el.value = anno + '/' + String(n).padStart(3, '0');
+})();
+
+// ═══════════════════════════════════════════
+// COMPILA SCHEDA AUTOMATICAMENTE
+// ═══════════════════════════════════════════
+
+function compilaScheda() {
+  // 1. Numerazione automatica
+  const numScheda = getNextNumScheda();
+  document.getElementById('s-num').value = numScheda;
+
+  // 2. Dati da Preparazione
+  const nomePrepRaw = document.getElementById('prep-nome') ?
+    document.getElementById('prep-nome').value : '';
+  const prepNome = nomePrepRaw ||
+    (document.getElementById('conc').value + '% ' +
+     (tipoPrep === 'soluzione' ? 'Soluzione idroalcolica' :
+      tipoPrep === 'unguento' ? 'Unguento' :
+      tipoPrep === 'capsule' ? 'Capsule' :
+      tipoPrep === 'polvere' ? 'Polvere' : 'Sospensione'));
+
+  const qt   = document.getElementById('qt').value;
+  const conc = document.getElementById('conc').value;
+  const et   = document.getElementById('perc-et') ?
+    document.getElementById('perc-et').value : '70';
+
+  document.getElementById('s-prep').value  = prepNome;
+  document.getElementById('s-qt').value    = qt;
+  document.getElementById('s-conc').value  = conc;
+  if (document.getElementById('s-et')) document.getElementById('s-et').value = et;
+
+  // 3. Prezzo da Tariffazione (legge il totale già calcolato)
+  const totEl = document.getElementById('tariff-totale');
+  if (totEl && totEl.textContent) {
+    const match = totEl.textContent.match(/[\d,]+/);
+    if (match) {
+      const prezzo = parseFloat(match[0].replace(',', '.'));
+      if (!isNaN(prezzo)) document.getElementById('s-prezzo').value = prezzo.toFixed(2);
+    }
+  }
+
+  // 4. Lotti da Inventario — prende le sostanze pertinenti
+  const inv = invLoad();
+  const oggi = new Date();
+
+  function trovaCognomeLotto(keywords) {
+    const match = inv.find(item =>
+      keywords.some(k => item.nome.toLowerCase().includes(k))
+      && (!item.dataCh) // non chiusa
+    );
+    return match ? (match.lottoInt || match.lotto || '—') : '—';
+  }
+
+  const lottoAS = trovaCognomeLotto(['salicilico', 'acido salicilico']);
+  const lottoET = trovaCognomeLotto(['etanolo', 'alcool etilico']);
+  const lottoAC = trovaCognomeLotto(['acqua']);
+  const lottoMIN = trovaCognomeLotto(['minoxidil']);
+  const lottoGLIC = trovaCognomeLotto(['glicole propilenico', 'glicole']);
+
+  if (document.getElementById('s-lotto-as')) document.getElementById('s-lotto-as').value = lottoAS;
+  if (document.getElementById('s-lotto-et')) document.getElementById('s-lotto-et').value = lottoET;
+  if (document.getElementById('s-lotto-ac')) document.getElementById('s-lotto-ac').value = lottoAC;
+
+  // 5. Data odierna
+  const oggi_str = new Date().toISOString().split('T')[0];
+  if (document.getElementById('s-data')) document.getElementById('s-data').value = oggi_str;
+
+  // 6. Aggiorna la scheda e naviga
+  aggiornaScheda();
+  const navBtns = document.querySelectorAll('.nav-btn');
+  showPage('scheda', navBtns[2]);
+}
 
 // ═══════════════════════════════════════════
 // INVENTARIO
