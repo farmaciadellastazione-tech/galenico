@@ -833,9 +833,11 @@ function addMesi(s, mesi) {
 function popolaPASuggestions() {
   const dl = document.getElementById('pa-suggestions');
   if (!dl) return;
-  dl.innerHTML = Object.keys(ALLEGATO_A).map(k =>
-    '<option value="' + k.charAt(0).toUpperCase() + k.slice(1) + '">'
-  ).join('');
+  // Prima le sostanze dell'inventario (più rilevanti), poi tutto l'Allegato A
+  const invNomi = INV_HARDCODED.map(s => s.nome);
+  const allNomi = Object.keys(ALLEGATO_A).map(k => k.charAt(0).toUpperCase() + k.slice(1));
+  const tutti = [...new Set([...invNomi, ...allNomi])];
+  dl.innerHTML = tutti.map(k => '<option value="' + k + '">').join('');
 }
 
 function sincronizzaPA() {
@@ -845,6 +847,8 @@ function sincronizzaPA() {
     tNome.value = nome;
     tarRicercaPA();
   }
+  // propaga prezzi e dati all'intero flusso
+  sincronizzaTariffazione();
 }
 
 function calcPrep() {
@@ -970,6 +974,77 @@ function calcPrep() {
   ).join('');
   document.getElementById('alert-solub').innerHTML = alertSolub;
   document.getElementById('procedura').innerHTML = proc.map(p => '<li>'+p+'</li>').join('');
+
+  // ── Propagazione automatica a Tariffazione ──
+  sincronizzaTariffazione();
+}
+
+function sincronizzaTariffazione() {
+  const nomePA = (document.getElementById('prep-pa-nome') ? document.getElementById('prep-pa-nome').value.trim() : '') || '';
+
+  // Cerca prezzo PA
+  if (nomePA) {
+    const trovato = invGetPrezzo(nomePA);
+    if (trovato) {
+      const paEl = document.getElementById('t-pa');
+      const fonteEl = document.getElementById('t-pa-fonte');
+      if (paEl) {
+        paEl.value = trovato.prezzo.toFixed(4);
+        paEl.readOnly = trovato.fonte === 'allegatoA';
+        paEl.style.background = trovato.fonte === 'allegatoA' ? 'var(--accent-light)' : 'var(--bg)';
+        paEl.style.color = trovato.fonte === 'allegatoA' ? 'var(--accent)' : 'var(--text)';
+      }
+      if (fonteEl) {
+        if (trovato.fonte === 'allegatoA') {
+          fonteEl.innerHTML = '<strong style="color:var(--accent)">✓ Allegato A — €'+trovato.prezzo.toFixed(4)+'/g (obbligatorio)</strong>';
+          tarPADaAllegatoA = true;
+        } else {
+          fonteEl.innerHTML = '<strong style="color:var(--accent-mid)">✓ Inventario — €'+trovato.prezzo.toFixed(4)+'/g (Art. 5, prezzo acquisto)</strong>';
+          tarPADaAllegatoA = false;
+        }
+      }
+      // aggiorna nome PA in tariff
+      const nomeTarEl = document.getElementById('t-pa-nome');
+      if (nomeTarEl) nomeTarEl.value = nomePA;
+    }
+  }
+
+  // Propaga tipo
+  const mapTipo = {soluzione:'liquida', unguento:'semisolida', capsule:'capsule', polvere:'polvere', sospensione:'sospensione'};
+  if (mapTipo[tipoPrep] && mapTipo[tipoPrep] !== tipoTariff) {
+    const tarBtns = document.querySelectorAll('#page-tariffazione .seg-btn');
+    const mapIdx = {liquida:0, sospensione:1, semisolida:2, polvere:3, capsule:4};
+    setTipoTariff(mapTipo[tipoPrep], tarBtns[mapIdx[mapTipo[tipoPrep]]]);
+  }
+
+  // Propaga quantità e concentrazione (per preparazioni non-capsule)
+  if (tipoPrep !== 'capsule') {
+    const qt = document.getElementById('qt').value;
+    const conc = document.getElementById('conc').value;
+    const percEt = document.getElementById('perc-et') ? document.getElementById('perc-et').value : '0';
+    const qtTarEl = document.getElementById('t-qt');
+    const concTarEl = document.getElementById('t-conc');
+    const etPercEl = document.getElementById('t-et-perc');
+    if (qtTarEl) qtTarEl.value = qt;
+    if (concTarEl) concTarEl.value = conc;
+    if (etPercEl) etPercEl.value = percEt;
+
+    // Prezzo etanolo da inventario
+    const etInv = invGetPrezzo('etanolo');
+    if (etInv && document.getElementById('t-et')) {
+      document.getElementById('t-et').value = etInv.prezzo.toFixed(5);
+    }
+  } else {
+    // capsule: propaga n° capsule e mg/cps
+    const nCaps = document.getElementById('n-caps') ? document.getElementById('n-caps').value : '';
+    const mgPA  = document.getElementById('mg-pa-cps') ? document.getElementById('mg-pa-cps').value : '';
+    const taglia= document.getElementById('taglia-caps') ? document.getElementById('taglia-caps').value : '0';
+    if (document.getElementById('t-ncaps')) document.getElementById('t-ncaps').value = nCaps;
+    if (document.getElementById('t-mgpa'))  document.getElementById('t-mgpa').value  = mgPA;
+    if (document.getElementById('t-taglia-sync')) document.getElementById('t-taglia-sync').value = taglia;
+  }
+
+  calcTariff();
 }
 
 // ═══════════════════════════════════════════
@@ -1426,6 +1501,64 @@ function calcTariff() {
     '<div class="totale-item main"><div class="totale-label">Prezzo al pubblico</div><div class="totale-num">'+fmtE(totale)+'</div></div>';
 }
 
+// ═══════════════════════════════════════════
+// INVENTARIO HARDCODED (aggiorna prezzi qui)
+// ═══════════════════════════════════════════
+const INV_HARDCODED = [
+  { nome:'Minoxidil',             h:'H302,H318,H335', unit:'g',  prezzo:0.3904, lotto:'F2300213', lottoInt:'5/24',    scad:'2028-10', dataAp:'2024-03-01', sds:'http://www.farmalabor.it/certificati/F2300213.pdf' },
+  { nome:'Glicole propilenico',   h:'',               unit:'g',  prezzo:0.0159, lotto:'R2510991', lottoInt:'10/2025', scad:'2027-04', dataAp:'2025-12-10', sds:'http://www.farmalabor.it/certificati/R2510991.pdf' },
+  { nome:'Acqua purificata',      h:'',               unit:'ml', prezzo:0.002,  lotto:'R2426776', lottoInt:'10/24',   scad:'2026-10', dataAp:'2026-05-11', sds:'http://www.farmalabor.it/certificati/R2426776.pdf' },
+  { nome:'Etanolo 96°',           h:'H225,H319',      unit:'ml', prezzo:0.01474,lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
+  { nome:'Vaselina filante bianca',h:'',              unit:'g',  prezzo:0.023,  lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
+  { nome:'Lanolina anidra',       h:'',               unit:'g',  prezzo:0.041,  lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
+  { nome:'Clobazam',              h:'H302,H361',      unit:'g',  prezzo:0,      lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
+];
+
+// Merge: localStorage prevale su hardcoded (dati più freschi)
+function invLoadMerged() {
+  const stored = invLoad();
+  const merged = [...INV_HARDCODED];
+  stored.forEach(s => {
+    const idx = merged.findIndex(h => h.nome.toLowerCase() === s.nome.toLowerCase());
+    if (idx >= 0) merged[idx] = { ...merged[idx], ...s };
+    else merged.push(s);
+  });
+  return merged;
+}
+
+// Popola select sostanza in inventario con hardcoded
+function invPopulateSelect() {
+  const sel = document.getElementById('inv-sel');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— seleziona —</option>';
+  INV_HARDCODED.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.nome + '|' + s.h;
+    opt.textContent = s.nome;
+    sel.appendChild(opt);
+  });
+  const altro = document.createElement('option');
+  altro.value = 'Altro|';
+  altro.textContent = 'Altra sostanza...';
+  sel.appendChild(altro);
+}
+
+// Cerca prezzo nell'inventario merged (per PA e eccipienti)
+function invGetPrezzo(nomeSostanza) {
+  const q = nomeSostanza.toLowerCase().trim();
+  const merged = invLoadMerged();
+  const found = merged.find(s => s.nome.toLowerCase().includes(q) || q.includes(s.nome.toLowerCase().split(' ')[0]));
+  // Fallback su ALLEGATO_A
+  if (!found || !found.prezzo) {
+    const chiaveAll = Object.keys(ALLEGATO_A).find(k => k.includes(q) || q.includes(k.split(' ')[0]));
+    if (chiaveAll) return { prezzo: ALLEGATO_A[chiaveAll], fonte: 'allegatoA' };
+    return null;
+  }
+  return { prezzo: found.prezzo, fonte: 'inventario', lotto: found.lottoInt || found.lotto || '—' };
+}
+
+let tipoScheda = 'soluzione';
+
 function setTipoScheda(t, btn) {
   tipoScheda = t;
   document.querySelectorAll('#scheda-inputs .seg-btn').forEach(b => b.classList.remove('active'));
@@ -1741,9 +1874,6 @@ function aggiornaScheda() {
 const oggi=new Date(), pad=n=>String(n).padStart(2,'0');
 document.getElementById('s-data').value=oggi.getFullYear()+'-'+pad(oggi.getMonth()+1)+'-'+pad(oggi.getDate());
 
-popolaPASuggestions();
-calcPrep(); calcTariff(); aggiornaScheda();
-
 // ═══════════════════════════════════════════
 // NUMERAZIONE SCHEDE
 // ═══════════════════════════════════════════
@@ -1843,8 +1973,8 @@ function compilaScheda() {
     }
   }
 
-  // 5. Lotti da Inventario
-  const inv = invLoad();
+  // 5. Lotti da Inventario (merged: hardcoded + localStorage)
+  const inv = invLoadMerged();
 
   function trovaCognomeLotto(keywords) {
     const match = inv.find(item =>
@@ -2093,7 +2223,7 @@ function invSalvaModifica(idx) {
 }
 
 function invRender() {
-  const inv = invLoad();
+  const inv = invLoadMerged();
   const oggi = new Date();
   const tra60 = new Date(); tra60.setDate(tra60.getDate()+60);
   const alerts = document.getElementById('inv-alerts');
@@ -2265,10 +2395,6 @@ function stampaDymo() {
 }
 
 // init inventario
-invRender();
-// init etichette
-etiqAggiorna();
-
 // ═══════════════════════════════════════════
 // FORMULARIO AI
 // ═══════════════════════════════════════════
@@ -2572,6 +2698,14 @@ showPage = function(id, btn) {
   _origShowPage(id, btn);
   if (id === 'archivio') archivioRender('');
 };
+
+// ── INIT ──
+invPopulateSelect();
+invRender();
+etiqAggiorna();
+aiCaricaKey();
+popolaPASuggestions();
+calcPrep(); // calcPrep chiama sincronizzaTariffazione → calcTariff
 </script>
 </body>
 </html>
