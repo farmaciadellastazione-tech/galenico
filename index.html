@@ -1434,7 +1434,7 @@ function calcTariff() {
       {name:'Capsule vuote — '+nCaps+' × '+fmtE(pCpsVuote), val:costoCps, badge:'al costo', badgeType:'ok'},
       {group:'Costi di preparazione — All. B Capsule (D.M. 22/09/2017)'},
       {name:'Base '+nCaps+' capsule (rif. 120: €22,00'+(nCaps<120?' −'+fmt(diff10*1,2):nCaps>120?' +'+fmt(diff10*2,2):'')+' €)', val:baseB},
-      ...(comp>0?[{name:'Componenti aggiuntivi: '+comp+' × €0,60', val:addComp}]:[]),
+      ...(comp>0?[{name:'Componenti aggiuntivi: '+comp+' × €'+fmt(c.compExtra,2), val:addComp}]:[]),
       ...(op>0?[{name:'Op. tecnologiche aggiuntive: '+op+' × €2,30', val:addOp}]:[]),
       {name:'Incremento 40% su costi preparazione (Art. 7)', val:inc40},
       {group:'Supplementi e diritti'},
@@ -1454,7 +1454,7 @@ function calcTariff() {
     const percEt = parseFloat(document.getElementById('t-et-perc').value)||0;
     const grPA   = qt*conc/100;
     const mlET   = tipoTariff === 'liquida' ? qt*percEt/100 : 0;
-    const nFlac  = tipoTariff === 'liquida' ? Math.ceil(qt/100) : 1;
+    const nFlac  = 1;
     const costoPA  = grPA*pPA;
     const costoET  = mlET*pET;
     const costoFL  = nFlac*pFL;
@@ -1517,7 +1517,7 @@ function calcTariff() {
       ...extraRowsArr.map(e=>({name:e.nome+' — '+fmt(e.qty,3)+' '+e.unit+' × '+fmtE(e.prez)+'/'+e.unit+' (Art. 5)', val:e.costo})),
       {group:'Costi di preparazione — All. B '+nomeVoce+' (D.M. 22/09/2017)'},
       {name:baseDesc, val:baseB},
-      ...(comp>0?[{name:'Componenti aggiuntivi: '+comp+' × €0,60', val:addComp}]:[]),
+      ...(comp>0?[{name:'Componenti aggiuntivi: '+comp+' × €'+fmt(c.compExtra,2), val:addComp}]:[]),
       ...(op>0?[{name:'Op. tecnologiche aggiuntive: '+op+' × €2,30', val:addOp}]:[]),
       {name:'Incremento 40% su costi preparazione (Art. 7)', val:inc40},
       {group:'Supplementi e diritti'},
