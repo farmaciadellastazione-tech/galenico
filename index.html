@@ -503,18 +503,24 @@
       <div id="inv-qr-msg" style="font-size:11px;font-family:var(--mono);color:var(--accent);margin-top:4px;min-height:16px"></div>
     </div>
     <div class="inv-form" style="grid-template-columns:2fr 2fr;margin-bottom:8px">
-      <div style="position:relative">
-        <label>Sostanza <span style="color:var(--text-faint);font-weight:400">(digita per cercare)</span></label>
-        <input type="text" id="inv-cerca" placeholder="es. Carbone attivo, Minoxidil..." autocomplete="off"
-          oninput="invFiltraSostanze()" onfocus="invFiltraSostanze()" onblur="setTimeout(()=>document.getElementById('inv-dropdown').style.display='none',200)"
-          style="width:100%">
-        <input type="hidden" id="inv-sel-nome">
-        <input type="hidden" id="inv-sel-h">
-        <div id="inv-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:100;max-height:260px;overflow-y:auto;font-size:13px;font-family:var(--mono)"></div>
+      <div>
+        <label>Sostanza</label>
+        <select id="inv-sel" onchange="invPrecompila()">
+          <option value="">— seleziona —</option>
+          <option value="">— nessuna —</option>
+          <option value="Minoxidil|H302,H318,H335">Minoxidil</option>
+          <option value="Etanolo 96°|H225,H319">Etanolo 96°</option>
+          <option value="Glicole propilenico|">Glicole propilenico E 1520</option>
+          <option value="Acqua purificata|">Acqua purificata</option>
+          <option value="Vaselina filante bianca|">Vaselina filante bianca</option>
+          <option value="Lanolina anidra|">Lanolina anidra</option>
+          <option value="Clobazam|H302,H361">Clobazam</option>
+          <option value="Altro|">Altra sostanza...</option>
+        </select>
       </div>
       <div>
-        <label>Nome libero (se non in lista)</label>
-        <input type="text" id="inv-nome-libero" placeholder="es. Lattosio monoidrato" style="width:100%">
+        <label>Nome libero (se "Altra")</label>
+        <input type="text" id="inv-nome-libero" placeholder="es. Acido borico">
       </div>
     </div>
 
@@ -702,6 +708,19 @@
   </div>
 
   <div class="card">
+    <div class="card-title">Token GitHub (sincronizzazione inventario)</div>
+    <div class="ai-key-row">
+      <input type="password" id="gh-token-input" placeholder="ghp_..." autocomplete="off" spellcheck="false">
+      <button onclick="ghSalvaToken()">✓ Salva</button>
+      <button onclick="ghMostraToken()" style="background:var(--text-muted)">👁</button>
+    </div>
+    <div id="gh-token-status" style="font-size:11px;font-family:var(--mono);color:var(--text-faint);margin-top:4px"></div>
+    <div style="font-size:11px;color:var(--text-faint);font-family:var(--mono)">
+      Token GitHub con scope <strong>gist</strong> — lo stesso di LinguaeQuiz. Salvato in localStorage.
+    </div>
+  </div>
+
+  <div class="card">
     <div class="card-title">Nuova preparazione</div>
     <div class="field-row" style="margin-bottom:0.75rem">
       <span class="field-label">Nome preparazione</span>
@@ -825,7 +844,7 @@ function addMesi(s, mesi) {
 }
 
 // ═══════════════════════════════════════════
-// INVENTARIO HARDCODED — aggiorna prezzi qui
+// INVENTARIO HARDCODED
 // ═══════════════════════════════════════════
 const INV_HARDCODED = [
   { nome:'Minoxidil',               h:'H302,H318,H335', unit:'g',  prezzo:0.3904,  lotto:'F2300213', lottoInt:'5/24',    scad:'2028-10', dataAp:'2024-03-01', sds:'http://www.farmalabor.it/certificati/F2300213.pdf' },
@@ -837,7 +856,12 @@ const INV_HARDCODED = [
   { nome:'Clobazam',                h:'H302,H361',      unit:'g',  prezzo:0,       lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
 ];
 
-// localStorage prevale sull'hardcoded
+const INV_OBBLIGATORIE = new Set(['carbone attivo','potassio ioduro','acqua depurata','acqua purificata','alcool etilico','etanolo']);
+
+function invNominalizza(s) {
+  return (s||'').toLowerCase().replace(/[àáâ]/g,'a').replace(/[èéê]/g,'e').replace(/[ìí]/g,'i').replace(/[òó]/g,'o').replace(/[ùú]/g,'u').trim();
+}
+
 function invLoadMerged() {
   const stored = invLoad();
   const merged = INV_HARDCODED.map(h => ({ ...h, _hardcoded: true }));
@@ -849,7 +873,6 @@ function invLoadMerged() {
   return merged;
 }
 
-// Cerca prezzo nell'inventario (inventario > Allegato A)
 function invGetPrezzo(nomeSostanza) {
   const q = invNominalizza(nomeSostanza);
   const merged = invLoadMerged();
@@ -860,13 +883,48 @@ function invGetPrezzo(nomeSostanza) {
   return null;
 }
 
+// ── Dropdown ricerca sostanza ──
+function invFiltraSostanze() {
+  const q  = invNominalizza(document.getElementById('inv-cerca').value);
+  const dd = document.getElementById('inv-dropdown');
+  const hcNomi  = INV_HARDCODED.map(s => ({ nome: s.nome, h: s.h || '', src: 'inv' }));
+  const allNomi = Object.keys(ALLEGATO_A)
+    .filter(k => !INV_HARDCODED.find(h => invNominalizza(h.nome) === invNominalizza(k)))
+    .map(k => ({ nome: k.charAt(0).toUpperCase() + k.slice(1), h: '', src: 'all' }));
+  const tutti = [...hcNomi, ...allNomi];
+  const obblig  = tutti.filter(s => INV_OBBLIGATORIE.has(invNominalizza(s.nome)));
+  const altri   = tutti.filter(s => !INV_OBBLIGATORIE.has(invNominalizza(s.nome)));
+  const ordinate = [...obblig, ...altri];
+  const filtrate = q ? ordinate.filter(s => invNominalizza(s.nome).includes(q)) : ordinate;
+  if (!filtrate.length) { dd.style.display = 'none'; return; }
+  dd.innerHTML = filtrate.slice(0, 40).map(s => {
+    const isObb = INV_OBBLIGATORIE.has(invNominalizza(s.nome));
+    const isInv = s.src === 'inv';
+    const b1 = isObb ? '<span style="background:#fff0c0;color:#7a4a00;border:1px solid #e8c840;border-radius:3px;font-size:10px;padding:1px 5px;margin-left:6px">⚕ obbligatoria</span>' : '';
+    const b2 = isInv ? '<span style="background:var(--accent-light);color:var(--accent);border:1px solid #c4d9c0;border-radius:3px;font-size:10px;padding:1px 5px;margin-left:4px">inv</span>' : '';
+    return `<div onmousedown="invSelezionaSostanza('${s.nome.replace(/'/g,"\\'")}','${s.h}')"
+      style="padding:7px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center"
+      onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background=''">
+      <span style="flex:1">${s.nome}</span>${b1}${b2}</div>`;
+  }).join('');
+  dd.style.display = 'block';
+}
+
+function invSelezionaSostanza(nome, h) {
+  document.getElementById('inv-cerca').value    = nome;
+  document.getElementById('inv-sel-nome').value = nome;
+  document.getElementById('inv-sel-h').value    = h;
+  document.getElementById('inv-dropdown').style.display = 'none';
+  const hc = INV_HARDCODED.find(s => invNominalizza(s.nome) === invNominalizza(nome));
+  if (hc && hc.unit) document.getElementById('inv-unit').value = hc.unit;
+}
+
 function popolaPASuggestions() {
   const dl = document.getElementById('pa-suggestions');
   if (!dl) return;
   const invNomi = INV_HARDCODED.map(s => s.nome);
   const allNomi = Object.keys(ALLEGATO_A).map(k => k.charAt(0).toUpperCase() + k.slice(1));
-  const tutti = [...new Set([...invNomi, ...allNomi])];
-  dl.innerHTML = tutti.map(k => '<option value="' + k + '">').join('');
+  dl.innerHTML = [...new Set([...invNomi, ...allNomi])].map(k => '<option value="' + k + '">').join('');
 }
 
 function sincronizzaPA() {
@@ -1009,18 +1067,8 @@ function sincronizzaTariffazione() {
     if (trovato) {
       const paEl = document.getElementById('t-pa');
       const fonteEl = document.getElementById('t-pa-fonte');
-      if (paEl) {
-        paEl.value = trovato.prezzo.toFixed(4);
-        paEl.readOnly = trovato.fonte === 'allegatoA';
-        paEl.style.background = trovato.fonte === 'allegatoA' ? 'var(--accent-light)' : 'var(--bg)';
-        paEl.style.color = trovato.fonte === 'allegatoA' ? 'var(--accent)' : 'var(--text)';
-      }
-      if (fonteEl) {
-        fonteEl.innerHTML = trovato.fonte === 'allegatoA'
-          ? '<strong style="color:var(--accent)">✓ Allegato A — €'+trovato.prezzo.toFixed(4)+'/g (obbligatorio)</strong>'
-          : '<strong style="color:var(--accent-mid)">✓ Inventario — €'+trovato.prezzo.toFixed(4)+'/g (Art. 5)</strong>';
-        tarPADaAllegatoA = trovato.fonte === 'allegatoA';
-      }
+      if (paEl) { paEl.value = trovato.prezzo.toFixed(4); paEl.readOnly = trovato.fonte==='allegatoA'; paEl.style.background = trovato.fonte==='allegatoA'?'var(--accent-light)':'var(--bg)'; }
+      if (fonteEl) { fonteEl.innerHTML = trovato.fonte==='allegatoA' ? '<strong style="color:var(--accent)">✓ Allegato A — €'+trovato.prezzo.toFixed(4)+'/g (obbligatorio)</strong>' : '<strong style="color:var(--accent-mid)">✓ Inventario — €'+trovato.prezzo.toFixed(4)+'/g (Art. 5)</strong>'; tarPADaAllegatoA = trovato.fonte==='allegatoA'; }
       if (document.getElementById('t-pa-nome')) document.getElementById('t-pa-nome').value = nomePA;
     }
   }
@@ -1031,17 +1079,14 @@ function sincronizzaTariffazione() {
     setTipoTariff(mapTipo[tipoPrep], tarBtns[mapIdx[mapTipo[tipoPrep]]]);
   }
   if (tipoPrep !== 'capsule') {
-    if (document.getElementById('t-qt'))      document.getElementById('t-qt').value = document.getElementById('qt').value;
-    if (document.getElementById('t-conc'))    document.getElementById('t-conc').value = document.getElementById('conc').value;
-    if (document.getElementById('t-et-perc') && document.getElementById('perc-et'))
-      document.getElementById('t-et-perc').value = document.getElementById('perc-et').value;
+    if (document.getElementById('t-qt'))   document.getElementById('t-qt').value   = document.getElementById('qt').value;
+    if (document.getElementById('t-conc')) document.getElementById('t-conc').value = document.getElementById('conc').value;
+    if (document.getElementById('t-et-perc') && document.getElementById('perc-et')) document.getElementById('t-et-perc').value = document.getElementById('perc-et').value;
     const etInv = invGetPrezzo('etanolo');
     if (etInv && document.getElementById('t-et')) document.getElementById('t-et').value = etInv.prezzo.toFixed(5);
   } else {
-    if (document.getElementById('t-ncaps') && document.getElementById('n-caps'))
-      document.getElementById('t-ncaps').value = document.getElementById('n-caps').value;
-    if (document.getElementById('t-mgpa') && document.getElementById('mg-pa-cps'))
-      document.getElementById('t-mgpa').value = document.getElementById('mg-pa-cps').value;
+    if (document.getElementById('t-ncaps') && document.getElementById('n-caps')) document.getElementById('t-ncaps').value = document.getElementById('n-caps').value;
+    if (document.getElementById('t-mgpa')  && document.getElementById('mg-pa-cps')) document.getElementById('t-mgpa').value  = document.getElementById('mg-pa-cps').value;
   }
   calcTariff();
 }
@@ -1916,7 +1961,7 @@ function compilaScheda() {
     }
   }
 
-  // 5. Lotti da Inventario (merged: hardcoded + localStorage)
+  // 5. Lotti da Inventario (merged: hardcoded + localStorage + Gist)
   const inv = invLoadMerged();
 
   function trovaCognomeLotto(keywords) {
@@ -1956,12 +2001,90 @@ function compilaScheda() {
 // INVENTARIO
 // ═══════════════════════════════════════════
 
-const INV_KEY = 'gal_inventario_v1';
+const INV_KEY   = 'gal_inventario_v1';
+const GH_TOKEN_KEY = 'gal_gh_token';
+const GIST_ID   = '6e97567a6b7e6408930936807c327144';
+const GIST_FILE = 'galenico_inventario.json';
+
+// ── Token GitHub ──
+function ghGetToken() { return localStorage.getItem(GH_TOKEN_KEY) || ''; }
+
+function ghSalvaToken() {
+  const t = document.getElementById('gh-token-input').value.trim();
+  if (!t) { ghStatus('⚠ Token vuoto', 'var(--warn)'); return; }
+  localStorage.setItem(GH_TOKEN_KEY, t);
+  document.getElementById('gh-token-input').value = '●'.repeat(12);
+  ghStatus('✓ Token salvato — sincronizzo inventario...', 'var(--accent)');
+  invSyncFromGist();
+}
+
+function ghMostraToken() {
+  const el = document.getElementById('gh-token-input');
+  const t  = ghGetToken();
+  el.value = el.type === 'password' ? t : '●'.repeat(12);
+  el.type  = el.type === 'password' ? 'text' : 'password';
+}
+
+function ghCaricaToken() {
+  const t = ghGetToken();
+  const el = document.getElementById('gh-token-input');
+  if (el) el.value = t ? '●'.repeat(12) : '';
+  if (t) ghStatus('✓ Token presente — inventario sincronizzato via Gist', 'var(--accent)');
+}
+
+function ghStatus(msg, color) {
+  const el = document.getElementById('gh-token-status');
+  if (el) { el.textContent = msg; el.style.color = color || 'var(--text-faint)'; }
+}
+
+// ── Sync Gist ──
+async function invSyncFromGist() {
+  const token = ghGetToken();
+  if (!token) return; // nessun token → solo localStorage
+  ghStatus('⟳ Carico inventario da Gist...', 'var(--text-faint)');
+  try {
+    const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const content = data.files[GIST_FILE]?.content || '[]';
+    const remote = JSON.parse(content);
+    localStorage.setItem(INV_KEY, JSON.stringify(remote));
+    ghStatus('✓ Inventario aggiornato da Gist (' + remote.length + ' voci)', 'var(--accent)');
+    invRender();
+  } catch(e) {
+    ghStatus('⚠ Errore Gist: ' + e.message, 'var(--warn)');
+  }
+}
+
+async function invSyncToGist(data) {
+  const token = ghGetToken();
+  if (!token) return; // nessun token → solo localStorage
+  try {
+    await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(data, null, 2) } } })
+    });
+    ghStatus('✓ Inventario salvato su Gist', 'var(--accent)');
+  } catch(e) {
+    ghStatus('⚠ Salvataggio Gist fallito: ' + e.message, 'var(--warn)');
+  }
+}
 
 function invLoad() {
   try { return JSON.parse(localStorage.getItem(INV_KEY) || '[]'); } catch { return []; }
 }
-function invSave(d) { localStorage.setItem(INV_KEY, JSON.stringify(d)); }
+
+function invSave(d) {
+  localStorage.setItem(INV_KEY, JSON.stringify(d));
+  invSyncToGist(d); // salva anche su Gist in background
+}
 
 function invParseQR() {
   const raw = document.getElementById('inv-qr-raw').value.trim();
@@ -2028,73 +2151,15 @@ function invCalcolaPrezzoMod() {
   }
 }
 
-// ── SOSTANZE OBBLIGATORIE (dotazione FU XII) ──
-const INV_OBBLIGATORIE = new Set([
-  'carbone attivo', 'potassio ioduro', 'acqua depurata', 'acqua purificata', 'alcool etilico', 'etanolo'
-]);
-
-function invNominalizza(s) {
-  return s.toLowerCase().replace(/[àáâ]/g,'a').replace(/[èéê]/g,'e').replace(/[ìí]/g,'i').replace(/[òó]/g,'o').replace(/[ùú]/g,'u').trim();
-}
-
-function invFiltraSostanze() {
-  const q     = invNominalizza(document.getElementById('inv-cerca').value);
-  const dd    = document.getElementById('inv-dropdown');
-
-  // Costruisci lista: INV_HARDCODED + ALLEGATO_A (senza doppioni)
-  const hcNomi = INV_HARDCODED.map(s => ({ nome: s.nome, h: s.h || '', src: 'inv' }));
-  const allNomi = Object.keys(ALLEGATO_A)
-    .filter(k => !INV_HARDCODED.find(h => invNominalizza(h.nome) === invNominalizza(k)))
-    .map(k => ({ nome: k.charAt(0).toUpperCase() + k.slice(1), h: '', src: 'all' }));
-  const tutti = [...hcNomi, ...allNomi];
-
-  // Obbligatorie in cima se nessuna query
-  const obblig = tutti.filter(s => INV_OBBLIGATORIE.has(invNominalizza(s.nome)));
-  const altri  = tutti.filter(s => !INV_OBBLIGATORIE.has(invNominalizza(s.nome)));
-  const ordinate = [...obblig, ...altri];
-
-  const filtrate = q
-    ? ordinate.filter(s => invNominalizza(s.nome).includes(q))
-    : ordinate;
-
-  if (!filtrate.length) { dd.style.display = 'none'; return; }
-
-  dd.innerHTML = filtrate.slice(0, 40).map(s => {
-    const isObb  = INV_OBBLIGATORIE.has(invNominalizza(s.nome));
-    const isInv  = s.src === 'inv';
-    const badge  = isObb  ? '<span style="background:#fff0c0;color:#7a4a00;border:1px solid #e8c840;border-radius:3px;font-size:10px;padding:1px 5px;margin-left:6px">⚕ obbligatoria</span>' : '';
-    const badge2 = isInv  ? '<span style="background:var(--accent-light);color:var(--accent);border:1px solid #c4d9c0;border-radius:3px;font-size:10px;padding:1px 5px;margin-left:4px">inv</span>' : '';
-    return `<div data-nome="${s.nome}" data-h="${s.h}"
-      onmousedown="invSelezionaSostanza('${s.nome.replace(/'/g,"\\'")}','${s.h}')"
-      style="padding:7px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:4px"
-      onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background=''">
-      <span style="flex:1">${s.nome}</span>${badge}${badge2}
-    </div>`;
-  }).join('');
-
-  dd.style.display = 'block';
-}
-
-function invSelezionaSostanza(nome, h) {
-  document.getElementById('inv-cerca').value    = nome;
-  document.getElementById('inv-sel-nome').value = nome;
-  document.getElementById('inv-sel-h').value    = h;
-  document.getElementById('inv-dropdown').style.display = 'none';
-  // precompila unità dal hardcoded se disponibile
-  const hc = INV_HARDCODED.find(s => invNominalizza(s.nome) === invNominalizza(nome));
-  if (hc && hc.unit) document.getElementById('inv-unit').value = hc.unit;
-}
-
 function invAggiungi() {
-  const nomeHidden  = document.getElementById('inv-sel-nome').value.trim();
-  const nomeLibero  = document.getElementById('inv-nome-libero').value.trim();
+  const nomeHidden = (document.getElementById('inv-sel-nome') ? document.getElementById('inv-sel-nome').value.trim() : '');
+  const nomeLibero = document.getElementById('inv-nome-libero').value.trim();
   const nome = nomeHidden || nomeLibero;
-  const h    = document.getElementById('inv-sel-h').value || '';
+  const h    = (document.getElementById('inv-sel-h') ? document.getElementById('inv-sel-h').value : '') || '';
   if (!nome) { alert('Seleziona o inserisci una sostanza.'); return; }
 
   const item = {
-    nome,
-    h,
+    nome, h,
     lotto:       document.getElementById('inv-lotto').value.trim(),
     lottoInt:    document.getElementById('inv-lotto-int').value.trim(),
     scad:        document.getElementById('inv-scad').value,
@@ -2115,8 +2180,8 @@ function invAggiungi() {
   invSave(inv);
 
   // reset campi
-  ['inv-lotto','inv-lotto-int','inv-scad','inv-qty',
-   'inv-nome-libero','inv-ddt-num','inv-ddt-data','inv-data-ap','inv-data-ch','inv-sds','inv-prezzo','inv-prezzo-bolla',
+  ['inv-lotto','inv-lotto-int','inv-scad','inv-qty','inv-nome-libero',
+   'inv-ddt-num','inv-ddt-data','inv-data-ap','inv-data-ch','inv-sds','inv-prezzo','inv-prezzo-bolla',
    'inv-cerca','inv-sel-nome','inv-sel-h']
     .forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('inv-unit').value = 'g';
@@ -2224,25 +2289,21 @@ function invRender() {
   const tra60  = new Date(); tra60.setDate(tra60.getDate()+60);
   const alerts = document.getElementById('inv-alerts');
   const lista  = document.getElementById('inv-lista');
-
-  // alert scadenze
   const allItems = invLoadMerged();
   const scaduti = allItems.filter(i => i.scad && new Date(i.scad+'-01') < oggi);
   const inScad  = allItems.filter(i => { if(!i.scad) return false; const d=new Date(i.scad+'-01'); return d>=oggi && d<tra60; });
   let aHtml = '';
   if (scaduti.length) aHtml += `<div class="alert-scad err">⚠ <strong>SCADUTI:</strong> ${scaduti.map(s=>s.nome).join(', ')}</div>`;
-  if (inScad.length)  aHtml += `<div class="alert-scad warn">⚡ <strong>In scadenza entro 60 giorni:</strong> ${inScad.map(s=>s.nome+' ('+fmtMese(s.scad)+')').join(', ')}</div>`;
+  if (inScad.length)  aHtml += `<div class="alert-scad warn">⚡ <strong>In scadenza entro 60gg:</strong> ${inScad.map(s=>s.nome+' ('+fmtMese(s.scad)+')').join(', ')}</div>`;
   alerts.innerHTML = aHtml;
 
   const storedNomi = stored.map(s => invNominalizza(s.nome));
   const hardcodedSenzaLS = INV_HARDCODED.filter(h => !storedNomi.includes(invNominalizza(h.nome)));
-
   let rows = '';
 
-  // ── voci localStorage (modificabili/eliminabili) ──
   stored.forEach((item, lsIdx) => {
     const scadData = item.scad ? new Date(item.scad+'-01') : null;
-    let cls = scadData && scadData < oggi ? 'scaduto' : (scadData && scadData < tra60 ? 'in-scadenza' : '');
+    const cls = scadData && scadData < oggi ? 'scaduto' : (scadData && scadData < tra60 ? 'in-scadenza' : '');
     const scadIcon = cls==='scaduto' ? '⚠ ' : cls==='in-scadenza' ? '⚡ ' : '';
     const isObb = INV_OBBLIGATORIE.has(invNominalizza(item.nome));
     const hTags = item.h ? item.h.split(',').map(s=>s.trim()).filter(Boolean).map(s=>`<span class="tag-h">${s}</span>`).join('') : '';
@@ -2260,11 +2321,9 @@ function invRender() {
         ${item.sds?`<a href="${item.sds}" target="_blank" title="SDS" style="text-decoration:none;font-size:15px;margin-right:6px">📄</a>`:'<span style="display:inline-block;width:21px;margin-right:6px"></span>'}
         <button class="btn-del" style="margin-right:4px;border-color:#a0b8a0;color:var(--accent)" onclick="invModifica(${lsIdx})">✏</button>
         <button class="btn-del" onclick="invElimina(${lsIdx})">✕</button>
-      </td>
-    </tr>`;
+      </td></tr>`;
   });
 
-  // ── voci hardcoded senza lotto (sola lettura) ──
   if (hardcodedSenzaLS.length) {
     rows += `<tr><td colspan="8" style="padding:6px 8px;font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;background:var(--bg);border-top:2px solid var(--border)">Sostanze predefinite — aggiungi un lotto per registrarle</td></tr>`;
     hardcodedSenzaLS.forEach(item => {
@@ -2281,19 +2340,12 @@ function invRender() {
         <td class="inv-scad">${item.scad?fmtMese(item.scad):'—'}</td>
         <td class="inv-qty">—</td>
         <td class="inv-qty">${item.prezzo?`<div class="inv-sub">€ ${item.prezzo.toFixed(4)}/${item.unit}</div>`:'<span class="inv-sub">—</span>'}</td>
-        <td style="font-size:10px;font-family:var(--mono);color:var(--text-faint)">predefinita</td>
-      </tr>`;
+        <td style="font-size:10px;font-family:var(--mono);color:var(--text-faint)">predefinita</td></tr>`;
     });
   }
 
-  if (!rows) {
-    lista.innerHTML = '<div style="color:var(--text-faint);font-size:13px;padding:1rem 0;text-align:center">Nessuna sostanza registrata</div>';
-    return;
-  }
-
-  lista.innerHTML = `<table class="inv-table">
-    <thead><tr><th>Sostanza</th><th>Lotto fornitore / interno</th><th>DDT</th><th>Apertura</th><th>Scadenza</th><th>Qtà</th><th>Prezzo</th><th></th></tr></thead>
-    <tbody>${rows}</tbody></table>`;
+  if (!rows) { lista.innerHTML = '<div style="color:var(--text-faint);font-size:13px;padding:1rem 0;text-align:center">Nessuna sostanza registrata</div>'; return; }
+  lista.innerHTML = `<table class="inv-table"><thead><tr><th>Sostanza</th><th>Lotto fornitore / interno</th><th>DDT</th><th>Apertura</th><th>Scadenza</th><th>Qtà</th><th>Prezzo</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function fmtMese(ym) {
@@ -2393,6 +2445,7 @@ function stampaDymo() {
   });
 }
 
+// init inventario
 // ═══════════════════════════════════════════
 // FORMULARIO AI
 // ═══════════════════════════════════════════
@@ -2698,7 +2751,8 @@ showPage = function(id, btn) {
 };
 
 // ── INIT ──
-invRender();
+ghCaricaToken();
+invSyncFromGist().then(() => invRender()).catch(() => invRender());
 etiqAggiorna();
 aiCaricaKey();
 popolaPASuggestions();
