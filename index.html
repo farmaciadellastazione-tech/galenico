@@ -409,7 +409,7 @@
 
   <div class="card">
     <div class="card-title">Operazioni e supplementi</div>
-    <div class="field-row"><span class="field-label">Componenti aggiuntivi</span><input type="number" id="t-comp" value="0" step="1" min="0" max="4" oninput="calcTariff()"><span class="field-note">×€0,60 cad. (max 4)</span></div>
+    <div class="field-row"><span class="field-label">Componenti aggiuntivi</span><input type="number" id="t-comp" value="0" step="1" min="0" max="4" oninput="calcTariff()"><span class="field-note">oltre PA (etanolo auto)</span></div>
     <div class="field-row"><span class="field-label">Op. tecnologiche aggiuntive</span><input type="number" id="t-op" value="0" step="1" min="0" max="10" oninput="calcTariff()"><span class="field-note">×€2,30 cad.</span></div>
     <div class="field-row"><span class="field-label">Supplemento stupefacenti (Art. 8b)</span><input type="number" id="t-stupp" value="0" step="1" min="0" max="3" oninput="calcTariff()"><span class="field-note">×€2,50 cad.</span></div>
     <div class="field-row"><span class="field-label">Supplemento doping (Art. 8c)</span><input type="number" id="t-dop" value="0" step="1" min="0" max="1" oninput="calcTariff()"><span class="field-note">×€2,50</span></div>
@@ -1383,7 +1383,10 @@ function tarForzaManuale() {
 function calcTariff() {
   const pPA   = parseFloat(document.getElementById('t-pa').value)||0;
   const pFL   = parseFloat(document.getElementById('t-fl').value)||0;
-  const comp  = parseInt(document.getElementById('t-comp').value)||0;
+  const compManuale = parseInt(document.getElementById('t-comp').value)||0;
+  const percEtTariff = parseFloat(document.getElementById('t-et-perc')?.value)||0;
+  const compAutoEt = (tipoTariff === 'liquida' && percEtTariff > 0) ? 1 : 0;
+  const comp = compManuale + compAutoEt;
   const op    = parseInt(document.getElementById('t-op').value)||0;
   const stupp = parseInt(document.getElementById('t-stupp').value)||0;
   const dop   = parseInt(document.getElementById('t-dop').value)||0;
@@ -2202,7 +2205,7 @@ function invModifica(lsIdx) {
   // Trova la riga e sostituiscila con un form inline
   const tbody = lista.querySelector('tbody');
   const rows = tbody.querySelectorAll('tr');
-  const tr = rows[idx];
+  const tr = rows[lsIdx];
 
   tr.innerHTML = `
     <td colspan="7" style="padding:10px 8px;background:var(--accent-light);border-radius:var(--radius)">
