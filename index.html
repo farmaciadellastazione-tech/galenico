@@ -823,6 +823,7 @@ function showPage(id, btn) {
   document.getElementById('page-' + id).classList.add('active');
   btn.classList.add('active');
   if (id === 'scheda') aggiornaScheda();
+  if (id === 'etichette') etiqDaScheda();
 }
 
 function setTipo(t, btn) {
@@ -1943,7 +1944,7 @@ function getLastNumScheda() {
 
 function compilaScheda() {
   try {
-  const numScheda = getNextNumScheda();
+  const numScheda = getLastNumScheda() === '2026/000' ? getNextNumScheda() : getLastNumScheda();
   document.getElementById('s-num').value = numScheda;
 
   // 2. Sincronizza tipo da Preparazione → Scheda
@@ -2439,16 +2440,30 @@ function etiqDaScheda() {
   const mesi    = document.getElementById('s-mesi').value;
   const prezzo  = document.getElementById('s-prezzo').value;
 
+  // unità in base al tipo
+  const unitaQt = (tipoScheda === 'soluzione' || tipoScheda === 'sospensione') ? ' ml' :
+                  tipoScheda === 'capsule' ? ' cps' : ' g';
+
   if (prep)    document.getElementById('e-nome').value = prep;
-  if (qt)      document.getElementById('e-qty').value  = qt+' ml';
-  if (paz && paz) document.getElementById('e-paziente').value = paz;
+  if (qt)      document.getElementById('e-qty').value  = qt + unitaQt;
+  if (paz)     document.getElementById('e-paziente').value = paz;
   if (mesi)    document.getElementById('e-mesi').value = mesi;
   if (prezzo)  document.getElementById('e-prezzo').value = prezzo;
   if (dataVal) {
     const [y,m,g] = dataVal.split('-');
     document.getElementById('e-data').value = g+'/'+m+'/'+y;
   }
-  document.getElementById('e-h').value = 'H302, H318, H335';
+
+  // uso esterno/interno in base al tipo scheda
+  const usoEl = document.getElementById('e-uso');
+  if (usoEl) {
+    if (tipoScheda === 'capsule' || tipoScheda === 'polvere') usoEl.value = 'USO ORALE';
+    else usoEl.value = 'USO ESTERNO';
+  }
+
+  // frasi H: cerca nel campo scheda o usa default vuoto
+  const hField = document.getElementById('s-h-note');
+  document.getElementById('e-h').value = (hField && hField.value) ? hField.value : '';
   etiqAggiorna();
 }
 
@@ -2662,9 +2677,12 @@ function archLoad() {
 function archSave(d) { localStorage.setItem(ARCH_KEY, JSON.stringify(d)); }
 
 function salvaInArchivio() {
+  // Incrementa il numero scheda solo al salvataggio definitivo
+  const nuovoNum = getNextNumScheda();
+  document.getElementById('s-num').value = nuovoNum;
   const scheda = {
     id: Date.now(),
-    num:    document.getElementById('s-num').value,
+    num: nuovoNum,
     prep:   document.getElementById('s-prep').value,
     tipo:   tipoScheda,
     qt:     document.getElementById('s-qt').value,
