@@ -941,7 +941,7 @@ function popolaPASuggestions() {
 function sincronizzaPA() {
   const nome = document.getElementById('prep-pa-nome').value.trim();
   const tNome = document.getElementById('t-pa-nome');
-  if (tNome && nome) { tNome.value = nome; tarRicercaPA(); }
+  if (tNome && nome && nome.length >= 8) { tNome.value = nome; tarRicercaPA(); }
   sincronizzaTariffazione();
 }
 
@@ -1367,7 +1367,7 @@ function tarRicercaPA() {
   const fonte = document.getElementById('t-pa-fonte');
   const inputPA = document.getElementById('t-pa');
 
-  if (!q) { sug.innerHTML = ''; fonte.textContent = ''; tarPADaAllegatoA = false; return; }
+  if (!q || q.length < 8) { sug.innerHTML = ''; fonte.textContent = ''; return; }
 
   // Cerca corrispondenza esatta
   const esatta = ALLEGATO_A[q];
