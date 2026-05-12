@@ -1994,14 +1994,12 @@ function compilaScheda() {
     if (document.getElementById('s-eccip')) document.getElementById('s-eccip').value = eccip;
   }
 
-  // 4. Prezzo da Tariffazione (legge il totale già calcolato)
-  const totEl = document.getElementById('tariff-totale');
-  if (totEl && totEl.textContent) {
-    const match = totEl.textContent.match(/[\d,]+/);
-    if (match) {
-      const prezzo = parseFloat(match[0].replace(',', '.'));
-      if (!isNaN(prezzo)) document.getElementById('s-prezzo').value = prezzo.toFixed(2);
-    }
+  // 4. Prezzo da Tariffazione — legge l'ultimo elemento .totale-num (prezzo al pubblico)
+  const totNums = document.querySelectorAll('#tariff-totale .totale-num');
+  if (totNums.length > 0) {
+    const prezzoTxt = totNums[totNums.length-1].textContent.replace('€','').replace(',','.').trim();
+    const prezzo = parseFloat(prezzoTxt);
+    if (!isNaN(prezzo) && prezzo > 0) document.getElementById('s-prezzo').value = prezzo.toFixed(2);
   }
 
   // 5. Lotti da Inventario (merged: hardcoded + localStorage + Gist)
@@ -2036,8 +2034,8 @@ function compilaScheda() {
 
   // 7. Aggiorna la scheda e naviga
   aggiornaScheda();
-  const navBtns = document.querySelectorAll('.nav-btn');
-  showPage('scheda', navBtns[2]);
+  const schedaBtn = document.querySelector('.nav-btn[onclick*="scheda"]');
+  if (schedaBtn) showPage('scheda', schedaBtn);
 }
 
 // ═══════════════════════════════════════════
