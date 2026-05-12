@@ -373,8 +373,19 @@
 
   <div class="card">
     <div class="card-title">Altri costi materie prime (netto IVA)</div>
-    <div class="field-row" id="tt-row-et"><span class="field-label">Etanolo 96° (€/ml)</span><input type="number" id="t-et" value="" step="0.00001" min="0" oninput="calcTariff()"><span class="field-note">prezzo acquisto</span></div>
-    <div class="field-row"><span class="field-label">Flacone / recipiente (€ cad.)</span><input type="number" id="t-fl" value="" step="0.01" min="0" oninput="calcTariff()"><span class="field-note">al costo, All. B nota 2</span></div>
+    <div class="field-row" id="tt-row-et"><span class="field-label">Etanolo 96° (€/ml)</span><input type="number" id="t-et" value="" step="0.00001" min="0" oninput="calcTariff()"><span class="field-note" id="t-et-fonte">prezzo acquisto</span></div>
+    <div class="field-row">
+      <span class="field-label">Flacone / recipiente (€ cad.)</span>
+      <input type="number" id="t-fl" value="" step="0.01" min="0" oninput="calcTariff()">
+      <span class="field-note" id="t-fl-fonte">al costo</span>
+    </div>
+    <div class="field-row" style="align-items:flex-start">
+      <span class="field-label">Cerca flacone in inventario</span>
+      <div style="flex:1">
+        <input type="text" id="t-fl-cerca" placeholder="es. flacone 125" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)" oninput="tarCercaFlacone()">
+        <div id="t-fl-suggerimenti" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px"></div>
+      </div>
+    </div>
     <div style="margin-top:0.75rem;border-top:1px solid var(--border);padding-top:0.75rem">
       <div class="tariff-group-title">Componenti extra non in All. A (Art. 5) — fino a 3</div>
       <div id="tt-extra-rows">
@@ -937,16 +948,18 @@ function sincronizzaPA() {
 function calcPrep() {
   const qt   = parseFloat(document.getElementById('qt').value) || 100;
   const conc = parseFloat(document.getElementById('conc').value) || 2;
-  const percEt = parseFloat(document.getElementById('perc-et').value) || 70;
+  const percEt = parseFloat(document.getElementById('perc-et').value) || 0;
   const grPA = qt * conc / 100;
   const mlET = tipoPrep === 'soluzione' ? qt * percEt / 100 : 0;
+  // ml di etanolo 96° necessari per ottenere percEt% in qt ml
+  const mlET96 = tipoPrep === 'soluzione' && percEt > 0 ? (qt * percEt / 96) : 0;
   let items = [], proc = [], alertSolub = '';
 
   if (tipoPrep === 'soluzione') {
     const idroalcolica = percEt > 0;
     items = idroalcolica ? [
       {name:'Principio attivo', val:fmt(grPA,2), unit:'g'},
-      {name:'Etanolo '+percEt+'°', val:fmt(mlET,1), unit:'ml'},
+      {name:'Etanolo 96°', val:fmt(mlET96,1), unit:'ml'},
       {name:'Acqua purificata', val:'q.b. a '+qt, unit:'ml'},
     ] : [
       {name:'Principio attivo', val:fmt(grPA,2), unit:'g'},
@@ -954,7 +967,7 @@ function calcPrep() {
     ];
     proc = idroalcolica ? [
       'Pesare <strong>'+fmt(grPA,2)+' g</strong> di principio attivo su bilancia analitica.',
-      'Sciogliere in <strong>'+fmt(mlET,1)+' ml</strong> di etanolo '+percEt+'°.',
+      'Sciogliere in <strong>'+fmt(mlET96,1)+' ml</strong> di etanolo 96°.',
       'Trasferire in matraccio tarato da <strong>'+qt+' ml</strong>.',
       'Portare a volume con acqua purificata q.b. a '+qt+' ml, mescolando.',
       'Verificare limpidezza. Filtrare su carta da filtro se necessario.',
@@ -1083,7 +1096,11 @@ function sincronizzaTariffazione() {
     if (document.getElementById('t-conc')) document.getElementById('t-conc').value = document.getElementById('conc').value;
     if (document.getElementById('t-et-perc') && document.getElementById('perc-et')) document.getElementById('t-et-perc').value = document.getElementById('perc-et').value;
     const etInv = invGetPrezzo('etanolo');
-    if (etInv && document.getElementById('t-et')) document.getElementById('t-et').value = etInv.prezzo.toFixed(5);
+    if (etInv && document.getElementById('t-et')) {
+      document.getElementById('t-et').value = etInv.prezzo.toFixed(5);
+      const src = document.getElementById('t-et-fonte');
+      if (src) { src.textContent = 'da inventario'; src.style.color = 'var(--accent)'; }
+    }
   } else {
     if (document.getElementById('t-ncaps') && document.getElementById('n-caps')) document.getElementById('t-ncaps').value = document.getElementById('n-caps').value;
     if (document.getElementById('t-mgpa')  && document.getElementById('mg-pa-cps')) document.getElementById('t-mgpa').value  = document.getElementById('mg-pa-cps').value;
@@ -1318,6 +1335,29 @@ function tarCercaPA(nome) {
     .filter(([k]) => k.includes(q) || q.includes(k.split(' ')[0]))
     .sort((a,b) => a[0].length - b[0].length)
     .slice(0, 6);
+}
+
+function tarCercaFlacone() {
+  const q = (document.getElementById('t-fl-cerca').value||'').toLowerCase().trim();
+  const dd = document.getElementById('t-fl-suggerimenti');
+  if (!q) { dd.innerHTML = ''; return; }
+  const inv = invLoadMerged();
+  const matches = inv.filter(s =>
+    invNominalizza(s.nome).includes(invNominalizza(q)) && s.prezzo > 0
+  ).slice(0, 8);
+  if (!matches.length) { dd.innerHTML = '<span style="font-size:12px;color:var(--text-faint)">Nessun risultato</span>'; return; }
+  dd.innerHTML = matches.map(s =>
+    `<button onclick="tarSelezionaFlacone('${s.nome.replace(/'/g,"\\'")}',${s.prezzo})" style="font-size:12px;font-family:var(--mono);padding:3px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">${s.nome} — €${s.prezzo.toFixed(2)}</button>`
+  ).join('');
+}
+
+function tarSelezionaFlacone(nome, prezzo) {
+  document.getElementById('t-fl').value = prezzo.toFixed(2);
+  document.getElementById('t-fl-cerca').value = nome;
+  document.getElementById('t-fl-suggerimenti').innerHTML = '';
+  document.getElementById('t-fl-fonte').textContent = 'da inventario';
+  document.getElementById('t-fl-fonte').style.color = 'var(--accent)';
+  calcTariff();
 }
 
 function tarRicercaPA() {
@@ -1644,13 +1684,13 @@ function aggiornaScheda() {
     const conc   = parseFloat(document.getElementById('s-conc').value)||0;
     const percEt = parseFloat(document.getElementById('s-et').value)||0;
     const grPA   = qt*conc/100;
-    const mlET   = qt*percEt/100;
-    const nFlac  = Math.ceil(qt/100);
+    const mlET96s = percEt > 0 ? qt*percEt/96 : 0;
+    const nFlac  = 1;
     const pET    = parseFloat(document.getElementById('t-et').value)||0;
 
     formulaItems = [
       {nome:nomePA, val:fmt(grPA,2), unit:'g'},
-      {nome:'Etanolo '+percEt+'°', val:fmt(mlET,1), unit:'ml'},
+      ...(percEt>0?[{nome:'Etanolo 96°', val:fmt(mlET96s,1), unit:'ml'}]:[]),
       {nome:'Acqua purificata', val:'q.b. a '+qt, unit:'ml'},
       {nome:'Flacone ambrato', val:String(nFlac), unit:'pz'},
     ];
