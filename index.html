@@ -1696,7 +1696,7 @@ function aggiornaScheda() {
     ];
     proc = [
       'Pesare <strong>'+fmt(grPA,2)+' g</strong> di '+nomePA+' su bilancia analitica.',
-      'Sciogliere in <strong>'+fmt(mlET,1)+' ml</strong> di etanolo '+percEt+'°.',
+      'Sciogliere in <strong>'+fmt(mlET96s,1)+' ml</strong> di etanolo 96°.',
       'Trasferire in matraccio tarato da <strong>'+qt+' ml</strong>.',
       'Portare a volume con acqua purificata q.b. a '+qt+' ml, mescolando.',
       'Verificare limpidezza. Filtrare su carta da filtro se necessario.',
@@ -1707,7 +1707,7 @@ function aggiornaScheda() {
       {nome:'Etanolo 96°', lotto:document.getElementById('s-lotto-et').value||'—'},
       {nome:'Acqua purificata', lotto:document.getElementById('s-lotto-ac').value||'—'},
     ];
-    costoPA = grPA*pPA; costoET = mlET*pET;
+    costoPA = grPA*pPA; costoET = mlET96s*pET;
     costoFL_s = nFlac*pFL; baseB = 6.65; nomeVoceB = 'Soluzioni (voce 1)';
 
   // ═══════════ SOSPENSIONE ═══════════
@@ -1942,7 +1942,7 @@ function getLastNumScheda() {
 // ═══════════════════════════════════════════
 
 function compilaScheda() {
-  // 1. Numerazione automatica
+  try {
   const numScheda = getNextNumScheda();
   document.getElementById('s-num').value = numScheda;
 
@@ -2036,6 +2036,7 @@ function compilaScheda() {
   aggiornaScheda();
   const schedaBtn = document.querySelector('.nav-btn[onclick*="scheda"]');
   if (schedaBtn) showPage('scheda', schedaBtn);
+  } catch(e) { alert('Errore compilaScheda: ' + e.message); }
 }
 
 // ═══════════════════════════════════════════
