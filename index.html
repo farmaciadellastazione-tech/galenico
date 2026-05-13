@@ -2046,9 +2046,27 @@ function invLoad() {
   try { return JSON.parse(localStorage.getItem(INV_KEY) || '[]'); } catch { return []; }
 }
 
-function invSave(d) {
-  localStorage.setItem(INV_KEY, JSON.stringify(d));
-  invSyncToGist(d); // salva anche su Gist in background
+async function invSave(d) {
+  localStorage.setItem(INV_KEY, JSON.stringify(d)); // cache locale immediata
+  const token = ghGetToken();
+  if (!token) {
+    ghStatus('⚠ Nessun token GitHub — dati salvati solo in locale', 'var(--warn)');
+    return;
+  }
+  try {
+    await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(d, null, 2) } } })
+    });
+    ghStatus('✓ Salvato su Gist (' + d.length + ' voci)', 'var(--accent)');
+  } catch(e) {
+    ghStatus('⚠ Gist fallito: ' + e.message + ' — dati solo in locale', 'var(--warn)');
+  }
 }
 
 function invParseQR() {
@@ -2424,7 +2442,11 @@ function stampaDymo() {
   });
 }
 
-// init inventario
+// init
+invRender();
+ghCaricaToken();
+invSyncFromGist();
+etiqAggiorna();
 // ═══════════════════════════════════════════
 // AI rimosso-e 
 </script>
