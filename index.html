@@ -2254,7 +2254,7 @@ function invElimina(lsIdx) {
   const inv = invLoad(); inv.splice(lsIdx,1); invSave(inv); invRender();
 }
 
-async function invPromuviPredefinita(nome) {
+function invPromuviPredefinita(nome) {
   const hc = INV_HARDCODED.find(h => h.nome === nome);
   if (!hc) return;
   const inv = invLoad();
@@ -2264,7 +2264,7 @@ async function invPromuviPredefinita(nome) {
     scad: hc.scad||'', dataAp: hc.dataAp||'', dataCh: '',
     ddtNum: '', ddtData: '', qty: '', prezzoBolla: 0, sds: hc.sds||''
   });
-  await invSave(inv);
+  invSave(inv);
   invRender();
   setTimeout(() => invModifica(inv.length - 1), 150);
 }
@@ -2331,7 +2331,7 @@ function invModifica(lsIdx) {
           <input id="mod-prezzo" type="number" value="${item.prezzo||''}" min="0" step="0.0001" readonly style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--accent-light);color:var(--accent);font-weight:500">
         </div>
         <div style="display:flex;align-items:flex-end;gap:6px">
-          <button onclick="invSalvaModifica(${idx})" style="font-family:var(--sans);font-size:13px;padding:5px 14px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;font-weight:500">✓ Salva</button>
+          <button onclick="invSalvaModifica(${lsIdx})" style="font-family:var(--sans);font-size:13px;padding:5px 14px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;font-weight:500">✓ Salva</button>
           <button onclick="invRender()" style="font-family:var(--sans);font-size:13px;padding:5px 10px;background:none;border:1px solid var(--border-strong);color:var(--text-muted);border-radius:var(--radius);cursor:pointer">Annulla</button>
         </div>
       </div>
