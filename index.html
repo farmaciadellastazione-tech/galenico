@@ -2177,6 +2177,23 @@ function invElimina(lsIdx) {
   const inv = invLoad(); inv.splice(lsIdx,1); invSave(inv); invRender();
 }
 
+function invPromuviPredefinita(nome) {
+  const hc = INV_HARDCODED.find(h => h.nome === nome);
+  if (!hc) return;
+  const inv = invLoad();
+  // copia i dati hardcoded in localStorage
+  inv.push({
+    nome: hc.nome, h: hc.h||'', unit: hc.unit||'g',
+    prezzo: hc.prezzo||0, lotto: hc.lotto||'', lottoInt: hc.lottoInt||'',
+    scad: hc.scad||'', dataAp: hc.dataAp||'', dataCh: '',
+    ddtNum: '', ddtData: '', qty: '', prezzoBolla: 0, sds: hc.sds||''
+  });
+  invSave(inv);
+  invRender();
+  // apre subito il form di modifica sull'ultima voce aggiunta
+  setTimeout(() => invModifica(inv.length - 1), 100);
+}
+
 function invModifica(lsIdx) {
   const inv = invLoad();
   const item = inv[lsIdx];
@@ -2315,7 +2332,8 @@ function invRender() {
       const isObb = INV_OBBLIGATORIE.has(invNominalizza(item.nome));
       const hTags = item.h ? item.h.split(',').map(s=>s.trim()).filter(Boolean).map(s=>`<span class="tag-h">${s}</span>`).join('') : '';
       const obbTag = isObb ? `<span style="background:#fff0c0;color:#7a4a00;border:1px solid #e8c840;border-radius:3px;font-size:10px;padding:1px 4px;margin-left:4px">⚕ obbligatoria</span>` : '';
-      rows += `<tr class="${cls}" style="opacity:0.6">
+      const nomeEnc = item.nome.replace(/'/g,"\\'");
+      rows += `<tr class="${cls}" style="opacity:0.75">
         <td><div class="inv-nome">${item.nome}${obbTag}</div><div>${hTags}</div></td>
         <td><div class="inv-sub">${item.lotto||'—'}</div>${item.lottoInt?`<div class="inv-sub">int: ${item.lottoInt}</div>`:''}</td>
         <td><div class="inv-sub">—</div></td>
@@ -2323,7 +2341,10 @@ function invRender() {
         <td class="inv-scad">${item.scad?fmtMese(item.scad):'—'}</td>
         <td class="inv-qty">—</td>
         <td class="inv-qty">${item.prezzo?`<div class="inv-sub">€ ${item.prezzo.toFixed(4)}/${item.unit}</div>`:'<span class="inv-sub">—</span>'}</td>
-        <td style="font-size:10px;font-family:var(--mono);color:var(--text-faint)">predefinita</td></tr>`;
+        <td style="white-space:nowrap">
+          ${item.sds?`<a href="${item.sds}" target="_blank" title="SDS" style="text-decoration:none;font-size:15px;margin-right:6px">📄</a>`:'<span style="display:inline-block;width:21px;margin-right:6px"></span>'}
+          <button class="btn-del" style="border-color:#a0b8a0;color:var(--accent)" onclick="invPromuviPredefinita('${nomeEnc}')">✏</button>
+        </td></tr>`;
     });
   }
 
