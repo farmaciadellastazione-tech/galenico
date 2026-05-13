@@ -2850,16 +2850,18 @@ const AI_KEY_LS = 'gal_groq_key';
 function aiGetSystemPrompt() {
   const inv = typeof invLoadMerged === 'function' ? invLoadMerged() : [];
   const invTxt = inv.length > 0
-    ? 'SOSTANZE DISPONIBILI IN INVENTARIO:\n' +
-      inv.map(s => '- ' + s.nome + (s.prezzo>0?' €'+s.prezzo.toFixed(4)+'/'+s.unit:'') + (s.h?' ['+s.h+']':'')).join('\n') + '\n\n'
-    : '';
+    ? 'SOSTANZE DISPONIBILI IN INVENTARIO (preferiscile quando possibile):\n' +
+      inv.map(s => '- ' + s.nome + (s.prezzo>0?' \u20ac'+s.prezzo.toFixed(4)+'/'+s.unit:'') + (s.h?' ['+s.h+']':'')).join('\n') + '\n\n'
+    : 'INVENTARIO VUOTO\n\n';
   return 'Sei un assistente farmaceutico specializzato ESCLUSIVAMENTE in galenica magistrale. ' +
     'Rispondi SOLO a domande su: preparazioni galeniche, formule farmaceutiche (FU XII), principi attivi, eccipienti, solventi, ' +
     'frasi H/P GHS, normativa italiana (D.M. 22/09/2017), calcoli di concentrazione, procedure di preparazione. ' +
     'Per qualsiasi altra domanda rispondi: "Posso rispondere solo a domande di galenica farmaceutica." ' +
-    'Quando proponi una formula rispondi SEMPRE in questo formato esatto:\n' +
-    'FORMULA:\n- [sostanza]: [quantità] [unità]\nPROCEDURA:\n1. [passo]\nNOTE: [avvertenze]\n' +
-    'Elenca ogni componente su una riga con trattino. Rispondi in italiano, conciso e preciso.\n\n' +
+    'IMPORTANTE: rispondi SEMPRE con la formula completa anche se alcune sostanze non sono in inventario. ' +
+    'Alla fine aggiungi: DA ORDINARE: [sostanze mancanti dall\'inventario] ' +
+    'Quando proponi una formula usa SEMPRE questo formato:\n' +
+    'FORMULA:\n- [sostanza]: [quantit\u00e0] [unit\u00e0]\nPROCEDURA:\n1. [passo]\nNOTE: [avvertenze]\n' +
+    'Per liquidi usa ml, per solidi usa g. Elenca ogni componente su riga separata con trattino.\n\n' +
     invTxt;
 }
 
@@ -2869,30 +2871,48 @@ function aiParseFormula(text) {
   let inFormula = false;
   for (const line of lines) {
     if (/^FORMULA\s*:/i.test(line.trim())) { inFormula = true; continue; }
-    if (/^PROCEDURA\s*:/i.test(line.trim()) || /^NOTE\s*:/i.test(line.trim())) inFormula = false;
+    if (/^PROCEDURA\s*:/i.test(line.trim()) || /^NOTE\s*:/i.test(line.trim()) || /^DA ORDINARE/i.test(line.trim())) inFormula = false;
     if (inFormula) {
-      const m = line.match(/^[-•]\s*(.+?):\s*([\d.,]+)\s*([a-zA-Z%°µ]+)?/);
+      const m = line.match(/^[-\u2022]\s*(.+?):\s*([\d.,]+)\s*([a-zA-Z%\u00b0\u00b5]+)?/);
       if (m) {
         const nome = m[1].trim();
         const qty  = m[2].replace(',','.');
-        const u    = (m[3]||'g').toLowerCase();
-        const unit = (u.startsWith('ml')||u==='l') ? 'ml' : (u==='pz'||u==='cps'||u==='caps') ? 'pz' : 'g';
+        const uRaw = (m[3]||'').toLowerCase();
+        // Se l\'AI specifica ml/l usa ml, se g usa g
+        // Altrimenti usa densità per decidere
+        let unit;
+        if (uRaw.startsWith('ml') || uRaw === 'l') unit = 'ml';
+        else if (uRaw === 'g' || uRaw === 'mg') unit = 'g';
+        else {
+          // prova con la densità
+          const d = typeof getDensita === 'function' ? getDensita(nome) : null;
+          unit = d ? 'ml' : 'g';
+        }
         comps.push({nome, qty, unit});
       }
     }
   }
-  return comps;
+  // Estrai DA ORDINARE
+  const daOrdinare = [];
+  const doMatch = text.match(/DA ORDINARE:\s*(.+)/i);
+  if (doMatch) {
+    doMatch[1].split(',').forEach(s => {
+      const t = s.trim();
+      if (t) daOrdinare.push(t);
+    });
+  }
+  return {comps, daOrdinare};
 }
 
-function aiRenderImportCard(comps) {
+function aiRenderImportCard(comps, daOrdinare) {
   if (!comps.length) return '';
   const inv = typeof invLoadMerged === 'function' ? invLoadMerged() : [];
   const rows = comps.map(c => {
     const found = inv.find(s => invNominalizza(s.nome).includes(invNominalizza(c.nome)) || invNominalizza(c.nome).includes(invNominalizza(s.nome)));
     const badge = found
-      ? '<span style="font-size:10px;color:var(--accent);margin-left:4px">✓ inventario</span>'
-      : '<span style="font-size:10px;color:var(--text-faint);margin-left:4px">non in inventario</span>';
-    const nomeEnc = c.nome.replace(/'/g,"\\'");
+      ? '<span style="font-size:10px;color:var(--accent);margin-left:4px">\u2713 inventario</span>'
+      : '<span style="font-size:10px;color:#c05000;margin-left:4px;font-weight:600">\u26a0 da ordinare</span>';
+    const nomeEnc = c.nome.replace(/\'/g,"\\\'");
     return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">' +
       '<span style="flex:1;font-size:12px;font-family:var(--mono)">' + c.nome + badge + '</span>' +
       '<span style="font-size:12px;font-family:var(--mono);color:var(--text-muted)">' + c.qty + ' ' + c.unit + '</span>' +
@@ -2901,9 +2921,15 @@ function aiRenderImportCard(comps) {
       '</div>';
   }).join('');
   const compsJson = JSON.stringify(comps).replace(/"/g,'&quot;');
+  let ordinareHtml = '';
+  if (daOrdinare && daOrdinare.length) {
+    ordinareHtml = '<div style="margin-top:8px;padding:6px 8px;background:#fff3cd;border-radius:var(--radius);font-size:12px;color:#856404">' +
+      '\u26a0 <strong>Da ordinare:</strong> ' + daOrdinare.join(', ') + '</div>';
+  }
   return '<div style="margin-top:8px;padding:8px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius)">' +
     '<div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">Componenti — clicca per aggiungere alla Preparazione</div>' +
     rows +
+    ordinareHtml +
     '<button onclick="aiImportaTutti(' + compsJson + ')" ' +
       'style="margin-top:8px;font-size:12px;padding:4px 14px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;width:100%">Aggiungi tutti</button>' +
     '</div>';
@@ -3021,10 +3047,10 @@ async function aiChiama(userMsg) {
       aiHistory.push({ role: 'assistant', content: reply });
       aiAddMsg('assistant', reply);
       // Prova a parsare la formula e mostrare card importazione
-      const comps = aiParseFormula(reply);
-      if (comps.length > 0) {
+      const parsed = aiParseFormula(reply);
+      if (parsed.comps.length > 0 || parsed.daOrdinare.length > 0) {
         const card = document.createElement('div');
-        card.innerHTML = aiRenderImportCard(comps);
+        card.innerHTML = aiRenderImportCard(parsed.comps, parsed.daOrdinare);
         document.getElementById('ai-messages').appendChild(card);
         document.getElementById('ai-messages').scrollTop = 99999;
       }
