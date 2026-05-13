@@ -605,6 +605,17 @@
     <div class="card-title">Scorte attuali</div>
     <div id="inv-lista"><div style="color:var(--text-faint);font-size:13px;padding:1rem 0;text-align:center">Nessuna sostanza registrata</div></div>
   </div>
+
+  <div class="card" style="margin-top:1rem;border-color:var(--border);">
+    <div class="card-title" style="font-size:12px;color:var(--text-faint);">🔗 Sincronizzazione GitHub Gist</div>
+    <div class="field-row" style="margin-top:0.5rem;">
+      <span class="field-label" style="font-size:12px;">Token GitHub</span>
+      <input type="password" id="gh-token-input" placeholder="ghp_..." style="width:260px;font-family:var(--mono);font-size:12px;">
+      <button onclick="ghSalvaToken()" style="margin-left:6px;font-family:var(--sans);font-size:12px;padding:4px 10px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;">Salva e sincronizza</button>
+      <button onclick="ghMostraToken()" style="margin-left:4px;font-family:var(--sans);font-size:12px;padding:4px 8px;background:none;border:1px solid var(--border-strong);border-radius:var(--radius);cursor:pointer;">👁</button>
+    </div>
+    <div id="gh-token-status" style="font-size:12px;color:var(--text-faint);margin-top:4px;font-family:var(--mono);"></div>
+  </div>
 </div>
 
 <!-- ETICHETTE -->
