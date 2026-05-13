@@ -236,7 +236,8 @@
     <button class="nav-btn" onclick="showPage('archivio',this)">Archivio</button>
     <button class="nav-btn" onclick="showPage('inventario',this)">Inventario</button>
     <button class="nav-btn" onclick="showPage('etichette',this)">Etichette</button>
-      </nav>
+    <button class="nav-btn" onclick="showPage('formulario',this)">🤖 AI</button>
+  </nav>
 </header>
 
 <main>
@@ -605,17 +606,6 @@
     <div class="card-title">Scorte attuali</div>
     <div id="inv-lista"><div style="color:var(--text-faint);font-size:13px;padding:1rem 0;text-align:center">Nessuna sostanza registrata</div></div>
   </div>
-
-  <div class="card" style="margin-top:1rem;border-color:var(--border);">
-    <div class="card-title" style="font-size:12px;color:var(--text-faint);">🔗 Sincronizzazione GitHub Gist</div>
-    <div class="field-row" style="margin-top:0.5rem;">
-      <span class="field-label" style="font-size:12px;">Token GitHub</span>
-      <input type="text" id="gh-token-input" placeholder="ghp_..." autocomplete="off" style="width:260px;font-family:var(--mono);font-size:12px;">
-      <button onclick="ghSalvaToken()" style="margin-left:6px;font-family:var(--sans);font-size:12px;padding:4px 10px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;">Salva e sincronizza</button>
-      <button onclick="ghMostraToken()" style="margin-left:4px;font-family:var(--sans);font-size:12px;padding:4px 8px;background:none;border:1px solid var(--border-strong);border-radius:var(--radius);cursor:pointer;">👁</button>
-    </div>
-    <div id="gh-token-status" style="font-size:12px;color:var(--text-faint);margin-top:4px;font-family:var(--mono);"></div>
-  </div>
 </div>
 
 <!-- ETICHETTE -->
@@ -710,6 +700,96 @@
   </div>
 </div>
 
+<!-- FORMULARIO AI -->
+<div class="page" id="page-formulario">
+  <h1>Formulario AI</h1>
+  <p class="subtitle">Assistente galenico — Groq llama-3.1-8b · solo farmacopea e preparazioni magistrali</p>
+
+  <div class="card">
+    <div class="card-title">Chiave API Groq</div>
+    <div class="ai-key-row">
+      <input type="text" id="ai-groq-key" placeholder="gsk_..." autocomplete="off" spellcheck="false">
+      <button onclick="aiSalvaKey()">✓ Salva</button>
+      <button onclick="aiMostraKey()" style="background:var(--text-muted)">👁</button>
+    </div>
+    <div id="ai-key-status" style="font-size:11px;font-family:var(--mono);color:var(--text-faint);margin-top:4px"></div>
+    <div style="font-size:11px;color:var(--text-faint);font-family:var(--mono)">
+      Chiave gratuita su <a href="https://console.groq.com" target="_blank" style="color:var(--accent)">console.groq.com</a> — salvata in localStorage, mai inviata altrove
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Token GitHub (sincronizzazione inventario)</div>
+    <div class="ai-key-row">
+      <input type="text" id="gh-token-input" placeholder="ghp_..." autocomplete="off" spellcheck="false">
+      <button onclick="ghSalvaToken()">✓ Salva</button>
+      <button onclick="ghMostraToken()" style="background:var(--text-muted)">👁</button>
+    </div>
+    <div id="gh-token-status" style="font-size:11px;font-family:var(--mono);color:var(--text-faint);margin-top:4px"></div>
+    <div style="font-size:11px;color:var(--text-faint);font-family:var(--mono)">
+      Token GitHub con scope <strong>gist</strong> — lo stesso di LinguaeQuiz. Salvato in localStorage.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Nuova preparazione</div>
+    <div class="field-row" style="margin-bottom:0.75rem">
+      <span class="field-label">Nome preparazione</span>
+      <input type="text" id="ai-prep-nome" placeholder="es. Minoxidil 5% soluzione cutanea" style="flex:1">
+    </div>
+    <div class="field-row" style="margin-bottom:0.75rem">
+      <span class="field-label">Forma farmaceutica</span>
+      <select id="ai-prep-forma">
+        <option>Soluzione idroalcolica</option>
+        <option>Unguento</option>
+        <option>Crema</option>
+        <option>Gel</option>
+        <option>Capsule</option>
+        <option>Polvere</option>
+        <option>Sospensione</option>
+        <option>Collirio</option>
+      </select>
+    </div>
+    <div class="field-row" style="margin-bottom:0.75rem">
+      <span class="field-label">Quantità totale</span>
+      <input type="number" id="ai-prep-qt" value="100" min="1" style="width:90px">
+      <select id="ai-prep-unit" style="width:70px;margin-left:4px">
+        <option>ml</option>
+        <option>g</option>
+        <option>pz</option>
+      </select>
+    </div>
+    <button class="btn-add" onclick="aiAvviaPreparazione()">🤖 Chiedi all'AI la formula</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Chat con l'assistente galenico</div>
+    <div class="ai-chip-row">
+      <span style="font-size:11px;color:var(--text-faint);font-family:var(--mono);align-self:center">Rapido:</span>
+      <button class="ai-chip" onclick="aiChip('Quali sono le frasi H di questa preparazione?')">Frasi H/P</button>
+      <button class="ai-chip" onclick="aiChip('Quali incompatibilità devo considerare?')">Incompatibilità</button>
+      <button class="ai-chip" onclick="aiChip('Qual è la solubilità del principio attivo in etanolo?')">Solubilità</button>
+      <button class="ai-chip" onclick="aiChip('Qual è la scadenza raccomandata dalla FU XII?')">Scadenza FU</button>
+      <button class="ai-chip" onclick="aiChip('Suggerisci varianti della formula con diversi eccipienti')">Varianti</button>
+      <button class="ai-chip" onclick="aiChip('Spiega la differenza tra p/v e p/p per questa preparazione')">p/v vs p/p</button>
+    </div>
+    <div class="ai-chat-wrap">
+      <div class="ai-chat-messages" id="ai-messages">
+        <div class="ai-msg assistant">Ciao! Sono l'assistente galenico. Inserisci il nome e la forma farmaceutica della preparazione, poi clicca <strong>"Chiedi all'AI la formula"</strong> — oppure scrivi direttamente una domanda.</div>
+      </div>
+      <div class="ai-input-row">
+        <textarea id="ai-input" placeholder="es. Aumenta la concentrazione a 5%, sostituisci la lanolina..." rows="1"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiInvia()}"
+          oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+        <button id="ai-send-btn" onclick="aiInvia()" title="Invia (Invio)">↑</button>
+      </div>
+    </div>
+    <div class="ai-actions">
+      <button class="btn-add" style="font-size:12px;padding:5px 14px" onclick="aiEsportaScheda()">→ Usa in Scheda</button>
+      <button style="font-family:var(--sans);font-size:12px;padding:5px 12px;background:none;border:1px solid var(--border-strong);color:var(--text-muted);border-radius:var(--radius);cursor:pointer" onclick="aiReset()">↺ Nuova conversazione</button>
+    </div>
+  </div>
+</div>
 
 <!-- ARCHIVIO SCHEDE -->
 <div class="page" id="page-archivio">
@@ -2047,22 +2127,19 @@ function invLoad() {
 }
 
 async function invSave(d) {
-  localStorage.setItem(INV_KEY, JSON.stringify(d)); // cache locale immediata
+  localStorage.setItem(INV_KEY, JSON.stringify(d));
   const token = ghGetToken();
   if (!token) {
     ghStatus('⚠ Nessun token GitHub — dati salvati solo in locale', 'var(--warn)');
     return;
   }
   try {
-    await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+    const r = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
       method: 'PATCH',
-      headers: {
-        Authorization: `token ${token}`,
-        Accept: 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json'
-      },
+      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
       body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(d, null, 2) } } })
     });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     ghStatus('✓ Salvato su Gist (' + d.length + ' voci)', 'var(--accent)');
   } catch(e) {
     ghStatus('⚠ Gist fallito: ' + e.message + ' — dati solo in locale', 'var(--warn)');
@@ -2181,7 +2258,6 @@ function invPromuviPredefinita(nome) {
   const hc = INV_HARDCODED.find(h => h.nome === nome);
   if (!hc) return;
   const inv = invLoad();
-  // copia i dati hardcoded in localStorage
   inv.push({
     nome: hc.nome, h: hc.h||'', unit: hc.unit||'g',
     prezzo: hc.prezzo||0, lotto: hc.lotto||'', lottoInt: hc.lottoInt||'',
@@ -2190,8 +2266,7 @@ function invPromuviPredefinita(nome) {
   });
   invSave(inv);
   invRender();
-  // apre subito il form di modifica sull'ultima voce aggiunta
-  setTimeout(() => invModifica(inv.length - 1), 100);
+  setTimeout(() => invModifica(inv.length - 1), 150);
 }
 
 function invModifica(lsIdx) {
@@ -2325,7 +2400,7 @@ function invRender() {
   });
 
   if (hardcodedSenzaLS.length) {
-    rows += `<tr><td colspan="8" style="padding:6px 8px;font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;background:var(--bg);border-top:2px solid var(--border)">Sostanze predefinite — aggiungi un lotto per registrarle</td></tr>`;
+    rows += `<tr><td colspan="8" style="padding:6px 8px;font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;background:var(--bg);border-top:2px solid var(--border)">Sostanze predefinite — clicca ✏ per modificare</td></tr>`;
     hardcodedSenzaLS.forEach(item => {
       const scadData = item.scad ? new Date(item.scad+'-01') : null;
       const cls = scadData && scadData < oggi ? 'scaduto' : (scadData && scadData < tra60 ? 'in-scadenza' : '');
@@ -2463,13 +2538,321 @@ function stampaDymo() {
   });
 }
 
-// init
-invRender();
-ghCaricaToken();
-invSyncFromGist();
-etiqAggiorna();
+// init inventario
 // ═══════════════════════════════════════════
-// AI rimosso-e 
+// FORMULARIO AI
+// ═══════════════════════════════════════════
+
+const AI_KEY_LS = 'gal_groq_key';
+const AI_SYSTEM = 'Sei un assistente farmaceutico specializzato ESCLUSIVAMENTE in galenica magistrale. ' +
+'Rispondi SOLO a domande su: preparazioni galeniche magistrali e officinali; formule farmaceutiche (FU XII, Codex, FU Europea); ' +
+'principi attivi, eccipienti, solventi e loro proprieta (solubilita, compatibilita, stabilita, pH); ' +
+'frasi H/P GHS per le sostanze utilizzate; normativa italiana galenica (D.M. 22/09/2017, FU XII); ' +
+'calcoli di concentrazione (p/v, p/p, v/v), diluizioni, rese; procedura di preparazione, ordine di miscelazione, temperatura. ' +
+'Per qualsiasi altra domanda rispondi: "Posso rispondere solo a domande di galenica farmaceutica." ' +
+'Quando proponi una formula usa questo formato:\n' +
+'FORMULA:\n- [sostanza]: [quantita] [unita]\nPROCEDURA: [passi numerati]\nNOTE: [avvertenze, stabilita, scadenza FU]\n' +
+'Rispondi in italiano, in modo conciso e preciso. Cita FU XII o normativa quando pertinente.';
+
+let aiHistory = [];
+
+function aiCaricaKey() {
+  const k = localStorage.getItem(AI_KEY_LS) || '';
+  const el = document.getElementById('ai-groq-key');
+  if (el && k) {
+    el.value = k;
+    document.getElementById('ai-key-status').innerHTML =
+      '<span style="color:var(--accent)">✓ Chiave caricata — ' + k.substring(0,8) + '...</span>';
+  }
+  return k;
+}
+
+function aiSalvaKey() {
+  const k = document.getElementById('ai-groq-key').value.trim();
+  const status = document.getElementById('ai-key-status');
+  if (!k) {
+    status.innerHTML = '<span style="color:var(--warn)">⚠ Chiave vuota</span>';
+    return;
+  }
+  if (!k.startsWith('gsk_')) {
+    status.innerHTML = '<span style="color:var(--warn)">⚠ La chiave Groq deve iniziare con gsk_</span>';
+    return;
+  }
+  localStorage.setItem(AI_KEY_LS, k);
+  status.innerHTML = '<span style="color:var(--accent)">✓ Salvata — ' + k.substring(0,8) + '...</span>';
+}
+
+function aiMostraKey() {
+  const el = document.getElementById('ai-groq-key');
+  el.type = el.type === 'password' ? 'text' : 'password';
+}
+
+function aiGetKey() {
+  return localStorage.getItem(AI_KEY_LS) || document.getElementById('ai-groq-key').value.trim();
+}
+
+function aiAddMsg(role, text) {
+  const wrap = document.getElementById('ai-messages');
+  const div = document.createElement('div');
+  div.className = 'ai-msg ' + role;
+  div.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+function aiAddSys(text) {
+  const wrap = document.getElementById('ai-messages');
+  const div = document.createElement('div');
+  div.className = 'ai-msg system';
+  div.textContent = text;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+async function aiChiama(userMsg) {
+  const key = aiGetKey();
+  if (!key || key.indexOf('gsk_') !== 0) {
+    aiAddSys('Inserisci una chiave Groq valida (gsk_...) nel campo in alto.');
+    return;
+  }
+  aiHistory.push({ role: 'user', content: userMsg });
+  aiAddMsg('user', userMsg);
+
+  const btn = document.getElementById('ai-send-btn');
+  btn.disabled = true; btn.textContent = '…';
+
+  const wrap = document.getElementById('ai-messages');
+  const typing = document.createElement('div');
+  typing.className = 'ai-msg assistant';
+  typing.id = 'ai-typing';
+  typing.innerHTML = '<em style="color:var(--text-faint)">elaborazione...</em>';
+  wrap.appendChild(typing);
+  wrap.scrollTop = wrap.scrollHeight;
+
+  try {
+    const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [{ role: 'system', content: AI_SYSTEM }].concat(aiHistory),
+        temperature: 0.3,
+        max_tokens: 800
+      })
+    });
+    const data = await resp.json();
+    typing.remove();
+    if (data.error) {
+      aiAddSys('Errore API: ' + data.error.message);
+      aiHistory.pop();
+    } else {
+      const reply = data.choices[0].message.content;
+      aiHistory.push({ role: 'assistant', content: reply });
+      aiAddMsg('assistant', reply);
+    }
+  } catch(e) {
+    typing.remove();
+    aiAddSys('Errore di rete: ' + e.message);
+    aiHistory.pop();
+  }
+  btn.disabled = false; btn.textContent = '↑';
+}
+
+function aiInvia() {
+  const inp = document.getElementById('ai-input');
+  const msg = inp.value.trim();
+  if (!msg) return;
+  inp.value = ''; inp.style.height = 'auto';
+  aiChiama(msg);
+}
+
+function aiChip(msg) { aiChiama(msg); }
+
+function aiAvviaPreparazione() {
+  const nome = document.getElementById('ai-prep-nome').value.trim();
+  const forma = document.getElementById('ai-prep-forma').value;
+  const qt = document.getElementById('ai-prep-qt').value;
+  const unit = document.getElementById('ai-prep-unit').value;
+  if (!nome) { aiAddSys('Inserisci il nome della preparazione prima di procedere.'); return; }
+  const navBtns = document.querySelectorAll('.nav-btn');
+  showPage('formulario', navBtns[navBtns.length - 1]);
+  const msg = 'Prepara la formula magistrale per: ' + nome +
+    ', forma farmaceutica: ' + forma +
+    ', quantita totale: ' + qt + ' ' + unit +
+    '. Indica ingredienti con quantita, procedura passo-passo, frasi H/P, scadenza raccomandata FU XII e avvertenze.';
+  aiChiama(msg);
+}
+
+function aiEsportaScheda() {
+  const nome = document.getElementById('ai-prep-nome').value;
+  if (nome) document.getElementById('s-prep').value = nome;
+  const navBtns = document.querySelectorAll('.nav-btn');
+  showPage('scheda', navBtns[2]);
+  aggiornaScheda();
+}
+
+function aiReset() {
+  aiHistory = [];
+  document.getElementById('ai-messages').innerHTML =
+    '<div class="ai-msg assistant">Nuova conversazione. Inserisci una preparazione o scrivi una domanda.</div>';
+  document.getElementById('ai-prep-nome').value = '';
+}
+
+aiCaricaKey();
+
+// ═══════════════════════════════════════════
+// ARCHIVIO SCHEDE
+// ═══════════════════════════════════════════
+
+const ARCH_KEY = 'gal_archivio_schede_v1';
+
+function archLoad() {
+  try { return JSON.parse(localStorage.getItem(ARCH_KEY) || '[]'); } catch { return []; }
+}
+
+function archSave(d) { localStorage.setItem(ARCH_KEY, JSON.stringify(d)); }
+
+function salvaInArchivio() {
+  // Incrementa il numero scheda solo al salvataggio definitivo
+  const nuovoNum = getNextNumScheda();
+  document.getElementById('s-num').value = nuovoNum;
+  const scheda = {
+    id: Date.now(),
+    num: nuovoNum,
+    prep:   document.getElementById('s-prep').value,
+    tipo:   tipoScheda,
+    qt:     document.getElementById('s-qt').value,
+    conc:   document.getElementById('s-conc').value,
+    paz:    document.getElementById('s-paz').value,
+    farm:   document.getElementById('s-farm').value,
+    data:   document.getElementById('s-data').value,
+    mesi:   document.getElementById('s-mesi').value,
+    prezzo: document.getElementById('s-prezzo').value,
+    ncaps:  document.getElementById('s-ncaps') ? document.getElementById('s-ncaps').value : '',
+    mgpa:   document.getElementById('s-mgpa') ? document.getElementById('s-mgpa').value : '',
+    taglia: document.getElementById('s-taglia') ? document.getElementById('s-taglia').value : '',
+    eccip:  document.getElementById('s-eccip') ? document.getElementById('s-eccip').value : '',
+    paNome: document.getElementById('s-pa-nome') ? document.getElementById('s-pa-nome').value : '',
+    lottoAS: document.getElementById('s-lotto-as') ? document.getElementById('s-lotto-as').value : '',
+    lottoET: document.getElementById('s-lotto-et') ? document.getElementById('s-lotto-et').value : '',
+    lottoAC: document.getElementById('s-lotto-ac') ? document.getElementById('s-lotto-ac').value : '',
+    lottoEC: document.getElementById('s-lotto-eccip') ? document.getElementById('s-lotto-eccip').value : '',
+    salvata: new Date().toISOString()
+  };
+
+  if (!scheda.prep || !scheda.num) {
+    alert('Compila almeno numero scheda e nome preparazione prima di salvare.');
+    return;
+  }
+
+  const arch = archLoad();
+  // Controlla duplicati per numero scheda
+  const dup = arch.findIndex(s => s.num === scheda.num);
+  if (dup >= 0) {
+    if (!confirm('Esiste già una scheda ' + scheda.num + '. Sovrascrivere?')) return;
+    arch[dup] = scheda;
+  } else {
+    arch.unshift(scheda); // più recente in cima
+  }
+  archSave(arch);
+  alert('Scheda ' + scheda.num + ' salvata in archivio.');
+}
+
+function archivioRender(filtro) {
+  filtro = (filtro || '').toLowerCase();
+  const arch = archLoad();
+  const lista = document.getElementById('archivio-lista');
+  const count = document.getElementById('archivio-count');
+
+  const filtered = filtro
+    ? arch.filter(s =>
+        (s.num||'').toLowerCase().includes(filtro) ||
+        (s.prep||'').toLowerCase().includes(filtro) ||
+        (s.paz||'').toLowerCase().includes(filtro))
+    : arch;
+
+  count.textContent = filtered.length + ' scheda' + (filtered.length !== 1 ? 'e' : '');
+
+  if (!filtered.length) {
+    lista.innerHTML = '<div style="text-align:center;color:var(--text-faint);font-size:13px;padding:2rem">Nessuna scheda in archivio</div>';
+    return;
+  }
+
+  lista.innerHTML = filtered.map(s => {
+    const dataFmt = s.data ? s.data.split('-').reverse().join('/') : '—';
+    const prezzoFmt = s.prezzo ? '€ ' + parseFloat(s.prezzo).toFixed(2) : '—';
+    return '<div class="arch-row">' +
+      '<div><div class="arch-num">' + (s.num||'—') + '</div><div class="arch-sub">' + dataFmt + '</div></div>' +
+      '<div><div class="arch-prep">' + (s.prep||'—') + '</div><div class="arch-sub">' + (s.paz||'') + (s.conc ? ' · ' + s.conc + '%' : '') + (s.qt ? ' · ' + s.qt + ' ml' : '') + '</div></div>' +
+      '<div class="arch-data">' + (s.farm||'') + '</div>' +
+      '<div class="arch-prezzo">' + prezzoFmt + '</div>' +
+      '<div class="arch-btns">' +
+        '<button onclick="archRiapri(' + s.id + ')" title="Riapri scheda" style="font-size:12px;padding:3px 8px;border:1px solid var(--border-strong);border-radius:4px;background:none;cursor:pointer;color:var(--accent)">↩</button>' +
+        '<button onclick="archElimina(' + s.id + ')" title="Elimina" style="font-size:12px;padding:3px 8px;border:1px solid #e0a0a0;border-radius:4px;background:none;cursor:pointer;color:var(--red,#8b1a1a)">✕</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function archElimina(id) {
+  const arch = archLoad();
+  const scheda = arch.find(s => s.id === id);
+  if (!scheda) return;
+  if (!confirm('Eliminare la scheda ' + scheda.num + ' — ' + scheda.prep + '?\n\nAttenzione: questa operazione è irreversibile.')) return;
+  if (!confirm('Sei proprio sicuro di voler eliminare la scheda ' + scheda.num + '?')) return;
+  archSave(arch.filter(s => s.id !== id));
+  archivioRender(document.getElementById('archivio-search').value);
+}
+
+function archRiapri(id) {
+  const arch = archLoad();
+  const s = arch.find(s => s.id === id);
+  if (!s) return;
+
+  // ripristina tipo
+  if (s.tipo) {
+    const sBtn = document.querySelectorAll('#scheda-inputs .seg-btn');
+    const mapIdx = {soluzione:0,unguento:1,capsule:2,polvere:3,sospensione:4};
+    setTipoScheda(s.tipo, sBtn[mapIdx[s.tipo]||0]);
+  }
+
+  document.getElementById('s-num').value    = s.num || '';
+  document.getElementById('s-prep').value   = s.prep || '';
+  document.getElementById('s-qt').value     = s.qt || '';
+  document.getElementById('s-conc').value   = s.conc || '';
+  document.getElementById('s-paz').value    = s.paz || '';
+  document.getElementById('s-farm').value   = s.farm || '';
+  document.getElementById('s-data').value   = s.data || '';
+  document.getElementById('s-mesi').value   = s.mesi || '';
+  document.getElementById('s-prezzo').value = s.prezzo || '';
+  if (document.getElementById('s-pa-nome'))  document.getElementById('s-pa-nome').value  = s.paNome || '';
+  if (document.getElementById('s-ncaps'))    document.getElementById('s-ncaps').value    = s.ncaps || '';
+  if (document.getElementById('s-mgpa'))     document.getElementById('s-mgpa').value     = s.mgpa || '';
+  if (document.getElementById('s-taglia'))   document.getElementById('s-taglia').value   = s.taglia || '0';
+  if (document.getElementById('s-eccip'))    document.getElementById('s-eccip').value    = s.eccip || '';
+  if (document.getElementById('s-lotto-as')) document.getElementById('s-lotto-as').value = s.lottoAS || '';
+  if (document.getElementById('s-lotto-et')) document.getElementById('s-lotto-et').value = s.lottoET || '';
+  if (document.getElementById('s-lotto-ac')) document.getElementById('s-lotto-ac').value = s.lottoAC || '';
+  if (document.getElementById('s-lotto-eccip')) document.getElementById('s-lotto-eccip').value = s.lottoEC || '';
+  aggiornaScheda();
+  const navBtns = document.querySelectorAll('.nav-btn');
+  showPage('scheda', navBtns[2]);
+}
+
+// Render archivio quando si apre la pagina
+const _origShowPage = showPage;
+showPage = function(id, btn) {
+  _origShowPage(id, btn);
+  if (id === 'archivio') archivioRender('');
+};
+
+// ── INIT ──
+ghCaricaToken();
+invSyncFromGist().then(() => invRender()).catch(() => invRender());
+etiqAggiorna();
+aiCaricaKey();
+popolaPASuggestions();
+calcPrep();
 </script>
 </body>
 </html>
