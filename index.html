@@ -2254,7 +2254,7 @@ function invElimina(lsIdx) {
   const inv = invLoad(); inv.splice(lsIdx,1); invSave(inv); invRender();
 }
 
-function invPromuviPredefinita(nome) {
+async function invPromuviPredefinita(nome) {
   const hc = INV_HARDCODED.find(h => h.nome === nome);
   if (!hc) return;
   const inv = invLoad();
@@ -2264,7 +2264,7 @@ function invPromuviPredefinita(nome) {
     scad: hc.scad||'', dataAp: hc.dataAp||'', dataCh: '',
     ddtNum: '', ddtData: '', qty: '', prezzoBolla: 0, sds: hc.sds||''
   });
-  invSave(inv);
+  await invSave(inv);
   invRender();
   setTimeout(() => invModifica(inv.length - 1), 150);
 }
