@@ -310,6 +310,14 @@
     </div>
   </div>
   <div class="card">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Componenti aggiuntivi <span style="font-weight:400;color:var(--text-faint)">(Art. 5 — max 4)</span></span>
+      <button class="btn-add" style="font-size:12px;padding:4px 12px" onclick="prepAddComp()">+ Aggiungi</button>
+    </div>
+    <div id="prep-comp-extra" style="margin-top:4px"></div>
+    <div style="font-size:11px;color:var(--text-faint);margin-top:4px">Glicerolo, conservanti, cosolubilizzanti, eccipienti non standard — al prezzo di acquisto netto IVA.</div>
+  </div>
+  <div class="card">
     <div class="card-title">Formula calcolata</div>
     <div class="formula-grid" id="formula-grid"></div>
     <div id="alert-solub"></div>
@@ -373,7 +381,7 @@
 
   <div class="card">
     <div class="card-title">Altri costi materie prime (netto IVA)</div>
-    <div class="field-row" id="tt-row-et"><span class="field-label">Etanolo 96° (€/ml)</span><input type="number" id="t-et" value="" step="0.00001" min="0" oninput="calcTariff()"><span class="field-note" id="t-et-fonte">prezzo acquisto</span></div>
+    <div class="field-row" id="tt-row-et"><span class="field-label">Etanolo 96° (€/ml)</span><input type="number" id="t-et" value="" step="0.00001" min="0" autocomplete="off" oninput="calcTariff()"><span class="field-note" id="t-et-fonte">prezzo acquisto</span></div>
     <div class="field-row">
       <span class="field-label">Flacone / recipiente (€ cad.)</span>
       <input type="number" id="t-fl" value="" step="0.01" min="0" oninput="calcTariff()">
@@ -516,22 +524,16 @@
     <div class="inv-form" style="grid-template-columns:2fr 2fr;margin-bottom:8px">
       <div>
         <label>Sostanza</label>
-        <select id="inv-sel" onchange="invPrecompila()">
-          <option value="">— seleziona —</option>
-          <option value="">— nessuna —</option>
-          <option value="Minoxidil|H302,H318,H335">Minoxidil</option>
-          <option value="Etanolo 96°|H225,H319">Etanolo 96°</option>
-          <option value="Glicole propilenico|">Glicole propilenico E 1520</option>
-          <option value="Acqua purificata|">Acqua purificata</option>
-          <option value="Vaselina filante bianca|">Vaselina filante bianca</option>
-          <option value="Lanolina anidra|">Lanolina anidra</option>
-          <option value="Clobazam|H302,H361">Clobazam</option>
-          <option value="Altro|">Altra sostanza...</option>
-        </select>
+        <input type="text" id="inv-nome-libero" placeholder="es. Minoxidil, Etanolo 96°..."
+          autocomplete="off"
+          style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
+          oninput="invCercaNome(this.value)">
+        <div id="inv-nome-sug" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px"></div>
       </div>
       <div>
-        <label>Nome libero (se "Altra")</label>
-        <input type="text" id="inv-nome-libero" placeholder="es. Acido borico">
+        <label>Frasi H (da SDS)</label>
+        <input type="text" id="inv-h" placeholder="es. H302, H318, H335" autocomplete="off"
+          style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">
       </div>
     </div>
 
@@ -926,12 +928,30 @@ function invFiltraSostanze() {
 
 function invSelezionaSostanza(nome, h) {
   document.getElementById('inv-cerca').value    = nome;
-  document.getElementById('inv-sel-nome').value = nome;
-  document.getElementById('inv-sel-h').value    = h;
+  document.getElementById('inv-nome-libero').value = nome;
+  if (document.getElementById('inv-h')) document.getElementById('inv-h').value = h || '';
   document.getElementById('inv-dropdown').style.display = 'none';
   const hc = INV_HARDCODED.find(s => invNominalizza(s.nome) === invNominalizza(nome));
   if (hc && hc.unit) document.getElementById('inv-unit').value = hc.unit;
 }
+
+function invCercaNome(q) {
+  const dd = document.getElementById('inv-nome-sug');
+  if (!dd) return;
+  if (!q || q.length < 3) { dd.innerHTML = ''; return; }
+  const inv = invLoadMerged ? invLoadMerged() : [];
+  const matches = inv.filter(s => invNominalizza(s.nome).includes(invNominalizza(q))).slice(0, 6);
+  dd.innerHTML = matches.map(s =>
+    `<button onclick="document.getElementById('inv-nome-libero').value='${s.nome.replace(/'/g,"\\'")}';
+      if(document.getElementById('inv-h')) document.getElementById('inv-h').value='${(s.h||'').replace(/'/g,"\\'")}';
+      document.getElementById('inv-nome-sug').innerHTML=''"
+      style="font-size:11px;padding:2px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">
+      ${s.nome}${s.h?' <span style="color:var(--text-faint)">'+s.h+'</span>':''}
+    </button>`
+  ).join('');
+}
+
+
 
 function popolaPASuggestions() {
   const dl = document.getElementById('pa-suggestions');
@@ -947,6 +967,68 @@ function sincronizzaPA() {
   if (tNome && nome && nome.length >= 8) { tNome.value = nome; tarRicercaPA(); }
   sincronizzaTariffazione();
 }
+
+// ── COMPONENTI AGGIUNTIVI PREPARAZIONE ──────────────────────────────────
+let prepComps = [];
+
+function prepAddComp() {
+  if (prepComps.length >= 4) return;
+  prepComps.push({nome:'', qty:'', unit:'g', prezzoAcq:0});
+  prepRenderComps();
+}
+
+function prepRemoveComp(i) {
+  prepComps.splice(i, 1);
+  prepRenderComps();
+  calcPrep();
+}
+
+function prepRenderComps() {
+  const container = document.getElementById('prep-comp-extra');
+  if (!container) return;
+  if (prepComps.length === 0) { container.innerHTML = '<div style="font-size:12px;color:var(--text-faint);padding:4px 0">Nessun componente aggiuntivo.</div>'; return; }
+  container.innerHTML = prepComps.map((c, i) => `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;padding:6px 8px;border:1px solid var(--border-strong);border-radius:var(--radius)">
+      <input type="text" value="${c.nome}" placeholder="Nome componente" autocomplete="off"
+        style="width:160px;font-family:var(--mono);font-size:13px;padding:3px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
+        oninput="prepComps[${i}].nome=this.value; prepCercaComp(${i},this.value); calcPrep()">
+      <input type="number" value="${c.qty}" placeholder="Qtà" min="0" step="0.1"
+        style="width:70px;font-family:var(--mono);font-size:13px;padding:3px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
+        oninput="prepComps[${i}].qty=this.value; calcPrep()">
+      <select onchange="prepComps[${i}].unit=this.value; calcPrep()"
+        style="font-family:var(--mono);font-size:13px;padding:3px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">
+        <option value="g" ${c.unit==='g'?'selected':''}>g</option>
+        <option value="ml" ${c.unit==='ml'?'selected':''}>ml</option>
+        <option value="pz" ${c.unit==='pz'?'selected':''}>pz</option>
+      </select>
+      <span style="font-size:11px;color:${c.prezzoAcq>0?'var(--accent)':'var(--text-faint)'}">${c.prezzoAcq>0?'€'+c.prezzoAcq.toFixed(4)+'/'+c.unit:'Art. 5'}</span>
+      <button onclick="prepRemoveComp(${i})" style="font-size:11px;padding:2px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">✕</button>
+      <div id="comp-sug-${i}" style="width:100%;display:flex;flex-wrap:wrap;gap:4px;margin-top:2px"></div>
+    </div>
+  `).join('');
+}
+
+function prepCercaComp(i, q) {
+  const dd = document.getElementById('comp-sug-'+i);
+  if (!dd || !q || q.length < 3) { if(dd) dd.innerHTML=''; return; }
+  const inv = typeof invLoadMerged === 'function' ? invLoadMerged() : [];
+  const matches = inv.filter(s => invNominalizza(s.nome).includes(invNominalizza(q))).slice(0, 6);
+  dd.innerHTML = matches.map(s =>
+    `<button onclick="prepSelComp(${i},'${s.nome.replace(/'/g,"\\'")}',${s.prezzo||0})"
+      style="font-size:11px;padding:2px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">
+      ${s.nome}${s.prezzo>0?' — €'+s.prezzo.toFixed(4):''}
+    </button>`
+  ).join('');
+}
+
+function prepSelComp(i, nome, prezzo) {
+  prepComps[i].nome = nome;
+  prepComps[i].prezzoAcq = prezzo;
+  prepRenderComps();
+  calcPrep();
+}
+
+function prepGetComps() { return prepComps.filter(c => c.nome && c.qty); }
 
 function calcPrep() {
   const qt   = parseFloat(document.getElementById('qt').value) || 100;
@@ -1068,6 +1150,13 @@ function calcPrep() {
     alertSolub = '<div class="alert alert-warn" style="margin-top:1rem"><span class="alert-icon">!</span><span><strong>Agitare prima dell\'uso.</strong> Verificare stabilità fisica della sospensione a 24h e 48h dalla preparazione.</span></div>';
   }
 
+  // Componenti aggiuntivi
+  const compsExtra = typeof prepGetComps === 'function' ? prepGetComps() : [];
+  compsExtra.forEach(c => items.push({name: c.nome, val: c.qty, unit: c.unit}));
+  if (compsExtra.length > 0) {
+    proc.push('Aggiungere: ' + compsExtra.map(c => '<strong>'+c.qty+' '+c.unit+'</strong> di '+c.nome).join(', ') + '.');
+  }
+
   document.getElementById('formula-grid').innerHTML = items.map(i =>
     '<div class="formula-item"><div class="formula-item-name">'+i.name+'</div><div class="formula-item-val">'+i.val+'<span class="formula-item-unit">'+i.unit+'</span></div></div>'
   ).join('');
@@ -1108,6 +1197,10 @@ function sincronizzaTariffazione() {
     if (document.getElementById('t-ncaps') && document.getElementById('n-caps')) document.getElementById('t-ncaps').value = document.getElementById('n-caps').value;
     if (document.getElementById('t-mgpa')  && document.getElementById('mg-pa-cps')) document.getElementById('t-mgpa').value  = document.getElementById('mg-pa-cps').value;
   }
+  // Sincronizza componenti extra: conta preparazione (escluso etanolo che è auto)
+  const nCompsPrep = typeof prepGetComps === 'function' ? prepGetComps().length : 0;
+  const tComp = document.getElementById('t-comp');
+  if (tComp) tComp.value = nCompsPrep;
   calcTariff();
 }
 
@@ -2212,11 +2305,9 @@ function invCalcolaPrezzoMod() {
 }
 
 function invAggiungi() {
-  const nomeHidden = (document.getElementById('inv-sel-nome') ? document.getElementById('inv-sel-nome').value.trim() : '');
-  const nomeLibero = document.getElementById('inv-nome-libero').value.trim();
-  const nome = nomeHidden || nomeLibero;
-  const h    = (document.getElementById('inv-sel-h') ? document.getElementById('inv-sel-h').value : '') || '';
-  if (!nome) { alert('Seleziona o inserisci una sostanza.'); return; }
+  const nome = document.getElementById('inv-nome-libero').value.trim();
+  const h    = document.getElementById('inv-h') ? document.getElementById('inv-h').value.trim() : '';
+  if (!nome) { alert('Inserisci il nome della sostanza.'); return; }
 
   const item = {
     nome, h,
@@ -2242,7 +2333,7 @@ function invAggiungi() {
   // reset campi
   ['inv-lotto','inv-lotto-int','inv-scad','inv-qty','inv-nome-libero',
    'inv-ddt-num','inv-ddt-data','inv-data-ap','inv-data-ch','inv-sds','inv-prezzo','inv-prezzo-bolla',
-   'inv-cerca','inv-sel-nome','inv-sel-h']
+   'inv-cerca','inv-h']
     .forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('inv-unit').value = 'g';
 
@@ -2544,15 +2635,84 @@ function stampaDymo() {
 // ═══════════════════════════════════════════
 
 const AI_KEY_LS = 'gal_groq_key';
-const AI_SYSTEM = 'Sei un assistente farmaceutico specializzato ESCLUSIVAMENTE in galenica magistrale. ' +
-'Rispondi SOLO a domande su: preparazioni galeniche magistrali e officinali; formule farmaceutiche (FU XII, Codex, FU Europea); ' +
-'principi attivi, eccipienti, solventi e loro proprieta (solubilita, compatibilita, stabilita, pH); ' +
-'frasi H/P GHS per le sostanze utilizzate; normativa italiana galenica (D.M. 22/09/2017, FU XII); ' +
-'calcoli di concentrazione (p/v, p/p, v/v), diluizioni, rese; procedura di preparazione, ordine di miscelazione, temperatura. ' +
-'Per qualsiasi altra domanda rispondi: "Posso rispondere solo a domande di galenica farmaceutica." ' +
-'Quando proponi una formula usa questo formato:\n' +
-'FORMULA:\n- [sostanza]: [quantita] [unita]\nPROCEDURA: [passi numerati]\nNOTE: [avvertenze, stabilita, scadenza FU]\n' +
-'Rispondi in italiano, in modo conciso e preciso. Cita FU XII o normativa quando pertinente.';
+
+function aiGetSystemPrompt() {
+  const inv = typeof invLoadMerged === 'function' ? invLoadMerged() : [];
+  const invTxt = inv.length > 0
+    ? 'SOSTANZE DISPONIBILI IN INVENTARIO:\n' +
+      inv.map(s => '- ' + s.nome + (s.prezzo>0?' €'+s.prezzo.toFixed(4)+'/'+s.unit:'') + (s.h?' ['+s.h+']':'')).join('\n') + '\n\n'
+    : '';
+  return 'Sei un assistente farmaceutico specializzato ESCLUSIVAMENTE in galenica magistrale. ' +
+    'Rispondi SOLO a domande su: preparazioni galeniche, formule farmaceutiche (FU XII), principi attivi, eccipienti, solventi, ' +
+    'frasi H/P GHS, normativa italiana (D.M. 22/09/2017), calcoli di concentrazione, procedure di preparazione. ' +
+    'Per qualsiasi altra domanda rispondi: "Posso rispondere solo a domande di galenica farmaceutica." ' +
+    'Quando proponi una formula rispondi SEMPRE in questo formato esatto:\n' +
+    'FORMULA:\n- [sostanza]: [quantità] [unità]\nPROCEDURA:\n1. [passo]\nNOTE: [avvertenze]\n' +
+    'Elenca ogni componente su una riga con trattino. Rispondi in italiano, conciso e preciso.\n\n' +
+    invTxt;
+}
+
+function aiParseFormula(text) {
+  const lines = text.split('\n');
+  const comps = [];
+  let inFormula = false;
+  for (const line of lines) {
+    if (/^FORMULA\s*:/i.test(line.trim())) { inFormula = true; continue; }
+    if (/^PROCEDURA\s*:/i.test(line.trim()) || /^NOTE\s*:/i.test(line.trim())) inFormula = false;
+    if (inFormula) {
+      const m = line.match(/^[-•]\s*(.+?):\s*([\d.,]+)\s*([a-zA-Z%°µ]+)?/);
+      if (m) {
+        const nome = m[1].trim();
+        const qty  = m[2].replace(',','.');
+        const u    = (m[3]||'g').toLowerCase();
+        const unit = (u.startsWith('ml')||u==='l') ? 'ml' : (u==='pz'||u==='cps'||u==='caps') ? 'pz' : 'g';
+        comps.push({nome, qty, unit});
+      }
+    }
+  }
+  return comps;
+}
+
+function aiRenderImportCard(comps) {
+  if (!comps.length) return '';
+  const inv = typeof invLoadMerged === 'function' ? invLoadMerged() : [];
+  const rows = comps.map(c => {
+    const found = inv.find(s => invNominalizza(s.nome).includes(invNominalizza(c.nome)) || invNominalizza(c.nome).includes(invNominalizza(s.nome)));
+    const badge = found
+      ? '<span style="font-size:10px;color:var(--accent);margin-left:4px">✓ inventario</span>'
+      : '<span style="font-size:10px;color:var(--text-faint);margin-left:4px">non in inventario</span>';
+    const nomeEnc = c.nome.replace(/'/g,"\\'");
+    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">' +
+      '<span style="flex:1;font-size:12px;font-family:var(--mono)">' + c.nome + badge + '</span>' +
+      '<span style="font-size:12px;font-family:var(--mono);color:var(--text-muted)">' + c.qty + ' ' + c.unit + '</span>' +
+      '<button onclick="aiImportaComp(\'' + nomeEnc + '\',\'' + c.qty + '\',\'' + c.unit + '\')" ' +
+        'style="font-size:11px;padding:2px 10px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);cursor:pointer">+ Aggiungi</button>' +
+      '</div>';
+  }).join('');
+  const compsJson = JSON.stringify(comps).replace(/"/g,'&quot;');
+  return '<div style="margin-top:8px;padding:8px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius)">' +
+    '<div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">Componenti — clicca per aggiungere alla Preparazione</div>' +
+    rows +
+    '<button onclick="aiImportaTutti(' + compsJson + ')" ' +
+      'style="margin-top:8px;font-size:12px;padding:4px 14px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;width:100%">Aggiungi tutti</button>' +
+    '</div>';
+}
+
+function aiImportaComp(nome, qty, unit) {
+  if (typeof prepComps === 'undefined') { alert('Vai prima nella sezione Preparazione.'); return; }
+  if (prepComps.length >= 4) { alert('Massimo 4 componenti aggiuntivi raggiunti.'); return; }
+  const inv = typeof invLoadMerged === 'function' ? invLoadMerged() : [];
+  const found = inv.find(s => invNominalizza(s.nome).includes(invNominalizza(nome)) || invNominalizza(nome).includes(invNominalizza(s.nome)));
+  prepComps.push({nome: found ? found.nome : nome, qty, unit, prezzoAcq: found ? (found.prezzo||0) : 0});
+  if (typeof prepRenderComps === 'function') prepRenderComps();
+  if (typeof calcPrep === 'function') calcPrep();
+  const prepBtn = document.querySelector('.nav-btn[onclick*=\"preparazione\"]');
+  if (prepBtn) showPage('preparazione', prepBtn);
+}
+
+function aiImportaTutti(comps) {
+  comps.forEach(c => aiImportaComp(c.nome, c.qty, c.unit));
+}
 
 let aiHistory = [];
 
@@ -2635,7 +2795,7 @@ async function aiChiama(userMsg) {
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
       body: JSON.stringify({
         model: 'llama-3.1-8b-instant',
-        messages: [{ role: 'system', content: AI_SYSTEM }].concat(aiHistory),
+        messages: [{ role: 'system', content: aiGetSystemPrompt() }].concat(aiHistory),
         temperature: 0.3,
         max_tokens: 800
       })
@@ -2649,6 +2809,14 @@ async function aiChiama(userMsg) {
       const reply = data.choices[0].message.content;
       aiHistory.push({ role: 'assistant', content: reply });
       aiAddMsg('assistant', reply);
+      // Prova a parsare la formula e mostrare card importazione
+      const comps = aiParseFormula(reply);
+      if (comps.length > 0) {
+        const card = document.createElement('div');
+        card.innerHTML = aiRenderImportCard(comps);
+        document.getElementById('ai-messages').appendChild(card);
+        document.getElementById('ai-messages').scrollTop = 99999;
+      }
     }
   } catch(e) {
     typing.remove();
