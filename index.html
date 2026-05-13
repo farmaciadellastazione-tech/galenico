@@ -245,7 +245,7 @@
 <!-- PREPARAZIONE -->
 <div class="page active" id="page-preparazione">
   <h1>Preparazione galenica</h1>
-  <p class="subtitle">Calcolo formula e procedura — espressione p/v (g per 100 ml)</p>
+  <p class="subtitle" id="prep-subtitle">Calcolo formula e procedura</p>
   <div class="card">
     <div class="card-title">Tipo di preparazione</div>
     <div class="seg">
@@ -255,19 +255,30 @@
       <button class="seg-btn" onclick="setTipo('polvere',this)">Polvere</button>
       <button class="seg-btn" onclick="setTipo('sospensione',this)">Sospensione</button>
     </div>
+    <!-- Selettore modalità -->
+    <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+      <span style="font-size:12px;color:var(--text-faint)">Modalità:</span>
+      <button id="modo-perc-btn" class="seg-btn active" style="font-size:12px;padding:3px 12px" onclick="setModoPrepara('perc',this)">% concentrazione</button>
+      <button id="modo-libera-btn" class="seg-btn" style="font-size:12px;padding:3px 12px" onclick="setModoPrepara('libera',this)">Formula libera (g/ml diretti)</button>
+    </div>
+  </div>
+
+  <!-- MODALITÀ % (default) -->
+  <div id="prep-modo-perc" class="card">
+    <div class="card-title">Parametri</div>
     <div class="field-row">
       <span class="field-label">Principio attivo</span>
-      <input type="text" id="prep-pa-nome" placeholder="es. Acido salicilico" style="width:220px;" list="pa-suggestions" oninput="sincronizzaPA()">
+      <input type="text" id="prep-pa-nome" placeholder="es. Minoxidil" style="width:220px;" list="pa-suggestions" oninput="sincronizzaPA()">
       <datalist id="pa-suggestions"></datalist>
     </div>
     <div class="field-row">
       <span class="field-label">Quantità totale</span>
-      <input type="number" id="qt" value="" min="10" max="1000" step="10" oninput="calcPrep()">
+      <input type="number" id="qt" value="" min="1" max="2000" step="1" oninput="calcPrep()">
       <span class="field-note">ml / g</span>
     </div>
     <div class="field-row">
-      <span class="field-label">Concentrazione principio attivo</span>
-      <input type="number" id="conc" value="" min="0.1" max="30" step="0.5" oninput="calcPrep()">
+      <span class="field-label">Concentrazione PA</span>
+      <input type="number" id="conc" value="" min="0.01" max="100" step="0.1" oninput="calcPrep()">
       <span class="field-note">% p/v</span>
     </div>
     <div class="field-row" id="row-et">
@@ -297,7 +308,7 @@
       <span class="field-note">pz</span>
     </div>
     <div class="field-row" id="row-eccip-nome" style="display:none">
-      <span class="field-label">Eccipiente</span>
+      <span class="field-label">Eccipiente principale</span>
       <input type="text" id="eccip-nome" value="" placeholder="es. Lattosio monoidrato" style="width:220px;" oninput="calcPrep()">
     </div>
     <div class="field-row" id="row-diluente" style="display:none">
@@ -308,6 +319,16 @@
         <option value="olio">Olio di semi</option>
       </select>
     </div>
+  </div>
+
+  <!-- MODALITÀ FORMULA LIBERA -->
+  <div id="prep-modo-libera" class="card" style="display:none">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Ingredienti (inserisci g o ml direttamente)</span>
+      <button class="btn-add" style="font-size:12px;padding:4px 12px" onclick="liberaAddRiga()">+ Ingrediente</button>
+    </div>
+    <div id="libera-righe" style="margin-top:6px"></div>
+    <div style="font-size:11px;color:var(--text-faint);margin-top:6px">Il totale e la concentrazione vengono calcolati automaticamente. Per l'etanolo inserisci i grammi — i ml equivalenti appariranno nella formula.</div>
   </div>
   <div class="card">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
@@ -968,7 +989,127 @@ function sincronizzaPA() {
   sincronizzaTariffazione();
 }
 
-// ── COMPONENTI AGGIUNTIVI PREPARAZIONE ──────────────────────────────────
+// ── MODALITÀ FORMULA LIBERA ──────────────────────────────────────────────
+let modoPrepara = 'perc'; // 'perc' | 'libera'
+let liberaRighe = []; // [{nome, qty, unit, isPa, densita}]
+
+// Densità approssimative per conversione g↔ml
+const DENSITA = {
+  'etanolo': 0.807, 'alcol etilico': 0.807, 'etanolo 96': 0.807, 'alcool': 0.807,
+  'glicole propilenico': 1.036, 'glicerina': 1.261, 'glicerolo': 1.261,
+  'olio di ricino': 0.956, 'olio di oliva': 0.911, 'olio di mandorle': 0.916,
+  'acqua': 1.000, 'acqua purificata': 1.000, 'acqua depurata': 1.000,
+  'paraffina liquida': 0.875,
+};
+
+function getDensita(nome) {
+  const n = nome.toLowerCase();
+  for (const [k,v] of Object.entries(DENSITA)) {
+    if (n.includes(k)) return v;
+  }
+  return null; // solidi: nessuna conversione
+}
+
+function setModoPrepara(modo, btn) {
+  modoPrepara = modo;
+  document.querySelectorAll('#page-preparazione .seg-btn[id^="modo-"]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('prep-modo-perc').style.display   = modo === 'perc'   ? '' : 'none';
+  document.getElementById('prep-modo-libera').style.display = modo === 'libera' ? '' : 'none';
+  if (modo === 'libera' && liberaRighe.length === 0) {
+    liberaAddRiga(true); // prima riga = PA
+  }
+  calcPrep();
+}
+
+function liberaAddRiga(isPa) {
+  liberaRighe.push({nome:'', qty:'', unit:'g', isPa: !!isPa, densita: null});
+  liberaRenderRighe();
+}
+
+function liberaRemoveRiga(i) {
+  if (liberaRighe.length <= 1) return;
+  liberaRighe.splice(i, 1);
+  liberaRenderRighe();
+  calcPrep();
+}
+
+function liberaRenderRighe() {
+  const container = document.getElementById('libera-righe');
+  if (!container) return;
+  container.innerHTML = liberaRighe.map((r, i) => {
+    const densita = getDensita(r.nome);
+    const convNote = r.qty && densita
+      ? (r.unit === 'g'
+          ? ' → ' + fmt(parseFloat(r.qty)/densita, 1) + ' ml'
+          : ' → ' + fmt(parseFloat(r.qty)*densita, 2) + ' g')
+      : '';
+    const paLabel = r.isPa
+      ? '<span style="font-size:10px;background:var(--accent);color:#fff;padding:1px 6px;border-radius:3px;margin-right:4px">PA</span>'
+      : '';
+    return `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;padding:6px 8px;border:1px solid var(--border${r.isPa?'-strong':''});border-radius:var(--radius)${r.isPa?';background:var(--accent-light)':''}">
+      ${paLabel}
+      <input type="text" value="${r.nome}" placeholder="${r.isPa?'Principio attivo':'Ingrediente'}" autocomplete="off"
+        style="width:180px;font-family:var(--mono);font-size:13px;padding:3px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
+        oninput="liberaRighe[${i}].nome=this.value; liberaRighe[${i}].densita=null; liberaCercaComp(${i},this.value); calcPrep()">
+      <input type="number" value="${r.qty}" placeholder="Quantità" min="0" step="0.1"
+        style="width:75px;font-family:var(--mono);font-size:13px;padding:3px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
+        oninput="liberaRighe[${i}].qty=this.value; calcPrep()">
+      <select onchange="liberaRighe[${i}].unit=this.value; calcPrep()"
+        style="font-family:var(--mono);font-size:13px;padding:3px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">
+        <option value="g" ${r.unit==='g'?'selected':''}>g</option>
+        <option value="ml" ${r.unit==='ml'?'selected':''}>ml</option>
+      </select>
+      <span style="font-size:11px;color:var(--accent)">${convNote}</span>
+      ${!r.isPa ? `<button onclick="liberaRemoveRiga(${i})" style="font-size:11px;padding:2px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">✕</button>` : ''}
+      <div id="libera-sug-${i}" style="width:100%;display:flex;flex-wrap:wrap;gap:4px;margin-top:2px"></div>
+    </div>`;
+  }).join('');
+}
+
+function liberaCercaComp(i, q) {
+  const dd = document.getElementById('libera-sug-'+i);
+  if (!dd || !q || q.length < 3) { if(dd) dd.innerHTML=''; return; }
+  const inv = typeof invLoadMerged === 'function' ? invLoadMerged() : [];
+  const allA = Object.keys(ALLEGATO_A).map(k => ({nome: k.charAt(0).toUpperCase()+k.slice(1), prezzo: ALLEGATO_A[k], fonte:'allegatoA'}));
+  const candidates = [...inv, ...allA].filter(s => invNominalizza(s.nome).includes(invNominalizza(q))).slice(0,6);
+  dd.innerHTML = candidates.map(s =>
+    `<button onclick="liberaSelComp(${i},'${s.nome.replace(/'/g,"\\'")}',${s.prezzo||0},'${s.fonte||'art5'}')"
+      style="font-size:11px;padding:2px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">
+      ${s.nome}${s.prezzo>0?' — €'+s.prezzo.toFixed(4)+'/g':''}${s.fonte==='allegatoA'?' ✓All.A':''}
+    </button>`
+  ).join('');
+}
+
+function liberaSelComp(i, nome, prezzo, fonte) {
+  liberaRighe[i].nome = nome;
+  liberaRighe[i].prezzoAcq = prezzo;
+  liberaRighe[i].fonte = fonte;
+  liberaRighe[i].densita = null;
+  liberaRenderRighe();
+  calcPrep();
+}
+
+function liberaGetIngr() {
+  return liberaRighe.filter(r => r.nome && r.qty);
+}
+
+function liberaCalcTotale() {
+  // Calcola totale g e concentrazione PA
+  const ingr = liberaGetIngr();
+  let totG = 0, paG = 0;
+  ingr.forEach(r => {
+    const q = parseFloat(r.qty)||0;
+    const densita = getDensita(r.nome);
+    const grams = r.unit === 'ml' && densita ? q * densita : q;
+    totG += grams;
+    if (r.isPa) paG = grams;
+  });
+  const conc = totG > 0 ? (paG / totG * 100) : 0;
+  return {totG, paG, conc, ingr};
+}
+
+
 let prepComps = [];
 
 function prepAddComp() {
@@ -1031,6 +1172,47 @@ function prepSelComp(i, nome, prezzo) {
 function prepGetComps() { return prepComps.filter(c => c.nome && c.qty); }
 
 function calcPrep() {
+  // Modalità formula libera
+  if (modoPrepara === 'libera') {
+    liberaRenderRighe();
+    const {totG, paG, conc, ingr} = liberaCalcTotale();
+    const items = ingr.map(r => {
+      const q = parseFloat(r.qty)||0;
+      const densita = getDensita(r.nome);
+      const convNote = densita && r.unit === 'g' ? ' (≈'+fmt(q/densita,1)+' ml)' :
+                       densita && r.unit === 'ml' ? ' (≈'+fmt(q*densita,2)+' g)' : '';
+      return {name: r.nome + (r.isPa?' (PA)':'') + convNote, val: r.qty, unit: r.unit};
+    });
+    if (totG > 0) items.push({name:'Totale calcolato', val: fmt(totG,1), unit:'g'});
+    if (conc > 0) items.push({name:'Concentrazione PA', val: fmt(conc,2), unit:'%'});
+    const proc = [
+      'Pesare e/o misurare tutti i componenti secondo la formula.',
+      ...ingr.map(r => 'Pesare <strong>'+r.qty+' '+r.unit+'</strong> di '+r.nome+'.'),
+      'Miscelare nell\'ordine indicato. Verificare aspetto e omogenità.',
+      'Trasferire nel recipiente finale. Etichettare.',
+    ];
+    document.getElementById('formula-grid').innerHTML = items.map(i =>
+      '<div class="formula-item"><div class="formula-item-name">'+i.name+'</div><div class="formula-item-val">'+i.val+'<span class="formula-item-unit">'+i.unit+'</span></div></div>'
+    ).join('');
+    document.getElementById('alert-solub').innerHTML = '';
+    document.getElementById('procedura').innerHTML = proc.map(p => '<li>'+p+'</li>').join('');
+    // Sincronizza alla tariffazione
+    const paNome = ingr.find(r => r.isPa);
+    if (paNome && document.getElementById('prep-pa-nome')) {
+      document.getElementById('prep-pa-nome').value = paNome.nome;
+    }
+    if (document.getElementById('qt')) document.getElementById('qt').value = fmt(totG,1);
+    if (document.getElementById('conc')) document.getElementById('conc').value = fmt(conc,2);
+    // Componenti extra per tariffazione (tutti tranne PA e acqua)
+    const compsPerTariff = ingr.filter(r => !r.isPa && !invNominalizza(r.nome).includes('acqua'));
+    prepComps = compsPerTariff.map(r => ({
+      nome: r.nome, qty: r.qty, unit: r.unit,
+      prezzoAcq: r.prezzoAcq||0, fonte: r.fonte||'art5'
+    }));
+    sincronizzaTariffazione();
+    return;
+  }
+
   const qt   = parseFloat(document.getElementById('qt').value) || 100;
   const conc = parseFloat(document.getElementById('conc').value) || 2;
   const percEt = parseFloat(document.getElementById('perc-et').value) || 0;
