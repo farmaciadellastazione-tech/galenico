@@ -614,10 +614,18 @@
         <input type="date" id="inv-data-ch">
       </div>
     </div>
-    <div class="inv-form" style="grid-template-columns:1fr;margin-bottom:8px">
+    <div class="inv-form" style="grid-template-columns:2fr 1fr 1fr;margin-bottom:8px">
       <div>
         <label>URL scheda tecnica (SDS)</label>
         <input type="url" id="inv-sds" placeholder="es. https://www.farmalabor.it/certificati/...">
+      </div>
+      <div>
+        <label>Codice a barre / EAN</label>
+        <input type="text" id="inv-barcode" placeholder="Scansiona o digita" autocomplete="off" oninput="invBarcodeInput(this.value)">
+      </div>
+      <div>
+        <label>Minimo ordinabile (g/ml)</label>
+        <input type="number" id="inv-min-order" placeholder="es. 100" min="0" step="1">
       </div>
     </div>
 
@@ -629,6 +637,18 @@
   <div class="card">
     <div class="card-title">Scorte attuali</div>
     <div id="inv-lista"><div style="color:var(--text-faint);font-size:13px;padding:1rem 0;text-align:center">Nessuna sostanza registrata</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Da ordinare</span>
+      <div style="display:flex;gap:8px">
+        <button class="btn-add" style="font-size:12px;padding:4px 12px" onclick="ordinaAggiungiManuale()">+ Aggiungi</button>
+        <button class="btn-add" style="font-size:12px;padding:4px 12px;background:var(--accent-mid)" onclick="ordinaEmail()">✉ Email Farmalabor</button>
+      </div>
+    </div>
+    <div id="ordini-lista" style="margin-top:8px"></div>
+    <div style="font-size:11px;color:var(--text-faint);margin-top:8px">Le sostanze segnalate dall'AI come mancanti vengono aggiunte automaticamente. Puoi aggiungerne altre manualmente.</div>
   </div>
 </div>
 
@@ -848,6 +868,7 @@ function showPage(id, btn) {
   btn.classList.add('active');
   if (id === 'scheda') aggiornaScheda();
   if (id === 'etichette') etiqDaScheda();
+  if (id === 'inventario') ordiniRender();
 }
 
 function setTipo(t, btn) {
@@ -990,7 +1011,92 @@ function sincronizzaPA() {
   sincronizzaTariffazione();
 }
 
-// ── MODALITÀ FORMULA LIBERA ──────────────────────────────────────────────
+// ── CODICE A BARRE ───────────────────────────────────────────────────────
+function invBarcodeInput(val) {
+  if (!val || val.length < 8) return;
+  // Cerca nell'inventario per codice
+  const inv = invLoadMerged();
+  const found = inv.find(s => s.barcode === val.trim());
+  if (found) {
+    document.getElementById('inv-nome-libero').value = found.nome;
+    if (document.getElementById('inv-h')) document.getElementById('inv-h').value = found.h || '';
+    document.getElementById('inv-barcode').style.borderColor = 'var(--accent)';
+  } else {
+    document.getElementById('inv-barcode').style.borderColor = '';
+  }
+}
+
+// ── LISTA ORDINI ─────────────────────────────────────────────────────────
+const ORDINI_KEY = 'gal_ordini';
+
+function ordiniLoad() {
+  try { return JSON.parse(localStorage.getItem(ORDINI_KEY) || '[]'); } catch { return []; }
+}
+
+function ordiniSave(list) {
+  localStorage.setItem(ORDINI_KEY, JSON.stringify(list));
+  ordiniRender();
+}
+
+function ordinaAggiungi(nome, minOrd) {
+  const list = ordiniLoad();
+  if (list.find(o => invNominalizza(o.nome) === invNominalizza(nome))) return; // già presente
+  list.push({nome, minOrd: minOrd || '', note: '', ts: Date.now()});
+  ordiniSave(list);
+}
+
+function ordinaAggiungiManuale() {
+  const nome = prompt('Nome sostanza da ordinare:');
+  if (!nome || !nome.trim()) return;
+  const minOrd = prompt('Quantità minima ordinabile (g/ml, lascia vuoto se non sai):') || '';
+  ordinaAggiungi(nome.trim(), minOrd);
+}
+
+function ordinaRimuovi(i) {
+  const list = ordiniLoad();
+  list.splice(i, 1);
+  ordiniSave(list);
+}
+
+function ordiniRender() {
+  const list = ordiniLoad();
+  const container = document.getElementById('ordini-lista');
+  if (!container) return;
+  if (!list.length) {
+    container.innerHTML = '<div style="color:var(--text-faint);font-size:13px;padding:8px 0">Nessuna sostanza da ordinare.</div>';
+    return;
+  }
+  container.innerHTML = list.map((o, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
+      <span style="flex:1;font-size:13px;font-family:var(--mono)">${o.nome}</span>
+      <input type="text" value="${o.minOrd||''}" placeholder="q.tà minima"
+        style="width:90px;font-family:var(--mono);font-size:12px;padding:2px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
+        oninput="ordiniAggiornaNota(${i},'minOrd',this.value)">
+      <input type="text" value="${o.note||''}" placeholder="note"
+        style="width:120px;font-family:var(--mono);font-size:12px;padding:2px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
+        oninput="ordiniAggiornaNota(${i},'note',this.value)">
+      <button onclick="ordinaRimuovi(${i})" style="font-size:11px;padding:2px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">✕</button>
+    </div>
+  `).join('');
+}
+
+function ordiniAggiornaNota(i, campo, val) {
+  const list = ordiniLoad();
+  if (list[i]) { list[i][campo] = val; ordiniSave(list); }
+}
+
+function ordinaEmail() {
+  const list = ordiniLoad();
+  if (!list.length) { alert('Nessuna sostanza da ordinare.'); return; }
+  const corpo = 'Gentili Signori,\n\nSi prega di quotare / spedire le seguenti sostanze:\n\n' +
+    list.map(o => '- ' + o.nome + (o.minOrd ? ' — ' + o.minOrd + ' g/ml' : '') + (o.note ? ' (' + o.note + ')' : '')).join('\n') +
+    '\n\nFarmacia della Stazione\nVia Fiume 75 — La Spezia\nTel. 0187-706147\n';
+  const subject = 'Ordine sostanze galeniche — Farmacia della Stazione';
+  const mailto = 'mailto:ordini@farmalabor.it?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(corpo);
+  window.open(mailto);
+}
+
+
 let modoPrepara = 'perc'; // 'perc' | 'libera'
 let liberaRighe = []; // [{nome, qty, unit, isPa, densita}]
 
@@ -2522,6 +2628,8 @@ function invAggiungi() {
 
   const item = {
     nome, h,
+    barcode:     document.getElementById('inv-barcode') ? document.getElementById('inv-barcode').value.trim() : '',
+    minOrd:      document.getElementById('inv-min-order') ? document.getElementById('inv-min-order').value : '',
     lotto:       document.getElementById('inv-lotto').value.trim(),
     lottoInt:    document.getElementById('inv-lotto-int').value.trim(),
     scad:        document.getElementById('inv-scad').value,
@@ -2544,7 +2652,7 @@ function invAggiungi() {
   // reset campi
   ['inv-lotto','inv-lotto-int','inv-scad','inv-qty','inv-nome-libero',
    'inv-ddt-num','inv-ddt-data','inv-data-ap','inv-data-ch','inv-sds','inv-prezzo','inv-prezzo-bolla',
-   'inv-cerca','inv-h']
+   'inv-cerca','inv-h','inv-barcode','inv-min-order']
     .forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('inv-unit').value = 'g';
 
@@ -3053,6 +3161,16 @@ async function aiChiama(userMsg) {
         card.innerHTML = aiRenderImportCard(parsed.comps, parsed.daOrdinare);
         document.getElementById('ai-messages').appendChild(card);
         document.getElementById('ai-messages').scrollTop = 99999;
+        // Aggiungi automaticamente alla lista ordini
+        parsed.daOrdinare.forEach(nome => {
+          if (typeof ordinaAggiungi === 'function') ordinaAggiungi(nome, '');
+        });
+        if (parsed.daOrdinare.length > 0) {
+          const nota = document.createElement('div');
+          nota.style.cssText = 'font-size:11px;color:var(--accent);margin-top:4px;font-family:var(--mono)';
+          nota.textContent = '→ ' + parsed.daOrdinare.length + ' sostanza/e aggiunta/e alla lista ordini (sezione Inventario)';
+          document.getElementById('ai-messages').appendChild(nota);
+        }
       }
     }
   } catch(e) {
@@ -3259,6 +3377,7 @@ aiCaricaKey();
 popolaPASuggestions();
 calcPrep();
 appRenderVersionBadge();
+ordiniRender();
 </script>
 </body>
 </html>
