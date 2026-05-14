@@ -1670,13 +1670,8 @@ function sincronizzaTariffazione() {
   if (tipoPrep !== 'capsule') {
     if (document.getElementById('t-qt'))   document.getElementById('t-qt').value   = document.getElementById('qt').value;
     if (document.getElementById('t-conc')) document.getElementById('t-conc').value = document.getElementById('conc').value;
-    if (document.getElementById('t-et-perc') && document.getElementById('perc-et')) document.getElementById('t-et-perc').value = document.getElementById('perc-et').value;
-    const etInv = invGetPrezzo('etanolo');
-    if (etInv && document.getElementById('t-et')) {
-      document.getElementById('t-et').value = etInv.prezzo.toFixed(5);
-      const src = document.getElementById('t-et-fonte');
-      if (src) { src.textContent = 'da inventario'; src.style.color = 'var(--accent)'; }
-    }
+    // t-et-perc rimosso
+    // etanolo trattato come qualsiasi sostanza
   } else {
     if (document.getElementById('t-ncaps') && document.getElementById('n-caps')) document.getElementById('t-ncaps').value = document.getElementById('n-caps').value;
     if (document.getElementById('t-mgpa')  && document.getElementById('mg-pa-cps')) document.getElementById('t-mgpa').value  = document.getElementById('mg-pa-cps').value;
@@ -2071,10 +2066,10 @@ function calcTariff() {
 
   } else {
     // ── LIQUIDA / SEMISOLIDA / POLVERE ── All. B DM 2017
-    const pET    = parseFloat(document.getElementById('t-et').value)||0;
+    const pET    = parseFloat((document.getElementById('t-et')?.value||'0'))||0;
     const qt     = parseFloat(document.getElementById('t-qt').value)||0;
     const conc   = parseFloat(document.getElementById('t-conc').value)||0;
-    const percEt = parseFloat(document.getElementById('t-et-perc').value)||0;
+    const percEt = parseFloat((document.getElementById('t-et-perc')?.value||'0'))||0;
     const grPA   = modoPrepara === 'libera' ? liberaGrPA : qt*conc/100;
     const mlET   = 0; // etanolo trattato come qualsiasi sostanza
     const nFlac  = 1;
@@ -2230,7 +2225,7 @@ function setTipoScheda(t, btn) {
     const isLiquida = tipoTariff === 'liquida' || tipoTariff === 'sospensione' || tipoTariff === 'semisolida' || tipoTariff === 'polvere';
     document.getElementById('tt-liquida').style.display  = isLiquida ? '' : 'none';
     document.getElementById('tt-capsule').style.display  = tipoTariff === 'capsule' ? '' : 'none';
-    document.getElementById('tt-row-et').style.display   = tipoTariff === 'liquida' ? '' : 'none';
+    // tt-row-et rimosso
   }
 
   aggiornaScheda();
@@ -2293,7 +2288,7 @@ function aggiornaScheda() {
       mlET96s = percEt > 0 ? qt*percEt/96 : 0;
     }
     const nFlac  = 1;
-    const pET    = parseFloat(document.getElementById('t-et').value)||0;
+    const pET    = parseFloat((document.getElementById('t-et')?.value||'0'))||0;
 
     if (modoPrepara === 'libera' && liberaRighe.length > 0) {
       const {ingr: ingrL} = liberaCalcTotale();
@@ -2480,7 +2475,7 @@ function aggiornaScheda() {
     // Modalità libera: mostra tutte le sostanze da liberaRigheExtra
     liberaRigheExtra.forEach(r => {
       const isEt = invNominalizza(r.nome).includes('etanolo') || invNominalizza(r.nome).includes('alcool') || invNominalizza(r.nome).includes('alcol');
-      const pET = parseFloat(document.getElementById('t-et').value)||0;
+      const pET = parseFloat((document.getElementById('t-et')?.value||'0'))||0;
       const dispQty = isEt ? fmt(r.qty/0.807,1)+' ml' : fmt(r.qty,2)+' '+r.unit;
       const dispPrezzo = isEt ? fmtE(pET)+'/ml' : fmtE(r.prezzo)+'/g';
       const dispCosto = isEt ? liberaMlEt*pET : r.costo;
@@ -2706,7 +2701,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 24;
+const APP_VERSION = 25;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
