@@ -1301,6 +1301,14 @@ function calcPrep() {
   if (modoPrepara === 'libera') {
     liberaRenderRighe();
     const {totG, paG, conc, ingr} = liberaCalcTotale();
+
+    // Nascondi pannello componenti aggiuntivi in modalità libera
+    const compCard = document.getElementById('prep-comp-extra');
+    if (compCard && compCard.closest) {
+      const card = compCard.closest('.card');
+      if (card) card.style.display = 'none';
+    }
+
     const items = ingr.map(r => {
       const q = parseFloat(r.qty)||0;
       const densita = getDensita(r.nome);
@@ -1312,8 +1320,8 @@ function calcPrep() {
     if (conc > 0) items.push({name:'Concentrazione PA', val: fmt(conc,2), unit:'%'});
     const proc = [
       'Pesare e/o misurare tutti i componenti secondo la formula.',
-      ...ingr.map(r => 'Pesare <strong>'+r.qty+' '+r.unit+'</strong> di '+r.nome+'.'),
-      'Miscelare nell\'ordine indicato. Verificare aspetto e omogenità.',
+      ...ingr.map(r => 'Pesare/misurare <strong>'+r.qty+' '+r.unit+'</strong> di '+r.nome+'.'),
+      'Miscelare nell\'ordine indicato. Verificare aspetto e omogeneità.',
       'Trasferire nel recipiente finale. Etichettare.',
     ];
     document.getElementById('formula-grid').innerHTML = items.map(i =>
@@ -1321,22 +1329,55 @@ function calcPrep() {
     ).join('');
     document.getElementById('alert-solub').innerHTML = '';
     document.getElementById('procedura').innerHTML = proc.map(p => '<li>'+p+'</li>').join('');
-    // Sincronizza alla tariffazione
-    const paNome = ingr.find(r => r.isPa);
-    if (paNome && document.getElementById('prep-pa-nome')) {
-      document.getElementById('prep-pa-nome').value = paNome.nome;
+
+    // Sincronizza PA name e qt/conc PRIMA di sincronizzaTariffazione
+    const paRiga = ingr.find(r => r.isPa);
+    if (paRiga && document.getElementById('prep-pa-nome')) {
+      document.getElementById('prep-pa-nome').value = paRiga.nome;
     }
-    if (document.getElementById('qt')) document.getElementById('qt').value = fmt(totG,1);
+    if (document.getElementById('qt'))   document.getElementById('qt').value   = fmt(totG,1);
     if (document.getElementById('conc')) document.getElementById('conc').value = fmt(conc,2);
-    // Componenti extra per tariffazione (tutti tranne PA e acqua)
-    const compsPerTariff = ingr.filter(r => !r.isPa && !invNominalizza(r.nome).includes('acqua'));
+
+    // Etanolo: calcola % v/v equivalente per tariffazione (compAutoEt)
+    const etRiga = ingr.find(r => {
+      const n = invNominalizza(r.nome);
+      return n.includes('etanolo') || n.includes('alcool') || n.includes('alcol');
+    });
+    if (etRiga && totG > 0) {
+      // g etanolo → % v/v: (g/densità_et) / totG_ml * 100
+      // usiamo densità 0.807 e totG come volume approssimativo
+      const mlEt = parseFloat(etRiga.qty) / 0.807;
+      const percEtCalc = mlEt / totG * 100;
+      if (document.getElementById('perc-et')) document.getElementById('perc-et').value = fmt(percEtCalc,1);
+    } else {
+      if (document.getElementById('perc-et')) document.getElementById('perc-et').value = '0';
+    }
+
+    // Componenti extra per tariffazione: escludi PA, acqua, etanolo
+    // (etanolo è già contato auto in calcTariff, acqua non conta)
+    const compsPerTariff = ingr.filter(r => {
+      if (r.isPa) return false;
+      const n = invNominalizza(r.nome);
+      if (n.includes('acqua')) return false;
+      if (n.includes('etanolo') || n.includes('alcool') || n.includes('alcol')) return false;
+      return true;
+    });
     prepComps = compsPerTariff.map(r => ({
       nome: r.nome, qty: r.qty, unit: r.unit,
       prezzoAcq: r.prezzoAcq||0, fonte: r.fonte||'art5'
     }));
+
     sincronizzaTariffazione();
     return;
   }
+
+  // Modalità % — mostra pannello componenti aggiuntivi
+  const compCard = document.getElementById('prep-comp-extra');
+  if (compCard && compCard.closest) {
+    const card = compCard.closest('.card');
+    if (card) card.style.display = '';
+  }
+
 
   const qt   = parseFloat(document.getElementById('qt').value) || 100;
   const conc = parseFloat(document.getElementById('conc').value) || 2;
@@ -2448,7 +2489,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 4;
+const APP_VERSION = 5;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
