@@ -2228,34 +2228,67 @@ function aggiornaScheda() {
 
   // ═══════════ SOLUZIONE ═══════════
   if (tipoScheda === 'soluzione') {
-    const qt     = parseFloat(document.getElementById('s-qt').value)||0;
-    const conc   = parseFloat(document.getElementById('s-conc').value)||0;
-    const percEt = parseFloat(document.getElementById('s-et').value)||0;
-    const grPA   = qt*conc/100;
-    const mlET96s = percEt > 0 ? qt*percEt/96 : 0;
+    // In modalità libera leggi direttamente da liberaRighe
+    let qt, conc, percEt, grPA, mlET96s;
+    if (modoPrepara === 'libera' && liberaRighe.length > 0) {
+      const {totG, paG, conc: concL, ingr} = liberaCalcTotale();
+      qt = totG; conc = concL; grPA = paG;
+      const etRiga = ingr.find(r => { const n=invNominalizza(r.nome); return n.includes('etanolo')||n.includes('alcool')||n.includes('alcol'); });
+      mlET96s = etRiga ? (parseFloat(etRiga.qty)||0) / 0.807 : 0;
+      percEt = mlET96s > 0 ? mlET96s / qt * 96 : 0;
+    } else {
+      qt     = parseFloat(document.getElementById('s-qt').value)||0;
+      conc   = parseFloat(document.getElementById('s-conc').value)||0;
+      percEt = parseFloat(document.getElementById('s-et').value)||0;
+      grPA   = qt*conc/100;
+      mlET96s = percEt > 0 ? qt*percEt/96 : 0;
+    }
     const nFlac  = 1;
     const pET    = parseFloat(document.getElementById('t-et').value)||0;
 
-    formulaItems = [
-      {nome:nomePA, val:fmt(grPA,2), unit:'g'},
-      ...(percEt>0?[{nome:'Etanolo 96°', val:fmt(mlET96s,1), unit:'ml'}]:[]),
-      {nome:'Acqua purificata', val:'q.b. a '+qt, unit:'ml'},
-      {nome:'Flacone ambrato', val:String(nFlac), unit:'pz'},
-    ];
-    proc = [
-      'Pesare <strong>'+fmt(grPA,2)+' g</strong> di '+nomePA+' su bilancia analitica.',
-      'Sciogliere in <strong>'+fmt(mlET96s,1)+' ml</strong> di etanolo 96°.',
-      'Trasferire in matraccio tarato da <strong>'+qt+' ml</strong>.',
-      'Portare a volume con acqua purificata q.b. a '+qt+' ml, mescolando.',
-      'Verificare limpidezza. Filtrare su carta da filtro se necessario.',
-      'Trasferire in flacone ambrato, chiudere ed etichettare.',
-    ];
-    lottiItems = [
-      {nome:nomePA, lotto:lottoAS},
-      {nome:'Etanolo 96°', lotto:document.getElementById('s-lotto-et').value||'—'},
-      {nome:'Acqua purificata', lotto:document.getElementById('s-lotto-ac').value||'—'},
-    ];
-    costoPA = grPA*pPA; costoET = mlET96s*pET;
+    if (modoPrepara === 'libera' && liberaRighe.length > 0) {
+      const {ingr: ingrL} = liberaCalcTotale();
+      formulaItems = ingrL.map(r => {
+        const q = parseFloat(r.qty)||0;
+        const densita = getDensita(r.nome);
+        const convNote = densita && r.unit==='g' ? ' (≈'+fmt(q/densita,1)+' ml)' : '';
+        return {nome: r.nome + convNote, val: r.qty, unit: r.unit};
+      });
+      formulaItems.push({nome:'Flacone ambrato', val:String(nFlac), unit:'pz'});
+      proc = [
+        'Pesare e/o misurare tutti i componenti secondo la formula.',
+        ...ingrL.map(r => 'Pesare/misurare <strong>'+r.qty+' '+r.unit+'</strong> di '+r.nome+'.'),
+        'Miscelare nell\'ordine indicato. Verificare aspetto e omogeneità.',
+        'Trasferire nel recipiente finale. Etichettare.',
+      ];
+      // Lotti da liberaRighe
+      lottiItems = ingrL.map(r => {
+        const invFound = invLoadMerged().find(s => invNominalizza(s.nome).includes(invNominalizza(r.nome)));
+        return {nome: r.nome, lotto: r.lotto || invFound?.lottoInt || invFound?.lotto || '—'};
+      });
+    } else {
+      formulaItems = [
+        {nome:nomePA, val:fmt(grPA,2), unit:'g'},
+        ...(percEt>0?[{nome:'Etanolo 96°', val:fmt(mlET96s,1), unit:'ml'}]:[]),
+        {nome:'Acqua purificata', val:'q.b. a '+qt, unit:'ml'},
+        {nome:'Flacone ambrato', val:String(nFlac), unit:'pz'},
+      ];
+      proc = [
+        'Pesare <strong>'+fmt(grPA,2)+' g</strong> di '+nomePA+' su bilancia analitica.',
+        'Sciogliere in <strong>'+fmt(mlET96s,1)+' ml</strong> di etanolo 96°.',
+        'Trasferire in matraccio tarato da <strong>'+qt+' ml</strong>.',
+        'Portare a volume con acqua purificata q.b. a '+qt+' ml, mescolando.',
+        'Verificare limpidezza. Filtrare su carta da filtro se necessario.',
+        'Trasferire in flacone ambrato, chiudere ed etichettare.',
+      ];
+      lottiItems = [
+        {nome:nomePA, lotto:lottoAS},
+        {nome:'Etanolo 96°', lotto:document.getElementById('s-lotto-et').value||'—'},
+        {nome:'Acqua purificata', lotto:document.getElementById('s-lotto-ac').value||'—'},
+      ];
+    }
+    costoPA = grPA*pPA;
+    costoET = modoPrepara === 'libera' ? liberaMlEt*pET : mlET96s*pET;
     costoFL_s = nFlac*pFL; baseB = 6.65; nomeVoceB = 'Soluzioni (voce 1)';
 
   // ═══════════ SOSPENSIONE ═══════════
@@ -2532,14 +2565,26 @@ function compilaScheda() {
         tipoPrep === 'unguento' ? 'Unguento' :
         tipoPrep === 'polvere' ? 'Polvere' : 'Sospensione'));
     document.getElementById('s-prep').value  = prepNome;
-    const qt   = document.getElementById('qt').value;
-    const conc = document.getElementById('conc').value;
-    const et   = document.getElementById('perc-et') ? document.getElementById('perc-et').value : '0';
-    document.getElementById('s-qt').value    = qt;
-    document.getElementById('s-conc').value  = conc;
-    if (document.getElementById('s-et')) document.getElementById('s-et').value = et;
-    const eccip = document.getElementById('eccip-nome') ? document.getElementById('eccip-nome').value : '';
-    if (document.getElementById('s-eccip')) document.getElementById('s-eccip').value = eccip;
+    if (modoPrepara === 'libera') {
+      // Modalità formula libera: leggi da liberaRighe
+      const {totG, paG, conc: concL, ingr} = liberaCalcTotale();
+      document.getElementById('s-qt').value   = fmt(totG,1);
+      document.getElementById('s-conc').value = fmt(concL,2);
+      const etRiga = ingr.find(r => {
+        const n = invNominalizza(r.nome);
+        return n.includes('etanolo') || n.includes('alcool') || n.includes('alcol');
+      });
+      if (document.getElementById('s-et')) document.getElementById('s-et').value = etRiga ? etRiga.qty : '0';
+    } else {
+      const qt   = document.getElementById('qt').value;
+      const conc = document.getElementById('conc').value;
+      const et   = document.getElementById('perc-et') ? document.getElementById('perc-et').value : '0';
+      document.getElementById('s-qt').value    = qt;
+      document.getElementById('s-conc').value  = conc;
+      if (document.getElementById('s-et')) document.getElementById('s-et').value = et;
+      const eccip = document.getElementById('eccip-nome') ? document.getElementById('eccip-nome').value : '';
+      if (document.getElementById('s-eccip')) document.getElementById('s-eccip').value = eccip;
+    }
   }
 
   // 4. Prezzo da Tariffazione — legge l'ultimo elemento .totale-num (prezzo al pubblico)
@@ -2593,7 +2638,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 13;
+const APP_VERSION = 14;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
