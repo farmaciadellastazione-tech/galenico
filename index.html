@@ -1144,12 +1144,24 @@ function liberaRemoveRiga(i) {
 function liberaRenderRighe() {
   const container = document.getElementById('libera-righe');
   if (!container) return;
+  // Non rifare il DOM se ci sono campi con focus — aggiorna solo i valori visualizzati
+  const hasFocus = container.querySelector('input:focus, select:focus');
+  if (hasFocus) {
+    // Aggiorna solo le note di conversione senza rifare il DOM
+    liberaRighe.forEach((r, i) => {
+      const densita = getDensita(r.nome);
+      const convNote = r.qty && densita
+        ? (r.unit === 'g' ? ' → '+fmt(parseFloat(r.qty)/densita,1)+' ml' : ' → '+fmt(parseFloat(r.qty)*densita,2)+' g')
+        : '';
+      const spans = container.querySelectorAll('[data-conv="'+i+'"]');
+      spans.forEach(s => s.textContent = convNote);
+    });
+    return;
+  }
   container.innerHTML = liberaRighe.map((r, i) => {
     const densita = getDensita(r.nome);
     const convNote = r.qty && densita
-      ? (r.unit === 'g'
-          ? ' → ' + fmt(parseFloat(r.qty)/densita, 1) + ' ml'
-          : ' → ' + fmt(parseFloat(r.qty)*densita, 2) + ' g')
+      ? (r.unit === 'g' ? ' → '+fmt(parseFloat(r.qty)/densita,1)+' ml' : ' → '+fmt(parseFloat(r.qty)*densita,2)+' g')
       : '';
     const paLabel = r.isPa
       ? '<span style="font-size:10px;background:var(--accent);color:#fff;padding:1px 6px;border-radius:3px;margin-right:4px">PA</span>'
@@ -1158,7 +1170,7 @@ function liberaRenderRighe() {
       ${paLabel}
       <input type="text" value="${r.nome}" placeholder="${r.isPa?'Principio attivo':'Ingrediente'}" autocomplete="off"
         style="width:180px;font-family:var(--mono);font-size:13px;padding:3px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
-        oninput="liberaRighe[${i}].nome=this.value; liberaRighe[${i}].densita=null; liberaCercaComp(${i},this.value); calcPrep()">
+        oninput="liberaRighe[${i}].nome=this.value; liberaRighe[${i}].densita=null; liberaCercaComp(${i},this.value)">
       <input type="number" value="${r.qty}" placeholder="Quantità" min="0" step="0.1"
         style="width:75px;font-family:var(--mono);font-size:13px;padding:3px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
         oninput="liberaRighe[${i}].qty=this.value; calcPrep()">
@@ -1167,25 +1179,31 @@ function liberaRenderRighe() {
         <option value="g" ${r.unit==='g'?'selected':''}>g</option>
         <option value="ml" ${r.unit==='ml'?'selected':''}>ml</option>
       </select>
-      <span style="font-size:11px;color:var(--accent)">${convNote}</span>
+      <span data-conv="${i}" style="font-size:11px;color:var(--accent)">${convNote}</span>
       ${!r.isPa ? `<button onclick="liberaRemoveRiga(${i})" style="font-size:11px;padding:2px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">✕</button>` : ''}
       <div id="libera-sug-${i}" style="width:100%;display:flex;flex-wrap:wrap;gap:4px;margin-top:2px"></div>
     </div>`;
   }).join('');
 }
 
+let _liberaCercaTimer = null;
 function liberaCercaComp(i, q) {
-  const dd = document.getElementById('libera-sug-'+i);
-  if (!dd || !q || q.length < 3) { if(dd) dd.innerHTML=''; return; }
-  const inv = typeof invLoadMerged === 'function' ? invLoadMerged() : [];
-  const allA = Object.keys(ALLEGATO_A).map(k => ({nome: k.charAt(0).toUpperCase()+k.slice(1), prezzo: ALLEGATO_A[k], fonte:'allegatoA'}));
-  const candidates = [...inv, ...allA].filter(s => invNominalizza(s.nome).includes(invNominalizza(q))).slice(0,6);
-  dd.innerHTML = candidates.map(s =>
-    `<button onclick="liberaSelComp(${i},'${s.nome.replace(/'/g,"\\'")}',${s.prezzo||0},'${s.fonte||'art5'}')"
-      style="font-size:11px;padding:2px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">
-      ${s.nome}${s.prezzo>0?' — €'+s.prezzo.toFixed(4)+'/g':''}${s.fonte==='allegatoA'?' ✓All.A':''}
-    </button>`
-  ).join('');
+  clearTimeout(_liberaCercaTimer);
+  _liberaCercaTimer = setTimeout(() => {
+    const dd = document.getElementById('libera-sug-'+i);
+    if (!dd) return;
+    if (!q || q.length < 3) { dd.innerHTML=''; return; }
+    const inv = typeof invLoadMerged === 'function' ? invLoadMerged() : [];
+    const allA = Object.keys(ALLEGATO_A).map(k => ({nome: k.charAt(0).toUpperCase()+k.slice(1), prezzo: ALLEGATO_A[k], fonte:'allegatoA'}));
+    const candidates = [...inv, ...allA].filter(s => invNominalizza(s.nome).includes(invNominalizza(q))).slice(0, 6);
+    dd.innerHTML = candidates.map(s =>
+      `<button onclick="liberaSelComp(${i},'${s.nome.replace(/'/g,"\\'")}',${s.prezzo||0},'${s.fonte||'art5'}')"
+        style="font-size:11px;padding:2px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">
+        ${s.nome}${s.prezzo>0?' — €'+s.prezzo.toFixed(4)+'/g':''}${s.fonte==='allegatoA'?' ✓All.A':''}
+      </button>`
+    ).join('');
+    if (!candidates.length) dd.innerHTML = '<span style="font-size:11px;color:var(--text-faint)">nessun risultato</span>';
+  }, 300);
 }
 
 function liberaSelComp(i, nome, prezzo, fonte) {
@@ -2430,7 +2448,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 3;
+const APP_VERSION = 4;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
