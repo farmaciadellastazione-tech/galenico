@@ -1088,9 +1088,9 @@ function ordiniAggiornaNota(i, campo, val) {
 function ordinaEmail() {
   const list = ordiniLoad();
   if (!list.length) { alert('Nessuna sostanza da ordinare.'); return; }
-  const corpo = 'Gentili Signori,\n\nSi prega di quotare / spedire le seguenti sostanze:\n\n' +
-    list.map(o => '- ' + o.nome + (o.minOrd ? ' — ' + o.minOrd + ' g/ml' : '') + (o.note ? ' (' + o.note + ')' : '')).join('\n') +
-    '\n\nFarmacia della Stazione\nVia Fiume 75 — La Spezia\nTel. 0187-706147\n';
+  const corpo = 'Spett.le Farmalabor,\n\nSi prega di quotare / spedire le seguenti sostanze:\n\n' +
+    list.map(o => '- ' + o.nome + (o.minOrd ? ' — ' + o.minOrd : '') + (o.note ? ' (' + o.note + ')' : '')).join('\n') +
+    '\n\nFarmacia della Stazione\nVia Fiume 75 — La Spezia\nTel. 0187-706147\nP.I. 01317570115\nCod. QU Farma 6706\n';
   const subject = 'Ordine sostanze galeniche — Farmacia della Stazione';
   const mailto = 'mailto:ordini@farmalabor.it?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(corpo);
   window.open(mailto);
@@ -2430,7 +2430,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 2;
+const APP_VERSION = 3;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -2729,6 +2729,14 @@ function invModifica(lsIdx) {
           <input id="mod-sds" type="url" value="${item.sds||''}" placeholder="https://..." oninput="this.dataset.manual='1'" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff">
         </div>
         <div>
+          <label style="font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:2px">Codice a barre / EAN</label>
+          <input id="mod-barcode" type="text" value="${item.barcode||''}" placeholder="Scansiona o digita" autocomplete="off" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff">
+        </div>
+        <div>
+          <label style="font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:2px">Minimo ordinabile</label>
+          <input id="mod-min-order" type="number" value="${item.minOrd||''}" min="0" step="1" placeholder="es. 100" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff">
+        </div>
+        <div>
           <label style="font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:2px">Quantità</label>
           <input id="mod-qty" type="number" value="${item.qty||0}" min="0" step="0.1" oninput="invCalcolaPrezzoMod()" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff">
         </div>
@@ -2761,6 +2769,8 @@ function invSalvaModifica(idx) {
     dataCh:   document.getElementById('mod-data-ch').value,
     qty:        parseFloat(document.getElementById('mod-qty').value) || 0,
     sds:        document.getElementById('mod-sds').value.trim(),
+    barcode:    document.getElementById('mod-barcode') ? document.getElementById('mod-barcode').value.trim() : (inv[idx].barcode||''),
+    minOrd:     document.getElementById('mod-min-order') ? document.getElementById('mod-min-order').value : (inv[idx].minOrd||''),
     prezzoBolla: parseFloat(document.getElementById('mod-prezzo-bolla').value) || 0,
     prezzo:     parseFloat(document.getElementById('mod-prezzo').value) || 0,
   };
