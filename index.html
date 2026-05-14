@@ -1331,15 +1331,28 @@ function calcPrep() {
       document.getElementById('prep-pa-nome').value = paRiga.nome;
       if (document.getElementById('t-pa-nome')) {
         document.getElementById('t-pa-nome').value = paRiga.nome;
-        // Cerca prezzo: prima All.A, poi inventario, poi usa prezzoAcq dalla riga
-        tarRicercaPA();
-        // Se dopo tarRicercaPA il prezzo è ancora 0, usa il prezzo dalla riga libera
-        const tPaEl = document.getElementById('t-pa');
-        if (tPaEl && (!tPaEl.value || parseFloat(tPaEl.value) === 0) && paRiga.prezzoAcq > 0) {
-          tPaEl.value = paRiga.prezzoAcq.toFixed(4);
+      }
+      // Imposta prezzo PA direttamente: All.A ha priorità, poi inventario, poi prezzoAcq dalla riga
+      const tPaEl = document.getElementById('t-pa');
+      const fonteEl = document.getElementById('t-pa-fonte');
+      if (tPaEl) {
+        const qNorm = invNominalizza(paRiga.nome);
+        const chiaveAll = Object.keys(ALLEGATO_A).find(k => k.includes(qNorm) || qNorm.includes(k.split(' ')[0]));
+        if (chiaveAll) {
+          tPaEl.value = ALLEGATO_A[chiaveAll].toFixed(4);
+          tPaEl.readOnly = true;
+          tPaEl.style.background = 'var(--accent-light)';
+          if (fonteEl) fonteEl.innerHTML = '<strong style="color:var(--accent)">✓ Allegato A — €'+ALLEGATO_A[chiaveAll].toFixed(4)+'/g (obbligatorio)</strong>';
+          tarPADaAllegatoA = true;
+        } else {
+          // Cerca in inventario
+          const invFound = invLoadMerged().find(s => invNominalizza(s.nome).includes(qNorm) || qNorm.includes(invNominalizza(s.nome)));
+          const prezzo = (invFound && invFound.prezzo > 0) ? invFound.prezzo : paRiga.prezzoAcq || 0;
+          tPaEl.value = prezzo > 0 ? prezzo.toFixed(4) : '';
           tPaEl.readOnly = false;
-          const fonteEl = document.getElementById('t-pa-fonte');
-          if (fonteEl) fonteEl.innerHTML = '<strong style="color:var(--accent-mid)">✓ Inventario — €'+paRiga.prezzoAcq.toFixed(4)+'/g (Art. 5)</strong>';
+          tPaEl.style.background = 'var(--bg)';
+          if (fonteEl && prezzo > 0) fonteEl.innerHTML = '<strong style="color:var(--accent-mid)">✓ Inventario — €'+prezzo.toFixed(4)+'/g (Art. 5)</strong>';
+          tarPADaAllegatoA = false;
         }
       }
     }
@@ -2498,7 +2511,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 6;
+const APP_VERSION = 7;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
