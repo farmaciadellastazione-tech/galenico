@@ -247,7 +247,7 @@
 <div class="page active" id="page-preparazione">
   <h1>Preparazione galenica</h1>
   <p class="subtitle" id="prep-subtitle">Calcolo formula e procedura</p>
-  <div class="card">
+  <div class="card" id="tariff-card-tipo">
     <div class="card-title">Tipo di preparazione</div>
     <div class="seg">
       <button class="seg-btn active" onclick="setTipo('soluzione',this)">Soluzione</button>
@@ -363,7 +363,7 @@
   <h1>Tariffazione magistrale</h1>
   <p class="subtitle">D.M. 22 settembre 2017 (mod. D.M. 13 dicembre 2017) — IVA 10%</p>
 
-  <div class="card">
+  <div class="card" id="tariff-card-tipo">
     <div class="card-title">Tipo di preparazione</div>
     <div class="seg">
       <button class="seg-btn active" onclick="setTipoTariff('liquida',this)">Soluzione</button>
@@ -389,7 +389,7 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="tariff-card-pa">
     <div class="card-title">Principio attivo — ricerca Allegato A</div>
     <div class="field-row">
       <span class="field-label">Sostanza</span>
@@ -404,7 +404,7 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="tariff-card-extra">
     <div class="card-title">Altri costi materie prime (netto IVA)</div>
     <div class="field-row" id="tt-row-et"><span class="field-label">Etanolo 96° (€/ml)</span><input type="number" id="t-et" value="" step="0.00001" min="0" autocomplete="off" oninput="calcTariff()"><span class="field-note" id="t-et-fonte">prezzo acquisto</span></div>
     <div class="field-row">
@@ -1620,6 +1620,25 @@ function calcPrep() {
 }
 
 function sincronizzaTariffazione() {
+  const isLibera = modoPrepara === 'libera';
+  // In modalità libera nascondi i campi manuali — tutto viene dalla formula
+  ['tariff-card-tipo','tariff-card-pa','tariff-card-extra'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = isLibera ? 'none' : '';
+  });
+  // Mostra/nascondi nota modalità libera
+  let notaEl = document.getElementById('tariff-libera-nota');
+  if (isLibera && !notaEl) {
+    notaEl = document.createElement('div');
+    notaEl.id = 'tariff-libera-nota';
+    notaEl.className = 'card';
+    notaEl.style.cssText = 'background:var(--accent-light);border:1px solid var(--accent);font-size:13px;color:var(--accent-dark,#1a5c2e)';
+    notaEl.innerHTML = '<strong>Modalità formula libera</strong> — sostanze, prezzi e componenti vengono dalla Preparazione automaticamente.';
+    const tarPage = document.getElementById('page-tariffazione');
+    if (tarPage) tarPage.insertBefore(notaEl, tarPage.children[2]);
+  }
+  if (notaEl) notaEl.style.display = isLibera ? '' : 'none';
+
   const nomePA = document.getElementById('prep-pa-nome') ? document.getElementById('prep-pa-nome').value.trim() : '';
   if (nomePA) {
     const trovato = invGetPrezzo(nomePA);
@@ -2664,7 +2683,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 18;
+const APP_VERSION = 19;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
