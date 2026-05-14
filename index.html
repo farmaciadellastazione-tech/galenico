@@ -1329,6 +1329,19 @@ function calcPrep() {
     const paRiga = ingr.find(r => r.isPa);
     if (paRiga && document.getElementById('prep-pa-nome')) {
       document.getElementById('prep-pa-nome').value = paRiga.nome;
+      if (document.getElementById('t-pa-nome')) {
+        document.getElementById('t-pa-nome').value = paRiga.nome;
+        // Cerca prezzo: prima All.A, poi inventario, poi usa prezzoAcq dalla riga
+        tarRicercaPA();
+        // Se dopo tarRicercaPA il prezzo è ancora 0, usa il prezzo dalla riga libera
+        const tPaEl = document.getElementById('t-pa');
+        if (tPaEl && (!tPaEl.value || parseFloat(tPaEl.value) === 0) && paRiga.prezzoAcq > 0) {
+          tPaEl.value = paRiga.prezzoAcq.toFixed(4);
+          tPaEl.readOnly = false;
+          const fonteEl = document.getElementById('t-pa-fonte');
+          if (fonteEl) fonteEl.innerHTML = '<strong style="color:var(--accent-mid)">✓ Inventario — €'+paRiga.prezzoAcq.toFixed(4)+'/g (Art. 5)</strong>';
+        }
+      }
     }
     if (document.getElementById('qt'))   document.getElementById('qt').value   = fmt(totG,1);
     if (document.getElementById('conc')) document.getElementById('conc').value = fmt(conc,2);
@@ -2485,7 +2498,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 5;
+const APP_VERSION = 6;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
