@@ -1141,7 +1141,7 @@ function setModoPrepara(modo, btn) {
 }
 
 function liberaAddRiga(isPa) {
-  liberaRighe.push({nome:'', qty:'', unit:'g', isPa: !!isPa, densita: null});
+  liberaRighe.push({nome:'', qty:'', unit:'g', isPa: false, densita: null});
   liberaRenderRighe();
 }
 
@@ -1174,12 +1174,10 @@ function liberaRenderRighe() {
     const convNote = r.qty && densita
       ? (r.unit === 'g' ? ' → '+fmt(parseFloat(r.qty)/densita,1)+' ml' : ' → '+fmt(parseFloat(r.qty)*densita,2)+' g')
       : '';
-    const paLabel = r.isPa
-      ? '<span style="font-size:10px;background:var(--accent);color:#fff;padding:1px 6px;border-radius:3px;margin-right:4px">PA</span>'
-      : '';
-    return `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;padding:6px 8px;border:1px solid var(--border${r.isPa?'-strong':''});border-radius:var(--radius)${r.isPa?';background:var(--accent-light)':''}">
+    const paLabel = '';
+    return `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;padding:6px 8px;border:1px solid var(--border-strong);border-radius:var(--radius)">
       ${paLabel}
-      <input type="text" value="${r.nome}" placeholder="${r.isPa?'Principio attivo':'Ingrediente'}" autocomplete="off"
+      <input type="text" value="${r.nome}" placeholder="Sostanza" autocomplete="off"
         style="width:180px;font-family:var(--mono);font-size:13px;padding:3px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
         oninput="liberaRighe[${i}].nome=this.value; liberaRighe[${i}].densita=null; liberaCercaComp(${i},this.value)">
       <input type="number" value="${r.qty}" placeholder="Quantità" min="0" step="0.1"
@@ -1191,7 +1189,7 @@ function liberaRenderRighe() {
         <option value="ml" ${r.unit==='ml'?'selected':''}>ml</option>
       </select>
       <span data-conv="${i}" style="font-size:11px;color:var(--accent)">${convNote}</span>
-      ${!r.isPa ? `<button onclick="liberaRemoveRiga(${i})" style="font-size:11px;padding:2px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">✕</button>` : ''}
+      <button onclick="liberaRemoveRiga(${i})" style="font-size:11px;padding:2px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">✕</button>
       <div id="libera-sug-${i}" style="width:100%;display:flex;flex-wrap:wrap;gap:4px;margin-top:2px"></div>
     </div>`;
   }).join('');
@@ -1265,14 +1263,15 @@ function liberaCalcTotale() {
   // Calcola totale g e concentrazione PA
   const ingr = liberaGetIngr();
   let totG = 0, paG = 0;
-  ingr.forEach(r => {
+  ingr.forEach((r, i) => {
     const q = parseFloat(r.qty)||0;
     const densita = getDensita(r.nome);
     const grams = r.unit === 'ml' && densita ? q * densita : q;
     totG += grams;
-    if (r.isPa) paG = grams;
+    if (i === 0) paG = grams; // prima sostanza = PA per il calcolo concentrazione
   });
-  const conc = totG > 0 ? (paG / totG * 100) : 0;
+  const concDich = parseFloat(document.getElementById('libera-conc')?.value)||0;
+  const conc = concDich > 0 ? concDich : (totG > 0 ? (paG / totG * 100) : 0);
   return {totG, paG, conc, ingr};
 }
 
@@ -1355,7 +1354,7 @@ function calcPrep() {
       const densita = getDensita(r.nome);
       const convNote = densita && r.unit === 'g' ? ' (≈'+fmt(q/densita,1)+' ml)' :
                        densita && r.unit === 'ml' ? ' (≈'+fmt(q*densita,2)+' g)' : '';
-      return {name: r.nome + (r.isPa?' (PA)':'') + convNote, val: r.qty, unit: r.unit};
+      return {name: r.nome + convNote, val: r.qty, unit: r.unit};
     });
     if (totG > 0) items.push({name:'Totale calcolato', val: fmt(totG,1), unit:'g'});
     if (conc > 0) items.push({name:'Concentrazione PA', val: fmt(conc,2), unit:'%'});
@@ -1372,7 +1371,7 @@ function calcPrep() {
     document.getElementById('procedura').innerHTML = proc.map(p => '<li>'+p+'</li>').join('');
 
     // Sincronizza PA name e qt/conc PRIMA di sincronizzaTariffazione
-    const paRiga = ingr.find(r => r.isPa);
+    const paRiga = ingr.length > 0 ? ingr[0] : null;
     if (paRiga && document.getElementById('prep-pa-nome')) {
       document.getElementById('prep-pa-nome').value = paRiga.nome;
       if (document.getElementById('t-pa-nome')) {
@@ -1422,8 +1421,8 @@ function calcPrep() {
 
     // Componenti extra per tariffazione: escludi PA, acqua, etanolo
     // (etanolo è già contato auto in calcTariff, acqua non conta)
-    const compsPerTariff = ingr.filter(r => {
-      if (r.isPa) return false;
+    const compsPerTariff = ingr.filter((r, _ri) => {
+      if (_ri === 0) return false; // prima sostanza = PA
       const n = invNominalizza(r.nome);
       if (n.includes('acqua')) return false;
       if (n.includes('etanolo') || n.includes('alcool') || n.includes('alcol')) return false;
@@ -1438,8 +1437,8 @@ function calcPrep() {
     liberaRigheExtra = [];
     liberaCostoExtra = 0;
 
-    ingr.forEach(r => {
-      if (r.isPa) return;
+    ingr.forEach((r, _ri) => {
+      if (_ri === 0) return; // prima sostanza = PA
       const q = parseFloat(r.qty)||0;
       const densita = getDensita(r.nome);
       const grams = r.unit === 'ml' && densita ? q * densita : q;
@@ -1971,7 +1970,10 @@ function calcTariff() {
   const compManuale = parseInt(document.getElementById('t-comp').value)||0;
   const percEtTariff = parseFloat(document.getElementById('t-et-perc')?.value)||0;
   const compAutoEt = (tipoTariff === 'liquida' && (percEtTariff > 0 || (modoPrepara === 'libera' && liberaMlEt > 0))) ? 1 : 0;
-  const comp = compManuale + compAutoEt;
+  // In modalità libera: conta tutte le sostanze, base 2 incluse nel prezzo base
+  const comp = modoPrepara === 'libera'
+    ? Math.max(0, liberaGetIngr().length - 2)  // oltre le prime 2
+    : compManuale + compAutoEt;
   const op    = parseInt(document.getElementById('t-op').value)||0;
   const stupp = parseInt(document.getElementById('t-stupp').value)||0;
   const dop   = parseInt(document.getElementById('t-dop').value)||0;
@@ -2656,7 +2658,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 16;
+const APP_VERSION = 17;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
