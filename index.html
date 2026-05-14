@@ -1621,11 +1621,25 @@ function calcPrep() {
 
 function sincronizzaTariffazione() {
   const isLibera = modoPrepara === 'libera';
-  // In modalità libera nascondi i campi manuali — tutto viene dalla formula
-  ['tariff-card-tipo','tariff-card-pa','tariff-card-extra'].forEach(id => {
+  // In modalità libera nascondi tipo, PA e componenti extra manuali
+  // Il flacone resta sempre visibile
+  ['tariff-card-tipo','tariff-card-pa'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = isLibera ? 'none' : '';
   });
+  // Nella card extra: nascondi solo le righe componenti, tieni flacone
+  const cardExtra = document.getElementById('tariff-card-extra');
+  if (cardExtra) {
+    const extraRows = cardExtra.querySelector('#tt-extra-rows');
+    const extraTitle = cardExtra.querySelector('.tariff-group-title');
+    const extraNote = cardExtra.querySelector('[style*="Lascia vuoto"]');
+    if (extraRows) extraRows.style.display = isLibera ? 'none' : '';
+    if (extraTitle) extraTitle.style.display = isLibera ? 'none' : '';
+    if (extraNote) extraNote.style.display = isLibera ? 'none' : '';
+    // Etanolo manuale: nascosto in modalità libera (viene dalla formula)
+    const rowEt = cardExtra.querySelector('#tt-row-et');
+    if (rowEt) rowEt.style.display = isLibera ? 'none' : '';
+  }
   // Mostra/nascondi nota modalità libera
   let notaEl = document.getElementById('tariff-libera-nota');
   if (isLibera && !notaEl) {
@@ -2458,15 +2472,28 @@ function aggiornaScheda() {
   // ═══════ calcolo tariff ═══════
   const suppH  = 2.50;
   const inc40  = baseB * 0.40;
-  const netto  = costoPA + costoET + baseB + inc40 + suppH + costoFL_s + costoExtra;
+  const nettoMaterie = modoPrepara === 'libera' ? (costoPA + liberaCostoExtra) : (costoPA + costoET + costoExtra);
+  const netto  = nettoMaterie + baseB + inc40 + suppH + costoFL_s;
   const iva    = netto * 0.10;
   const totale = prezzo > 0 ? prezzo : netto + iva;
 
   let tariffRows = [
     {n: nomePA + ' — ' + fmt(costoPA/Math.max(pPA,0.0001),3) + ' g × ' + fmtE(pPA) + '/g', v: costoPA},
   ];
-  if (costoET > 0) tariffRows.push({n:'Etanolo 96° × '+fmtE(parseFloat(document.getElementById('t-et').value)||0)+'/ml', v:costoET});
-  extra.forEach(e => tariffRows.push({n:e.nome+' '+fmt(e.qty,3)+' '+e.unit+' × '+fmtE(e.prez)+'/'+e.unit, v:e.costo}));
+  if (modoPrepara === 'libera') {
+    // Modalità libera: mostra tutte le sostanze da liberaRigheExtra
+    liberaRigheExtra.forEach(r => {
+      const isEt = invNominalizza(r.nome).includes('etanolo') || invNominalizza(r.nome).includes('alcool') || invNominalizza(r.nome).includes('alcol');
+      const pET = parseFloat(document.getElementById('t-et').value)||0;
+      const dispQty = isEt ? fmt(r.qty/0.807,1)+' ml' : fmt(r.qty,2)+' '+r.unit;
+      const dispPrezzo = isEt ? fmtE(pET)+'/ml' : fmtE(r.prezzo)+'/g';
+      const dispCosto = isEt ? liberaMlEt*pET : r.costo;
+      tariffRows.push({n: r.nome+' — '+dispQty+' × '+dispPrezzo, v: dispCosto});
+    });
+  } else {
+    if (costoET > 0) tariffRows.push({n:'Etanolo 96° × '+fmtE(parseFloat(document.getElementById('t-et').value)||0)+'/ml', v:costoET});
+    extra.forEach(e => tariffRows.push({n:e.nome+' '+fmt(e.qty,3)+' '+e.unit+' × '+fmtE(e.prez)+'/'+e.unit, v:e.costo}));
+  }
   tariffRows.push(
     {n:'All. B — '+nomeVoceB, v:baseB},
     {n:'Incremento 40% (Art. 7)', v:inc40},
@@ -2683,7 +2710,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 19;
+const APP_VERSION = 21;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
