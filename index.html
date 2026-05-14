@@ -1095,7 +1095,9 @@ function ordinaEmail() {
 }
 
 
-let modoPrepara = 'perc'; // 'perc' | 'libera'
+let modoPrepara = 'perc';
+let liberaGrPA = 0;
+let liberaMlEt = 0;
 let liberaRighe = []; // [{nome, qty, unit, isPa, densita}]
 
 // Densità approssimative per conversione g↔ml
@@ -1387,6 +1389,20 @@ function calcPrep() {
       nome: r.nome, qty: r.qty, unit: r.unit,
       prezzoAcq: r.prezzoAcq||0, fonte: r.fonte||'art5'
     }));
+
+    liberaGrPA = paG;
+
+    // Calcola ml reali di etanolo dalla riga libera
+    const etRigaPerTariff = ingr.find(r => {
+      const n = invNominalizza(r.nome);
+      return n.includes('etanolo') || n.includes('alcool') || n.includes('alcol');
+    });
+    if (etRigaPerTariff) {
+      const qEt = parseFloat(etRigaPerTariff.qty)||0;
+      liberaMlEt = etRigaPerTariff.unit === 'ml' ? qEt : qEt / 0.807;
+    } else {
+      liberaMlEt = 0;
+    }
 
     // Forza tipo tariffazione a liquida in modalità libera
     if (tipoTariff !== 'liquida') {
@@ -1958,8 +1974,8 @@ function calcTariff() {
     const qt     = parseFloat(document.getElementById('t-qt').value)||0;
     const conc   = parseFloat(document.getElementById('t-conc').value)||0;
     const percEt = parseFloat(document.getElementById('t-et-perc').value)||0;
-    const grPA   = qt*conc/100;
-    const mlET   = tipoTariff === 'liquida' ? qt*percEt/100 : 0;
+    const grPA   = modoPrepara === 'libera' ? liberaGrPA : qt*conc/100;
+    const mlET   = modoPrepara === 'libera' ? liberaMlEt : (tipoTariff === 'liquida' ? qt*percEt/100 : 0);
     const nFlac  = 1;
     const costoPA  = grPA*pPA;
     const costoET  = mlET*pET;
@@ -2511,7 +2527,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 7;
+const APP_VERSION = 9;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
