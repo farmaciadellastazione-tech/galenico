@@ -377,7 +377,6 @@
     <div id="tt-liquida">
       <div class="field-row"><span class="field-label">Quantità totale (ml)</span><input type="number" id="t-qt" value="" step="50" min="10" oninput="calcTariff()"></div>
       <div class="field-row"><span class="field-label">Concentrazione PA (%)</span><input type="number" id="t-conc" value="" step="0.5" min="0.1" oninput="calcTariff()"></div>
-      <div class="field-row"><span class="field-label">Etanolo (% v/v)</span><input type="number" id="t-et-perc" value="" step="5" min="0" max="96" oninput="calcTariff()"></div>
     </div>
 
     <!-- campi per capsule -->
@@ -406,7 +405,6 @@
 
   <div class="card" id="tariff-card-extra">
     <div class="card-title">Altri costi materie prime (netto IVA)</div>
-    <div class="field-row" id="tt-row-et"><span class="field-label">Etanolo 96° (€/ml)</span><input type="number" id="t-et" value="" step="0.00001" min="0" autocomplete="off" oninput="calcTariff()"><span class="field-note" id="t-et-fonte">prezzo acquisto</span></div>
     <div class="field-row">
       <span class="field-label">Flacone / recipiente (€ cad.)</span>
       <input type="number" id="t-fl" value="" step="0.01" min="0" oninput="calcTariff()">
@@ -1637,8 +1635,7 @@ function sincronizzaTariffazione() {
     if (extraTitle) extraTitle.style.display = isLibera ? 'none' : '';
     if (extraNote) extraNote.style.display = isLibera ? 'none' : '';
     // Etanolo manuale: nascosto in modalità libera (viene dalla formula)
-    const rowEt = cardExtra.querySelector('#tt-row-et');
-    if (rowEt) rowEt.style.display = isLibera ? 'none' : '';
+// tt-row-et rimosso
   }
   // Mostra/nascondi nota modalità libera
   let notaEl = document.getElementById('tariff-libera-nota');
@@ -1835,14 +1832,14 @@ const ALLEGATO_A = {
   'potassio ioduro': 0.424,
   'potassio permanganato': 0.252,
   'potassio sulfoguaiacolato': 0.144,
-  'procaina cloridrato': 59.177,
+  'procaina cloridrato': 0.580,
   'rabarbaro polvere': 0.066,
   'rabarbaro estratto fluido': 0.072,
   'ratania': 0.039,
   'resorcina': 0.216,
   'saccarina': 0.095,
-  'saccarosio': 0.491,
-  'zucchero': 0.491,
+  'saccarosio': 0.022,
+  'zucchero': 0.022,
   'senna foglia': 0.029,
   'senna frutti': 0.044,
   'sodio benzoato': 0.053,
@@ -1850,15 +1847,15 @@ const ALLEGATO_A = {
   'sodio bromuro': 0.169,
   'sodio citrato': 0.052,
   'sodio cloruro': 0.038,
-  'sodio fosfato bibasico': 4.188,
+  'sodio fosfato bibasico': 0.022,
   'sodio glicerofosfato': 0.089,
   'sodio ioduro': 0.369,
   'sodio salicilato': 0.055,
-  'sodio solfato anidro': 1.221,
+  'sodio solfato anidro': 0.025,
   'sodio solfato decaidrato': 0.010,
   'sodio stearato': 0.038,
   'sodio tiosolfato': 0.041,
-  'solfadiazina': 0.991,
+  'solfadiazina': 0.938,
   'solfanilammide': 0.354,
   'solfo precipitato': 0.034,
   'solfo sublimato': 0.031,
@@ -1889,7 +1886,7 @@ function setTipoTariff(t, btn) {
   const isLiquida = t === 'liquida' || t === 'sospensione' || t === 'semisolida' || t === 'polvere';
   document.getElementById('tt-liquida').style.display  = isLiquida ? '' : 'none';
   document.getElementById('tt-capsule').style.display  = t === 'capsule' ? '' : 'none';
-  document.getElementById('tt-row-et').style.display   = t === 'liquida' ? '' : 'none';
+  // tt-row-et rimosso
   const qtLabel = document.querySelector('#tt-liquida .field-label');
   if (qtLabel) qtLabel.textContent = (t === 'liquida' || t === 'sospensione') ? 'Quantità totale (ml)' : 'Quantità totale (g)';
   const refMap = {
@@ -2008,7 +2005,7 @@ function calcTariff() {
   const pFL   = parseFloat(document.getElementById('t-fl').value)||0;
   const compManuale = parseInt(document.getElementById('t-comp').value)||0;
   const percEtTariff = parseFloat(document.getElementById('t-et-perc')?.value)||0;
-  const compAutoEt = (tipoTariff === 'liquida' && (percEtTariff > 0 || (modoPrepara === 'libera' && liberaMlEt > 0))) ? 1 : 0;
+  const compAutoEt = 0; // etanolo trattato come qualsiasi sostanza, nessun auto-conteggio
   // In modalità libera: conta tutte le sostanze, base 2 incluse nel prezzo base
   const comp = modoPrepara === 'libera'
     ? Math.max(0, liberaGetIngr().length - 2)  // oltre le prime 2
@@ -2079,10 +2076,10 @@ function calcTariff() {
     const conc   = parseFloat(document.getElementById('t-conc').value)||0;
     const percEt = parseFloat(document.getElementById('t-et-perc').value)||0;
     const grPA   = modoPrepara === 'libera' ? liberaGrPA : qt*conc/100;
-    const mlET   = modoPrepara === 'libera' ? liberaMlEt : (tipoTariff === 'liquida' ? qt*percEt/100 : 0);
+    const mlET   = 0; // etanolo trattato come qualsiasi sostanza
     const nFlac  = 1;
     const costoPA  = grPA*pPA;
-    const costoET  = mlET*pET;
+    const costoET  = 0;
     const costoFL  = nFlac*pFL;
     const costoExtra = modoPrepara === 'libera' ? liberaCostoExtra : 0;
 
@@ -2151,7 +2148,6 @@ function calcTariff() {
             return {name: r.nome+' — '+dispQty+' × '+dispPrezzo, val: dispCosto};
           })
         : [
-            ...(mlET>0?[{name:'Etanolo 96° — '+fmt(mlET,1)+' ml × '+fmtE(pET)+'/ml', val:costoET}]:[]),
             ...extraRowsArr.map(e=>({name:e.nome+' — '+fmt(e.qty,3)+' '+e.unit+' × '+fmtE(e.prez)+'/'+e.unit+' (Art. 5)', val:e.costo})),
           ]
       ),
@@ -2341,7 +2337,7 @@ function aggiornaScheda() {
       ];
     }
     costoPA = grPA*pPA;
-    costoET = modoPrepara === 'libera' ? liberaMlEt*pET : mlET96s*pET;
+    costoET = 0; // etanolo in liberaRigheExtra o nei componenti extra
     costoFL_s = nFlac*pFL; baseB = 6.65; nomeVoceB = 'Soluzioni (voce 1)';
 
   // ═══════════ SOSPENSIONE ═══════════
@@ -2491,7 +2487,7 @@ function aggiornaScheda() {
       tariffRows.push({n: r.nome+' — '+dispQty+' × '+dispPrezzo, v: dispCosto});
     });
   } else {
-    if (costoET > 0) tariffRows.push({n:'Etanolo 96° × '+fmtE(parseFloat(document.getElementById('t-et').value)||0)+'/ml', v:costoET});
+// etanolo in liberaRigheExtra
     extra.forEach(e => tariffRows.push({n:e.nome+' '+fmt(e.qty,3)+' '+e.unit+' × '+fmtE(e.prez)+'/'+e.unit, v:e.costo}));
   }
   tariffRows.push(
@@ -2710,7 +2706,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 21;
+const APP_VERSION = 24;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
