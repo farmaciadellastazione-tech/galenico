@@ -1196,22 +1196,53 @@ function liberaCercaComp(i, q) {
     if (!dd) return;
     if (!q || q.length < 3) { dd.innerHTML=''; return; }
     const inv = typeof invLoadMerged === 'function' ? invLoadMerged() : [];
-    const allA = Object.keys(ALLEGATO_A).map(k => ({nome: k.charAt(0).toUpperCase()+k.slice(1), prezzo: ALLEGATO_A[k], fonte:'allegatoA'}));
-    const candidates = [...inv, ...allA].filter(s => invNominalizza(s.nome).includes(invNominalizza(q))).slice(0, 6);
-    dd.innerHTML = candidates.map(s =>
-      `<button onclick="liberaSelComp(${i},'${s.nome.replace(/'/g,"\\'")}',${s.prezzo||0},'${s.fonte||'art5'}')"
+    const qNorm = invNominalizza(q);
+
+    // Costruisci lista unificata: per ogni sostanza una sola voce
+    // Priorità prezzo: All.A > inventario. Lotto: sempre dall'inventario se disponibile
+    const seen = new Set();
+    const candidates = [];
+
+    // Prima cerca in Allegato A
+    Object.keys(ALLEGATO_A).forEach(k => {
+      if (!invNominalizza(k).includes(qNorm)) return;
+      const nome = k.charAt(0).toUpperCase() + k.slice(1);
+      const key = invNominalizza(nome);
+      if (seen.has(key)) return;
+      seen.add(key);
+      // Cerca lotto in inventario
+      const invFound = inv.find(s => invNominalizza(s.nome).includes(key) || key.includes(invNominalizza(s.nome)));
+      candidates.push({nome, prezzo: ALLEGATO_A[k], fonte:'allegatoA', lotto: invFound?.lottoInt || invFound?.lotto || ''});
+    });
+
+    // Poi cerca in inventario (solo sostanze non già trovate in All.A)
+    inv.forEach(s => {
+      if (!invNominalizza(s.nome).includes(qNorm)) return;
+      const key = invNominalizza(s.nome);
+      if (seen.has(key)) return;
+      seen.add(key);
+      candidates.push({nome: s.nome, prezzo: s.prezzo||0, fonte:'inventario', lotto: s.lottoInt || s.lotto || ''});
+    });
+
+    if (!candidates.length) { dd.innerHTML = '<span style="font-size:11px;color:var(--text-faint)">nessun risultato</span>'; return; }
+
+    dd.innerHTML = candidates.slice(0,6).map(s => {
+      const prezzoLabel = s.prezzo>0 ? ' — €'+s.prezzo.toFixed(4)+'/g' : '';
+      const fonteLabel = s.fonte==='allegatoA' ? ' <span style="color:var(--accent)">✓All.A</span>' : '';
+      const lottoLabel = s.lotto ? ' <span style="color:var(--text-faint)">lotto:'+s.lotto+'</span>' : '';
+      return `<button onclick="liberaSelComp(${i},'${s.nome.replace(/'/g,"\\'")}',${s.prezzo||0},'${s.fonte}','${s.lotto||''}')"
         style="font-size:11px;padding:2px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">
-        ${s.nome}${s.prezzo>0?' — €'+s.prezzo.toFixed(4)+'/g':''}${s.fonte==='allegatoA'?' ✓All.A':''}
-      </button>`
-    ).join('');
-    if (!candidates.length) dd.innerHTML = '<span style="font-size:11px;color:var(--text-faint)">nessun risultato</span>';
+        ${s.nome}${prezzoLabel}${fonteLabel}${lottoLabel}
+      </button>`;
+    }).join('');
   }, 300);
 }
 
-function liberaSelComp(i, nome, prezzo, fonte) {
+function liberaSelComp(i, nome, prezzo, fonte, lotto) {
   liberaRighe[i].nome = nome;
   liberaRighe[i].prezzoAcq = prezzo;
   liberaRighe[i].fonte = fonte;
+  liberaRighe[i].lotto = lotto || '';
   liberaRighe[i].densita = null;
   liberaRenderRighe();
   calcPrep();
@@ -2562,7 +2593,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 11;
+const APP_VERSION = 13;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -3518,7 +3549,7 @@ etiqAggiorna();
 aiCaricaKey();
 popolaPASuggestions();
 calcPrep();
-appRenderVersionBadge();
+setTimeout(appRenderVersionBadge, 100);
 ordiniRender();
 </script>
 </body>
