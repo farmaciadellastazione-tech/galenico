@@ -331,9 +331,7 @@
     <div id="libera-righe" style="margin-top:6px"></div>
     <div style="font-size:11px;color:var(--text-faint);margin-top:6px">Il totale e la concentrazione vengono calcolati automaticamente. Per l'etanolo inserisci i grammi — i ml equivalenti appariranno nella formula.</div>
   </div>
-  <div class="card">
-    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-      <span>Componenti aggiuntivi <span style="font-weight:400;color:var(--text-faint)">(Art. 5 — max 4)</span></span>
+  <div class="card" id="card-comp-extra">
       <button class="btn-add" style="font-size:12px;padding:4px 12px" onclick="prepAddComp()">+ Aggiungi</button>
     </div>
     <div id="prep-comp-extra" style="margin-top:4px"></div>
@@ -1303,11 +1301,8 @@ function calcPrep() {
     const {totG, paG, conc, ingr} = liberaCalcTotale();
 
     // Nascondi pannello componenti aggiuntivi in modalità libera
-    const compCard = document.getElementById('prep-comp-extra');
-    if (compCard && compCard.closest) {
-      const card = compCard.closest('.card');
-      if (card) card.style.display = 'none';
-    }
+    const ccExtra = document.getElementById('card-comp-extra');
+    if (ccExtra) ccExtra.style.display = 'none';
 
     const items = ingr.map(r => {
       const q = parseFloat(r.qty)||0;
@@ -1367,16 +1362,17 @@ function calcPrep() {
       prezzoAcq: r.prezzoAcq||0, fonte: r.fonte||'art5'
     }));
 
+    // Forza tipo tariffazione a liquida in modalità libera
+    if (tipoTariff !== 'liquida') {
+      const tarBtns = document.querySelectorAll('#page-tariffazione .seg-btn');
+      if (tarBtns[0]) setTipoTariff('liquida', tarBtns[0]);
+    }
     sincronizzaTariffazione();
     return;
   }
 
-  // Modalità % — mostra pannello componenti aggiuntivi
-  const compCard = document.getElementById('prep-comp-extra');
-  if (compCard && compCard.closest) {
-    const card = compCard.closest('.card');
-    if (card) card.style.display = '';
-  }
+  const ccExtra2 = document.getElementById('card-comp-extra');
+  if (ccExtra2) ccExtra2.style.display = '';
 
 
   const qt   = parseFloat(document.getElementById('qt').value) || 100;
