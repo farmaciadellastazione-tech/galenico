@@ -328,8 +328,13 @@
       <span>Ingredienti (inserisci g o ml direttamente)</span>
       <button class="btn-add" style="font-size:12px;padding:4px 12px" onclick="liberaAddRiga()">+ Ingrediente</button>
     </div>
+    <div class="field-row" style="margin-bottom:8px">
+      <span class="field-label">Concentrazione dichiarata</span>
+      <input type="number" id="libera-conc" value="" min="0" max="100" step="0.1" style="width:90px" oninput="calcPrep()">
+      <span class="field-note">% p/v — inserisci tu</span>
+    </div>
     <div id="libera-righe" style="margin-top:6px"></div>
-    <div style="font-size:11px;color:var(--text-faint);margin-top:6px">Il totale e la concentrazione vengono calcolati automaticamente. Per l'etanolo inserisci i grammi — i ml equivalenti appariranno nella formula.</div>
+    <div style="font-size:11px;color:var(--text-faint);margin-top:6px">La concentrazione dichiarata va in scheda e tariffazione. L'acqua va inserita come ingrediente ma non modifica la concentrazione.</div>
   </div>
   <div class="card" id="card-comp-extra">
       <button class="btn-add" style="font-size:12px;padding:4px 12px" onclick="prepAddComp()">+ Aggiungi</button>
@@ -883,7 +888,11 @@ function setTipo(t, btn) {
 }
 
 function fmt(n, dec) { dec = dec === undefined ? 2 : dec; return n.toFixed(dec).replace('.', ','); }
-function fmtE(n) { return '\u20AC\u202F' + fmt(n); }
+function fmtE(n) {
+  // Usa più decimali per prezzi molto piccoli
+  const dec = n > 0 && n < 0.01 ? 3 : 2;
+  return '\u20AC\u202F' + fmt(n, dec);
+}
 
 function fmtData(s) {
   if (!s) return '\u2014';
@@ -1333,7 +1342,9 @@ function calcPrep() {
   // Modalità formula libera
   if (modoPrepara === 'libera') {
     liberaRenderRighe();
-    const {totG, paG, conc, ingr} = liberaCalcTotale();
+    const {totG, paG, conc: concCalc, ingr} = liberaCalcTotale();
+    const concDich = parseFloat(document.getElementById('libera-conc')?.value)||0;
+    const conc = concDich > 0 ? concDich : concCalc;
 
     // Nascondi pannello componenti aggiuntivi in modalità libera
     const ccExtra = document.getElementById('card-comp-extra');
@@ -2231,8 +2242,9 @@ function aggiornaScheda() {
     // In modalità libera leggi direttamente da liberaRighe
     let qt, conc, percEt, grPA, mlET96s;
     if (modoPrepara === 'libera' && liberaRighe.length > 0) {
-      const {totG, paG, conc: concL, ingr} = liberaCalcTotale();
-      qt = totG; conc = concL; grPA = paG;
+      const {totG, paG, conc: concCalcA, ingr} = liberaCalcTotale();
+      const concDichA = parseFloat(document.getElementById('libera-conc')?.value)||0;
+      qt = totG; conc = concDichA > 0 ? concDichA : concCalcA; grPA = paG;
       const etRiga = ingr.find(r => { const n=invNominalizza(r.nome); return n.includes('etanolo')||n.includes('alcool')||n.includes('alcol'); });
       mlET96s = etRiga ? (parseFloat(etRiga.qty)||0) / 0.807 : 0;
       percEt = mlET96s > 0 ? mlET96s / qt * 96 : 0;
@@ -2558,16 +2570,15 @@ function compilaScheda() {
     const prepNome = nomePA ? nomePA+' '+mgPAcps+' mg/cps capsule' : 'Capsule';
     document.getElementById('s-prep').value = prepNome;
   } else {
-    const prepNome = nomePAraw ?
-      (nomePAraw + ' ' + document.getElementById('conc').value + '%') :
-      (document.getElementById('conc').value + '% ' +
-       (tipoPrep === 'soluzione' ? 'Soluzione idroalcolica' :
-        tipoPrep === 'unguento' ? 'Unguento' :
-        tipoPrep === 'polvere' ? 'Polvere' : 'Sospensione'));
-    document.getElementById('s-prep').value  = prepNome;
     if (modoPrepara === 'libera') {
       // Modalità formula libera: leggi da liberaRighe
-      const {totG, paG, conc: concL, ingr} = liberaCalcTotale();
+      const {totG, paG, conc: concCalcS, ingr} = liberaCalcTotale();
+      const concDichS = parseFloat(document.getElementById('libera-conc')?.value)||0;
+      const concL = concDichS > 0 ? concDichS : concCalcS;
+      const concStr = concL > 0 ? fmt(concL,1) + '% ' : '';
+      const tipoStr = tipoPrep === 'soluzione' ? 'Soluzione' : tipoPrep === 'unguento' ? 'Unguento' : tipoPrep === 'polvere' ? 'Polvere' : 'Sospensione';
+      const prepNome = nomePA ? nomePA + ' ' + concStr + tipoStr : tipoStr;
+      document.getElementById('s-prep').value = prepNome;
       document.getElementById('s-qt').value   = fmt(totG,1);
       document.getElementById('s-conc').value = fmt(concL,2);
       const etRiga = ingr.find(r => {
@@ -2576,6 +2587,13 @@ function compilaScheda() {
       });
       if (document.getElementById('s-et')) document.getElementById('s-et').value = etRiga ? etRiga.qty : '0';
     } else {
+      const prepNome = nomePAraw ?
+        (nomePAraw + ' ' + document.getElementById('conc').value + '%') :
+        (document.getElementById('conc').value + '% ' +
+         (tipoPrep === 'soluzione' ? 'Soluzione idroalcolica' :
+          tipoPrep === 'unguento' ? 'Unguento' :
+          tipoPrep === 'polvere' ? 'Polvere' : 'Sospensione'));
+      document.getElementById('s-prep').value  = prepNome;
       const qt   = document.getElementById('qt').value;
       const conc = document.getElementById('conc').value;
       const et   = document.getElementById('perc-et') ? document.getElementById('perc-et').value : '0';
@@ -2638,7 +2656,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 14;
+const APP_VERSION = 16;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
