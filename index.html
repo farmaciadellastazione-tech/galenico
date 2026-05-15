@@ -1446,18 +1446,30 @@ function calcPrep() {
       const q = parseFloat(r.qty)||0;
       const densita = getDensita(r.nome);
       const grams = r.unit === 'ml' && densita ? q * densita : q;
+      const mlQty  = r.unit === 'g' && densita ? q / densita : q; // ml effettivi
       const qNorm = invNominalizza(r.nome);
       const chiaveAll = Object.keys(ALLEGATO_A).find(k => k.includes(qNorm) || qNorm.includes(k.split(' ')[0]));
       let prezzo = 0;
+      let isLiquido = !!densita && r.unit === 'g' || r.unit === 'ml';
       if (chiaveAll) {
-        prezzo = ALLEGATO_A[chiaveAll];
+        prezzo = ALLEGATO_A[chiaveAll]; // All.A sempre in €/g
+        isLiquido = false; // usa grams
       } else {
         const invFound = invLoadMerged().find(s => invNominalizza(s.nome).includes(qNorm) || qNorm.includes(invNominalizza(s.nome)));
-        prezzo = (invFound && invFound.prezzo > 0) ? invFound.prezzo : (r.prezzoAcq||0);
+        if (invFound && invFound.prezzo > 0) {
+          prezzo = invFound.prezzo;
+          // Se la sostanza è liquida e il prezzo è €/ml, usa ml
+          isLiquido = (invFound.unit === 'ml' || !!densita);
+        } else {
+          prezzo = r.prezzoAcq||0;
+          isLiquido = r.unit === 'ml';
+        }
       }
-      const costo = grams * prezzo;
+      // Calcola costo correttamente: €/g × g oppure €/ml × ml
+      const qtPerCosto = isLiquido && !chiaveAll ? (r.unit === 'ml' ? q : q/densita) : grams;
+      const costo = qtPerCosto * prezzo;
       if (prezzo > 0) liberaCostoExtra += costo;
-      liberaRigheExtra.push({nome: r.nome, qty: q, unit: r.unit, grams, prezzo, costo});
+      liberaRigheExtra.push({nome: r.nome, qty: q, unit: r.unit, grams, mlQty, prezzo, costo, isLiquido: isLiquido && !chiaveAll});
     });
     const etRigaPerTariff = ingr.find(r => {
       const n = invNominalizza(r.nome);
@@ -2136,11 +2148,9 @@ function calcTariff() {
       // In modalità libera: tutti gli altri ingredienti con nome reale
       ...(modoPrepara === 'libera'
         ? liberaRigheExtra.map(r => {
-            const isEt = invNominalizza(r.nome).includes('etanolo') || invNominalizza(r.nome).includes('alcool') || invNominalizza(r.nome).includes('alcol');
-            const dispQty = isEt ? fmt(r.qty/0.807,1)+' ml' : fmt(r.qty,2)+' '+r.unit;
-            const dispPrezzo = isEt ? fmtE(pET)+'/ml' : fmtE(r.prezzo)+'/g';
-            const dispCosto = isEt ? mlET*pET : r.costo;
-            return {name: r.nome+' — '+dispQty+' × '+dispPrezzo, val: dispCosto};
+            const dispQty = r.isLiquido ? fmt(r.unit==='ml'?r.qty:r.qty/(getDensita(r.nome)||1),1)+' ml' : fmt(r.grams,2)+' g';
+            const dispUnit = r.isLiquido ? '/ml' : '/g';
+            return {name: r.nome+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, val: r.costo};
           })
         : [
             ...extraRowsArr.map(e=>({name:e.nome+' — '+fmt(e.qty,3)+' '+e.unit+' × '+fmtE(e.prez)+'/'+e.unit+' (Art. 5)', val:e.costo})),
@@ -2472,14 +2482,10 @@ function aggiornaScheda() {
     {n: nomePA + ' — ' + fmt(costoPA/Math.max(pPA,0.0001),3) + ' g × ' + fmtE(pPA) + '/g', v: costoPA},
   ];
   if (modoPrepara === 'libera') {
-    // Modalità libera: mostra tutte le sostanze da liberaRigheExtra
     liberaRigheExtra.forEach(r => {
-      const isEt = invNominalizza(r.nome).includes('etanolo') || invNominalizza(r.nome).includes('alcool') || invNominalizza(r.nome).includes('alcol');
-      const pET = parseFloat((document.getElementById('t-et')?.value||'0'))||0;
-      const dispQty = isEt ? fmt(r.qty/0.807,1)+' ml' : fmt(r.qty,2)+' '+r.unit;
-      const dispPrezzo = isEt ? fmtE(pET)+'/ml' : fmtE(r.prezzo)+'/g';
-      const dispCosto = isEt ? liberaMlEt*pET : r.costo;
-      tariffRows.push({n: r.nome+' — '+dispQty+' × '+dispPrezzo, v: dispCosto});
+      const dispQty = r.isLiquido ? fmt(r.unit==='ml'?r.qty:r.qty/(getDensita(r.nome)||1),1)+' ml' : fmt(r.grams,2)+' g';
+      const dispUnit = r.isLiquido ? '/ml' : '/g';
+      tariffRows.push({n: r.nome+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, v: r.costo});
     });
   } else {
 // etanolo in liberaRigheExtra
@@ -2701,7 +2707,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 25;
+const APP_VERSION = 26;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
