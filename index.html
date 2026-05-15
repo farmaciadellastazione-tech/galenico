@@ -377,10 +377,6 @@
     <div id="tt-liquida">
       <div class="field-row"><span class="field-label">Quantità totale (ml)</span><input type="number" id="t-qt" value="" step="50" min="10" oninput="calcTariff()"></div>
       <div class="field-row"><span class="field-label">Concentrazione PA (%)</span><input type="number" id="t-conc" value="" step="0.5" min="0.1" oninput="calcTariff()"></div>
-      <div id="tt-row-et">
-        <div class="field-row"><span class="field-label">Etanolo (% v/v)</span><input type="number" id="t-et-perc" value="" step="5" min="0" max="96" placeholder="es. 70" oninput="calcTariff()"><span class="field-note">lascia vuoto se assente</span></div>
-        <div class="field-row"><span class="field-label">Etanolo 96° (€/ml)</span><input type="number" id="t-et" value="" step="0.0001" min="0" placeholder="es. 0.0147" oninput="calcTariff()"><span class="field-note">prezzo acquisto</span></div>
-      </div>
     </div>
 
     <!-- campi per capsule -->
@@ -1897,8 +1893,6 @@ function setTipoTariff(t, btn) {
   const isLiquida = t === 'liquida' || t === 'sospensione' || t === 'semisolida' || t === 'polvere';
   document.getElementById('tt-liquida').style.display  = isLiquida ? '' : 'none';
   document.getElementById('tt-capsule').style.display  = t === 'capsule' ? '' : 'none';
-  const etRow = document.getElementById('tt-row-et');
-  if (etRow) etRow.style.display = (t === 'liquida' || t === 'sospensione') ? '' : 'none';
   const qtLabel = document.querySelector('#tt-liquida .field-label');
   if (qtLabel) qtLabel.textContent = (t === 'liquida' || t === 'sospensione') ? 'Quantità totale (ml)' : 'Quantità totale (g)';
   const refMap = {
@@ -2083,12 +2077,14 @@ function calcTariff() {
 
   } else {
     // ── LIQUIDA / SEMISOLIDA / POLVERE ── All. B DM 2017
-    const pET    = parseFloat((document.getElementById('t-et')?.value||'0'))||0;
     const qt     = parseFloat(document.getElementById('t-qt').value)||0;
     const conc   = parseFloat(document.getElementById('t-conc').value)||0;
-    const percEt = parseFloat((document.getElementById('t-et-perc')?.value||'0'))||0;
+    // Etanolo: % v/v da Preparazione, prezzo da inventario (auto)
+    const percEt = parseFloat(document.getElementById('perc-et')?.value||'0')||0;
+    const _etInv = invLoadMerged().find(s => invNominalizza(s.nome).includes('etanolo') || invNominalizza(s.nome).includes('alcool'));
+    const pET    = _etInv ? (_etInv.prezzo||0) : 0;
     const grPA   = modoPrepara === 'libera' ? liberaGrPA : qt*conc/100;
-    const mlET96s = (percEt > 0 && qt > 0) ? qt * percEt / 96 : 0;
+    const mlET96s = (percEt > 0 && qt > 0 && (tipoTariff === 'liquida' || tipoTariff === 'sospensione')) ? qt * percEt / 96 : 0;
     const nFlac  = 1;
     const costoPA  = grPA*pPA;
     const costoET  = mlET96s * pET;
@@ -2304,7 +2300,8 @@ function aggiornaScheda() {
       mlET96s = percEt > 0 ? qt*percEt/96 : 0;
     }
     const nFlac  = 1;
-    const pET    = parseFloat((document.getElementById('t-et')?.value||'0'))||0;
+    const _etInvS = invLoadMerged().find(s => invNominalizza(s.nome).includes('etanolo') || invNominalizza(s.nome).includes('alcool'));
+    const pET    = _etInvS ? (_etInvS.prezzo||0) : 0;
 
     if (modoPrepara === 'libera' && liberaRighe.length > 0) {
       const {ingr: ingrL} = liberaCalcTotale();
