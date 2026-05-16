@@ -322,6 +322,27 @@
     </div>
   </div>
 
+  <!-- PANNELLO CAPSULE EXTRA (visibile solo in libera+capsule) -->
+  <div id="prep-caps-extra" class="card" style="display:none">
+    <div class="card-title">Parametri capsula</div>
+    <div class="field-row">
+      <span class="field-label">Taglia capsula</span>
+      <select id="caps-taglia-lib" onchange="calcPrep()">
+        <option value="0">0 — 680 mg</option>
+        <option value="1">1 — 500 mg</option>
+        <option value="2">2 — 380 mg</option>
+        <option value="3">3 — 280 mg</option>
+        <option value="4">4 — 200 mg</option>
+      </select>
+      <span class="field-note">capacità indicativa</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Numero capsule</span>
+      <input type="number" id="caps-ncaps-lib" value="" min="1" max="1000" step="1" oninput="calcPrep()">
+      <span class="field-note">pz</span>
+    </div>
+  </div>
+
   <!-- MODALITÀ FORMULA LIBERA -->
   <div id="prep-modo-libera" class="card" style="display:none">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
@@ -360,6 +381,7 @@
 
 <!-- TARIFFAZIONE -->
 <div class="page" id="page-tariffazione">
+  <div style="margin-bottom:4px"><button onclick="showPage('preparazione', document.querySelector('.nav-btn[onclick*=preparazione]'))" style="font-size:12px;padding:3px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer;color:var(--text-faint)">← Preparazione</button></div>
   <h1>Tariffazione magistrale</h1>
   <p class="subtitle">D.M. 22 settembre 2017 (mod. D.M. 13 dicembre 2017) — IVA 10%</p>
 
@@ -472,6 +494,7 @@
 
 <!-- SCHEDA -->
 <div class="page" id="page-scheda">
+  <div style="margin-bottom:4px"><button onclick="showPage('preparazione', document.querySelector('.nav-btn[onclick*=preparazione]'))" style="font-size:12px;padding:3px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer;color:var(--text-faint)">← Preparazione</button></div>
   <h1>Scheda di lavorazione</h1>
   <p class="subtitle">Compilare i dati e stampare — oppure salva come PDF dal browser</p>
 
@@ -526,6 +549,7 @@
 
 <!-- INVENTARIO -->
 <div class="page" id="page-inventario">
+  <div style="margin-bottom:4px"><button onclick="showPage('preparazione', document.querySelector('.nav-btn[onclick*=preparazione]'))" style="font-size:12px;padding:3px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer;color:var(--text-faint)">← Preparazione</button></div>
   <h1>Inventario sostanze</h1>
   <p class="subtitle">Scorte, lotti e scadenze — dati salvati in locale</p>
 
@@ -655,6 +679,7 @@
 
 <!-- ETICHETTE -->
 <div class="page" id="page-etichette">
+  <div style="margin-bottom:4px"><button onclick="showPage('preparazione', document.querySelector('.nav-btn[onclick*=preparazione]'))" style="font-size:12px;padding:3px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer;color:var(--text-faint)">← Preparazione</button></div>
   <h1>Stampa etichette Dymo</h1>
   <p class="subtitle">Formato 32×57 mm (S0722540) — due etichette in sequenza</p>
 
@@ -747,6 +772,7 @@
 
 <!-- FORMULARIO AI -->
 <div class="page" id="page-formulario">
+  <div style="margin-bottom:4px"><button onclick="showPage('preparazione', document.querySelector('.nav-btn[onclick*=preparazione]'))" style="font-size:12px;padding:3px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer;color:var(--text-faint)">← Preparazione</button></div>
   <h1>Formulario AI</h1>
   <p class="subtitle">Assistente galenico — Groq llama-3.1-8b · solo farmacopea e preparazioni magistrali</p>
 
@@ -838,6 +864,7 @@
 
 <!-- ARCHIVIO SCHEDE -->
 <div class="page" id="page-archivio">
+  <div style="margin-bottom:4px"><button onclick="showPage('preparazione', document.querySelector('.nav-btn[onclick*=preparazione]'))" style="font-size:12px;padding:3px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer;color:var(--text-faint)">← Preparazione</button></div>
   <h1>Archivio schede di lavorazione</h1>
   <p class="subtitle">Conservazione obbligatoria — D.M. 22/09/2017 e s.m.i. (G.U. n. 24 del 30/01/2018)</p>
 
@@ -882,14 +909,21 @@ function setTipo(t, btn) {
   document.getElementById('row-ncaps').style.display     = t === 'capsule' ? '' : 'none';
   document.getElementById('row-eccip-nome').style.display= t === 'capsule' ? '' : 'none';
   document.getElementById('row-diluente').style.display  = t === 'sospensione' ? '' : 'none';
-  // Polvere e unguento: passa automaticamente a modalità libera (ricerca inventario/All.A per ogni ingrediente)
+  // Aggiorna label modalità in base al tipo
+  const percBtn = document.getElementById('modo-perc-btn');
+  const liberaBtn = document.getElementById('modo-libera-btn');
+  if (percBtn) percBtn.textContent  = t === 'capsule' ? 'Dati capsula' : '% concentrazione';
+  if (liberaBtn) liberaBtn.textContent = t === 'capsule' ? 'Per ingredienti (+ taglia/n°)' : 'Per ingredienti';
+  // Pannello capsule extra in modalità libera
+  const capExtra = document.getElementById('prep-caps-extra');
+  if (capExtra) capExtra.style.display = (t === 'capsule' && modoPrepara === 'libera') ? '' : 'none';
+  // Polvere e unguento: passa automaticamente a modalità libera
   if (t === 'polvere' || t === 'unguento') {
-    const liberaBtn = document.getElementById('modo-libera-btn');
     if (liberaBtn && modoPrepara !== 'libera') setModoPrepara('libera', liberaBtn);
-  } else if (t === 'soluzione' || t === 'capsule') {
-    const percBtn = document.getElementById('modo-perc-btn');
+  } else if (t === 'soluzione') {
     if (percBtn && modoPrepara !== 'perc') setModoPrepara('perc', percBtn);
   }
+  // Capsule: resta nel modo corrente
   calcPrep();
 }
 
@@ -1162,6 +1196,8 @@ function setModoPrepara(modo, btn) {
   btn.classList.add('active');
   document.getElementById('prep-modo-perc').style.display   = modo === 'perc'   ? '' : 'none';
   document.getElementById('prep-modo-libera').style.display = modo === 'libera' ? '' : 'none';
+  const capExtra = document.getElementById('prep-caps-extra');
+  if (capExtra) capExtra.style.display = (modo === 'libera' && tipoPrep === 'capsule') ? '' : 'none';
   if (modo === 'libera' && liberaRighe.length === 0) {
     liberaAddRiga(true); // prima riga = PA
   }
@@ -1459,8 +1495,33 @@ function calcPrep() {
         'Etichettare con <strong>"USO ESTERNO"</strong>, data e scadenza.',
       ];
 
+    } else if (tipoPrep === 'capsule') {
+      // Capsule in modalità libera: usa taglia e n°capsule dal pannello caps-extra
+      const capVolMap = {0:680, 1:500, 2:380, 3:280, 4:200};
+      const taglia = parseInt(document.getElementById('caps-taglia-lib')?.value||'0')||0;
+      const nCaps  = parseInt(document.getElementById('caps-ncaps-lib')?.value||'0')||0;
+      const capVol = capVolMap[taglia] || 680;
+      const grTot  = totG; // totale ingredienti pesati
+      const mgCps  = nCaps > 0 ? (grTot / nCaps * 1000) : 0;
+      // Aggiorna anche i campi standard capsule per compilaScheda
+      if (document.getElementById('n-caps') && nCaps) document.getElementById('n-caps').value = nCaps;
+      if (document.getElementById('taglia-caps')) document.getElementById('taglia-caps').value = taglia;
+      if (document.getElementById('mg-pa-cps') && paG && nCaps) document.getElementById('mg-pa-cps').value = fmt(paG/nCaps*1000,2);
+      items.push({name:'Taglia capsula', val:String(taglia), unit:''});
+      if (nCaps > 0) items.push({name:'Numero capsule', val:String(nCaps), unit:'pz'});
+      if (mgCps > 0) items.push({name:'Massa per capsula', val:fmt(mgCps,1), unit:'mg'});
+      if (mgCps > capVol * 1.05) items.push({name:'⚠ Supera capacità taglia '+taglia, val:fmt(capVol,0), unit:'mg max'});
+      proc = [
+        ...pesate,
+        'Eseguire la prova volumetrica con la miscela nell\'opercolatrice da '+nCaps+' capsule taglia '+taglia+'.',
+        'Miscelare PA ed eccipienti per almeno 5 minuti fino ad omogeneità cromatica.',
+        ...(hasCrystalline ? ['Setacciare i componenti cristallini al setaccio n° 355 µm prima della miscelazione. <em>(Op. tecnologica aggiuntiva — Art. 6)</em>'] : []),
+        'Riempire le capsule. Controllare il peso di almeno 5 capsule (atteso: '+fmt(mgCps,1)+' mg/cps).',
+        'Chiudere le capsule. Conservare in flacone ben chiuso. Etichettare.',
+      ];
+      if (hasCrystalline) opTecnologicheExtra = Math.max(opTecnologicheExtra, 1);
     } else {
-      // Generico per tipi non gestiti (capsule in libera, ecc.)
+      // Generico per tipi non gestiti
       proc = [
         ...pesate,
         'Miscelare nell\'ordine indicato. Verificare aspetto e omogeneità.',
