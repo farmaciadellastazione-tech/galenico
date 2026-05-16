@@ -462,7 +462,7 @@
     <div class="card-title">Dettaglio calcolo</div>
     <div id="tariff-detail"></div>
     <div class="totale-box" id="tariff-totale"></div>
-    <div class="ref-note" id="tariff-ref">Rif.: D.M. 22/09/2017 All. B — Preparazioni liquide</div>
+    <div class="ref-note" id="tariff-ref">Rif.: D.M. 22/09/2017 e s.m.i. All. B — Preparazioni liquide</div>
   </div>
   <div class="alert alert-warn"><span class="alert-icon">!</span><span>I prezzi così determinati <strong>non possono essere incrementati in alcun caso</strong> (Art. 10). Sconto 16% ammesso per enti pubblici (Art. 11).</span></div>
   <div style="text-align:right;margin-top:0.5rem">
@@ -839,7 +839,7 @@
 <!-- ARCHIVIO SCHEDE -->
 <div class="page" id="page-archivio">
   <h1>Archivio schede di lavorazione</h1>
-  <p class="subtitle">Conservazione obbligatoria — D.M. 22/09/2017</p>
+  <p class="subtitle">Conservazione obbligatoria — D.M. 22/09/2017 e s.m.i. (G.U. n. 24 del 30/01/2018)</p>
 
   <div id="archivio-alerts"></div>
 
@@ -857,7 +857,7 @@
 
 </main>
 
-<footer>galenico.html — uso interno farmacia · D.M. 22/09/2017 · FU XII</footer>
+<footer>galenico.html — uso interno farmacia · D.M. 22/09/2017 e s.m.i. (G.U. n. 24 del 30/01/2018) · FU XII</footer>
 
 <script>
 let tipoPrep = 'soluzione';
@@ -928,7 +928,7 @@ const INV_HARDCODED = [
   { nome:'Flacone ambrato 125ml',   h:'',               unit:'pz', prezzo:1.55,    lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
   { nome:'Amido di riso',           h:'',               unit:'g',  prezzo:0.0042,  lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
   { nome:'Lattosio monoidrato',     h:'',               unit:'g',  prezzo:0.0055,  lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
-  { nome:'Mentolo',                 h:'H228,H317,H411', unit:'g',  prezzo:0.128,   lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
+  { nome:'Mentolo naturale',         h:'H228,H317,H411', unit:'g',  prezzo:0.128,   lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
 ];
 
 const INV_OBBLIGATORIE = new Set(['carbone attivo','potassio ioduro','acqua depurata','acqua purificata','alcool etilico','etanolo']);
@@ -1132,6 +1132,7 @@ function ordinaEmail() {
 
 
 let modoPrepara = 'perc';
+let opTecnologicheDesc = ''; // descrizione op. aggiuntiva rilevata da calcPrep
 let liberaGrPA = 0;
 let liberaMlEt = 0;
 let liberaCostoExtra = 0;
@@ -1386,12 +1387,93 @@ function calcPrep() {
     });
     if (totG > 0) items.push({name:'Totale calcolato', val: fmt(totG,1), unit:'g'});
     if (conc > 0) items.push({name:'Concentrazione PA', val: fmt(conc,2), unit:'%'});
-    const proc = [
-      'Pesare e/o misurare tutti i componenti secondo la formula.',
-      ...ingr.map(r => 'Pesare/misurare <strong>'+r.qty+' '+r.unit+'</strong> di '+r.nome+'.'),
-      'Miscelare nell\'ordine indicato. Verificare aspetto e omogeneità.',
-      'Trasferire nel recipiente finale. Etichettare.',
-    ];
+    // ── Procedura intelligente per ogni tipo ──
+    let proc = [];
+    let opTecnologicheExtra = 0; // operazioni aggiuntive rilevate automaticamente dalla procedura
+
+    // Helper: rileva caratteristiche degli ingredienti
+    const _n = r => invNominalizza(r.nome);
+    const hasCrystalline = ingr.some(r => ['mentolo','acido salicilico','canfora','timolo','acido borico','resorcina','zinco ossido'].some(k => _n(r).includes(k)));
+    const hasEt = ingr.some(r => _n(r).includes('etanolo') || _n(r).includes('alcool') || _n(r).includes('alcol'));
+    const hasAcqua = ingr.some(r => _n(r).includes('acqua'));
+    const _etRiga = ingr.find(r => _n(r).includes('etanolo') || _n(r).includes('alcool') || _n(r).includes('alcol'));
+    const acquaNote = hasAcqua ? 'acqua purificata' : 'solvente appropriato';
+    const pesate = ingr.map(r => 'Pesare <strong>'+r.qty+' '+r.unit+'</strong> di '+r.nome+' su bilancia analitica.');
+    const totLabel = totG > 0 ? fmt(totG,1)+' g' : 'volume finale';
+
+    if (tipoPrep === 'polvere') {
+      if (hasCrystalline) { opTecnologicheExtra = Math.max(opTecnologicheExtra, 1); opTecnologicheDesc = 'levigazione PA cristallino (Art. 6)'; }
+      opTecnologicheExtra = Math.max(opTecnologicheExtra, 1);
+      opTecnologicheDesc = hasCrystalline ? 'triturazione + setacciatura (Art. 6)' : 'setacciatura 355 µm (Art. 6)';
+      proc = [
+        ...pesate,
+        ...(hasCrystalline ? ['Triturare i componenti cristallini (es. '+ingr.filter(r=>['mentolo','acido salicilico','canfora','timolo'].some(k=>_n(r).includes(k))).map(r=>r.nome).join(', ')+') in mortaio fino a polverizzazione fine.'] : []),
+        'Setacciare tutti i componenti al setaccio n° 355 µm per garantire omogeneità granulometrica. <em>(Op. tecnologica aggiuntiva — Art. 6)</em>',
+        'Miscelare per geometria: incorporare l\'eccipiente al PA in porzioni successive, mescolando accuratamente.',
+        'Verificare omogeneità cromatica e assenza di aggregati.',
+        'Trasferire nel recipiente. Chiudere ed etichettare con nome, concentrazione, data e scadenza.',
+      ];
+
+    } else if (tipoPrep === 'soluzione') {
+      // Filtrazione = 3ª operazione → extra se PA non si scioglie immediatamente
+      const needsFiltrazione = hasCrystalline || conc > 3;
+      if (needsFiltrazione) { opTecnologicheExtra = Math.max(opTecnologicheExtra, 1); opTecnologicheDesc = 'filtrazione (Art. 6)'; }
+      proc = [
+        ...pesate,
+        ...(hasEt
+          ? ['Sciogliere il principio attivo in <strong>'+_etRiga.qty+' '+_etRiga.unit+'</strong> di etanolo 96°, agitando fino a completa dissoluzione.']
+          : ['Sciogliere il principio attivo in circa '+fmt(totG*0.8,0)+' ml di '+acquaNote+', agitando.']),
+        ...(hasAcqua && hasEt ? ["Aggiungere gradualmente l'acqua purificata alla soluzione alcolica, mescolando."] : []),
+        ...(needsFiltrazione ? ['Filtrare su carta da filtro o membrana. <em>(Op. tecnologica aggiuntiva — Art. 6)</em>'] : []),
+        'Trasferire in matraccio tarato. Portare a volume con '+acquaNote+' q.b. a '+totLabel+'.',
+        'Verificare limpidezza. Trasferire in flacone ambrato. Chiudere ed etichettare.',
+      ];
+
+    } else if (tipoPrep === 'sospensione') {
+      opTecnologicheExtra = Math.max(opTecnologicheExtra, 1);
+      opTecnologicheDesc = 'setacciatura PA 180 µm (Art. 6)';
+      proc = [
+        ...pesate,
+        'Setacciare il principio attivo al setaccio n° 180 µm per ridurre la granulometria. <em>(Op. tecnologica aggiuntiva — Art. 6)</em>',
+        'Preparare il veicolo: sciogliere l\'agente sospendente (es. metilcellulosa, CMC-Na) in parte del solvente caldo, lasciare idratare.',
+        'Aggiungere il PA al veicolo in piccole porzioni agitando con omogenizzatore o con agitatore magnetico.',
+        'Portare a volume con '+acquaNote+' q.b. a '+totLabel+'. Agitare energicamente.',
+        'Verificare omogeneità e assenza di sedimento compatto.',
+        'Trasferire in flacone ambrato. Etichettare con <strong>"AGITARE PRIMA DELL\'USO"</strong>, data e scadenza.',
+      ];
+
+    } else if (tipoPrep === 'unguento') {
+      // Triturazione PA cristallino in unguento → op extra oltre le 2 standard (pesare + miscelare)
+      if (hasCrystalline) opTecnologicheExtra = Math.max(opTecnologicheExtra, 1);
+      const baseIngr = ingr.filter(r => ['vaselina','lanolina','paraffina','cera','cetomacrogol','eucerina'].some(k=>_n(r).includes(k)));
+      const paIngr   = ingr.filter((r,i) => i===0);
+      proc = [
+        ...pesate,
+        ...(hasCrystalline ? ['Triturare il principio attivo ('+paIngr.map(r=>r.nome).join(', ')+') in mortaio con poca base fino a pasta liscia (levigazione). <em>(Op. tecnologica aggiuntiva — Art. 6)</em>'] : []),
+        baseIngr.length > 0
+          ? 'Fondere a bagnomaria (~60°C) la base ('+baseIngr.map(r=>r.nome).join(' + ')+').'
+          : 'Fondere a bagnomaria (~60°C) la base unguentosa.',
+        'Allontanare dal calore. Incorporare il PA levigato nella base, mescolando energicamente fino a scomparsa dei granuli.',
+        'Mescolare durante il raffreddamento per evitare separazione di fase.',
+        'Verificare aspetto, colore e assenza di grumi. Invasare in barattolo opaco da '+totLabel+'.',
+        'Etichettare con <strong>"USO ESTERNO"</strong>, data e scadenza.',
+      ];
+
+    } else {
+      // Generico per tipi non gestiti (capsule in libera, ecc.)
+      proc = [
+        ...pesate,
+        'Miscelare nell\'ordine indicato. Verificare aspetto e omogeneità.',
+        'Trasferire nel recipiente finale. Etichettare.',
+      ];
+    }
+
+    // Auto-imposta op. tecnologiche aggiuntive in tariffazione (non sovrascrive se già più alto)
+    const tOpEl = document.getElementById('t-op');
+    if (tOpEl && (parseInt(tOpEl.value)||0) < opTecnologicheExtra) {
+      tOpEl.value = opTecnologicheExtra;
+      setTimeout(() => calcTariff(), 50);
+    }
     document.getElementById('formula-grid').innerHTML = items.map(i =>
       '<div class="formula-item"><div class="formula-item-name">'+i.name+'</div><div class="formula-item-val">'+i.val+'<span class="formula-item-unit">'+i.unit+'</span></div></div>'
     ).join('');
@@ -1926,11 +2008,11 @@ function setTipoTariff(t, btn) {
   const qtLabel = document.querySelector('#tt-liquida .field-label');
   if (qtLabel) qtLabel.textContent = (t === 'liquida' || t === 'sospensione') ? 'Quantità totale (ml)' : 'Quantità totale (g)';
   const refMap = {
-    liquida:     'Rif.: D.M. 22/09/2017 All. B voce 1 — Soluzioni €6,65 (comp.extra €0,80)',
-    sospensione: 'Rif.: D.M. 22/09/2017 All. B voce 3 — Emulsioni/sospensioni €13,30/250ml (+€0,70/100ml, comp.extra €0,70)',
-    semisolida:  'Rif.: D.M. 22/09/2017 All. B voce 4 — Semisolide €13,30/50g (+€0,75/50g, comp.extra €0,75)',
-    polvere:     'Rif.: D.M. 22/09/2017 All. B voce 5 — Polveri €6,65 (comp.extra €0,75)',
-    capsule:     'Rif.: D.M. 22/09/2017 All. B voce 7 — Capsule €22,00/120 pz (comp.extra €0,60)',
+    liquida:     'Rif.: D.M. 22/09/2017 e s.m.i. All. B voce 1 — Soluzioni €6,65 (comp.extra €0,80)',
+    sospensione: 'Rif.: D.M. 22/09/2017 e s.m.i. All. B voce 3 — Emulsioni/sospensioni €13,30/250ml (+€0,70/100ml, comp.extra €0,70)',
+    semisolida:  'Rif.: D.M. 22/09/2017 e s.m.i. All. B voce 4 — Semisolide €13,30/50g (+€0,75/50g, comp.extra €0,75)',
+    polvere:     'Rif.: D.M. 22/09/2017 e s.m.i. All. B voce 5 — Polveri €6,65 (comp.extra €0,75)',
+    capsule:     'Rif.: D.M. 22/09/2017 e s.m.i. All. B voce 7 — Capsule €22,00/120 pz (comp.extra €0,60)',
   };
   document.getElementById('tariff-ref').textContent = refMap[t] || '';
   calcTariff();
@@ -2101,10 +2183,10 @@ function calcTariff() {
       {name:'Principio attivo — '+fmt(grPA,3)+' g × '+fmtE(pPA)+'/g', val:costoPA},
       ...(costoEccip>0?[{name:'Eccipiente — '+fmt(grEccip,2)+' g × '+fmtE(pEccip)+'/g', val:costoEccip}]:[]),
       {name:'Capsule vuote — '+nCaps+' × '+fmtE(pCpsVuote), val:costoCps, badge:'al costo', badgeType:'ok'},
-      {group:'Costi di preparazione — All. B Capsule (D.M. 22/09/2017)'},
+      {group:'Costi di preparazione — All. B Capsule (D.M. 22/09/2017 e s.m.i.)'},
       {name:'Base '+nCaps+' capsule (rif. 120: €22,00'+(nCaps<120?' −'+fmt(diff10*1,2):nCaps>120?' +'+fmt(diff10*2,2):'')+' €)', val:baseB},
       ...(comp>0?[{name:'Componenti aggiuntivi: '+comp+' × €'+fmt(c.compExtra,2), val:addComp}]:[]),
-      ...(op>0?[{name:'Op. tecnologiche aggiuntive: '+op+' × €2,30', val:addOp}]:[]),
+      ...(op>0?[{name:'Op. tecnologiche aggiuntive: '+op+' × €2,30'+(opTecnologicheDesc?' ('+opTecnologicheDesc+')':''), val:addOp}]:[]),
       {name:'Incremento 40% su costi preparazione (Art. 7)', val:inc40},
       {group:'Supplementi e diritti'},
       ...(suppH>0 ? [{name:'Suppl. sostanza pericolosa H (Art. 8a)', val:suppH, badge:'H rilevato', badgeType:'warn'}] : [{name:'Nessuna sostanza pericolosa H — suppl. Art. 8a non applicato', val:0, badge:'ok', badgeType:'ok'}]),
@@ -2201,7 +2283,7 @@ function calcTariff() {
       {group:'Costi di preparazione — All. B '+nomeVoce+' (D.M. 22/09/2017)'},
       {name:baseDesc, val:baseB},
       ...(comp>0?[{name:'Componenti aggiuntivi: '+comp+' × €'+fmt(c.compExtra,2), val:addComp}]:[]),
-      ...(op>0?[{name:'Op. tecnologiche aggiuntive: '+op+' × €2,30', val:addOp}]:[]),
+      ...(op>0?[{name:'Op. tecnologiche aggiuntive: '+op+' × €2,30'+(opTecnologicheDesc?' ('+opTecnologicheDesc+')':''), val:addOp}]:[]),
       {name:'Incremento 40% su costi preparazione (Art. 7)', val:inc40},
       {group:'Supplementi e diritti'},
       ...(suppH>0 ? [{name:'Suppl. sostanza pericolosa H (Art. 8a)', val:suppH, badge:'H rilevato', badgeType:'warn'}] : [{name:'Nessuna sostanza pericolosa H — suppl. Art. 8a non applicato', val:0, badge:'ok', badgeType:'ok'}]),
