@@ -494,6 +494,14 @@
     <div class="field-row"><span class="field-label">Supplemento stupefacenti (Art. 8b)</span><input type="number" id="t-stupp" value="0" step="1" min="0" max="3" oninput="calcTariff()"><span class="field-note">×€2,50 cad.</span></div>
     <div class="field-row"><span class="field-label">Supplemento doping (Art. 8c)</span><input type="number" id="t-dop" value="0" step="1" min="0" max="1" oninput="calcTariff()"><span class="field-note">×€2,50</span></div>
     <div class="field-row"><span class="field-label">Diritto addizionale notturno</span><input type="number" id="t-notte" value="0" step="7.5" min="0" max="10" oninput="calcTariff()"><span class="field-note">€7,50 urb. / €10,00 rus.</span></div>
+    <div style="margin-top:0.75rem;border-top:1px solid var(--border);padding-top:0.75rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:12px;font-weight:500">Supplementi manuali</span>
+        <button onclick="suppManAddRiga()" style="font-size:11px;padding:2px 10px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">+ Aggiungi</button>
+      </div>
+      <div id="t-supp-manual-rows"></div>
+      <div style="font-size:11px;color:var(--text-faint);font-family:var(--mono);margin-top:2px">Per supplementi non previsti automaticamente — indicare la norma di riferimento.</div>
+    </div>
   </div>
 
   <div class="card">
@@ -1450,7 +1458,14 @@ function calcPrep() {
 
     // Helper: rileva caratteristiche degli ingredienti
     const _n = r => invNominalizza(r.nome);
-    const hasCrystalline = ingr.some(r => ['mentolo','acido salicilico','canfora','timolo','acido borico','resorcina','zinco ossido'].some(k => _n(r).includes(k)));
+    // Sostanze già in forma di polvere fine che non richiedono triturazione
+    const GIA_POLVERE = ['amido','lattosio','cellulosa','talco','magnesio stearato',
+      'silice','aerosil','carbossimetilcellulosa','croscarmellosio','carbopol',
+      'acqua','etanolo','alcool','glicole','glicerina','paraffina','vaselina','lanolina'];
+    // Tutti i PA solidi (prima riga) sono trattati come cristallini salvo eccezioni
+    const paRow = ingr[0];
+    const paIsPolvere = paRow && GIA_POLVERE.some(k => _n(paRow).includes(k));
+    const hasCrystalline = paRow && !paIsPolvere; // default: PA è cristallino
     const hasEt = ingr.some(r => _n(r).includes('etanolo') || _n(r).includes('alcool') || _n(r).includes('alcol'));
     const hasAcqua = ingr.some(r => _n(r).includes('acqua'));
     const _etRiga = ingr.find(r => _n(r).includes('etanolo') || _n(r).includes('alcool') || _n(r).includes('alcol'));
@@ -1464,7 +1479,7 @@ function calcPrep() {
       opTecnologicheDesc = hasCrystalline ? 'triturazione + setacciatura (Art. 6)' : 'setacciatura 355 µm (Art. 6)';
       proc = [
         ...pesate,
-        ...(hasCrystalline ? ['Triturare i componenti cristallini (es. '+ingr.filter(r=>['mentolo','acido salicilico','canfora','timolo'].some(k=>_n(r).includes(k))).map(r=>r.nome).join(', ')+') in mortaio fino a polverizzazione fine.'] : []),
+        ...(hasCrystalline ? ['Triturare i componenti cristallini (es. '+[ingr[0]].filter(r=>r&&r.nome&&!GIA_POLVERE.some(k=>_n(r).includes(k))).map(r=>r.nome).join(', ')||ingr[0]?.nome||'PA'+') in mortaio fino a polverizzazione fine.'] : []),
         'Setacciare tutti i componenti al setaccio n° 355 µm per garantire omogeneità granulometrica. <em>(Op. tecnologica aggiuntiva — Art. 6)</em>',
         'Miscelare per geometria: incorporare l\'eccipiente al PA in porzioni successive, mescolando accuratamente.',
         'Verificare omogeneità cromatica e assenza di aggregati.',
@@ -2133,6 +2148,39 @@ function tarCercaPA(nome) {
     .slice(0, 6);
 }
 
+// ── Supplementi manuali tariffazione ──
+let _suppManRighe = [];
+
+function suppManAddRiga() {
+  _suppManRighe.push({desc:'', importo:0});
+  suppManRender();
+}
+
+function suppManRemove(i) {
+  _suppManRighe.splice(i, 1);
+  suppManRender();
+  calcTariff();
+}
+
+function suppManRender() {
+  const cont = document.getElementById('t-supp-manual-rows');
+  if (!cont) return;
+  cont.innerHTML = _suppManRighe.map((r, i) => `
+    <div style="display:flex;gap:6px;align-items:center;padding:3px 0">
+      <input type="text" value="${r.desc}" placeholder="es. Suppl. Art.8a aggiuntivo — polverizzazione CBD"
+        style="flex:3;font-family:var(--mono);font-size:12px;padding:3px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
+        oninput="_suppManRighe[${i}].desc=this.value;calcTariff()">
+      <input type="number" value="${r.importo||''}" placeholder="€" step="0.10" min="0"
+        style="width:80px;font-family:var(--mono);font-size:12px;padding:3px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);text-align:right"
+        oninput="_suppManRighe[${i}].importo=parseFloat(this.value)||0;calcTariff()">
+      <button onclick="suppManRemove(${i})" style="font-size:11px;padding:2px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer;color:var(--text-faint)">✕</button>
+    </div>`).join('');
+}
+
+function suppManTotale() {
+  return _suppManRighe.reduce((s,r) => s + (parseFloat(r.importo)||0), 0);
+}
+
 function capsVuoteCerca(q) {
   const dd = document.getElementById('caps-vuote-sug');
   if (!dd) return;
@@ -2326,7 +2374,7 @@ function calcTariff() {
           .map(r => ({name: r.nome+' — '+r.qty+' pz × '+fmtE(r.prezzo)+'/pz', val: r.costo, badge:'al costo', badgeType:'ok'})),
       ];
       const costoTotMaterie = costoPA + liberaCostoExtra;
-      netto = costoTotMaterie + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte;
+      netto = costoTotMaterie + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte + suppManTotale();
     } else {
       // Modalità perc: usa campi manuali tariffazione
       const pEccip  = parseFloat(document.getElementById('t-eccip').value)||0;
@@ -2340,7 +2388,7 @@ function calcTariff() {
         ...(costoEccip>0?[{name:'Eccipiente — '+fmt(grEccip,2)+' g × '+fmtE(pEccip)+'/g', val:costoEccip}]:[]),
         {name:'Capsule vuote — '+nCaps+' × '+fmtE(pCpsVuote), val:costoCps, badge:'al costo', badgeType:'ok'},
       ];
-      netto = costoPA + costoEccip + costoCps + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte;
+      netto = costoPA + costoEccip + costoCps + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte + suppManTotale();
     }
 
     rows = [
@@ -2401,7 +2449,7 @@ function calcTariff() {
     const costoB  = baseB + addComp + addOp;
     const inc40   = costoB * 0.40;
 
-    netto = costoPA + (modoPrepara === 'libera' ? costoExtra : costoET + costoExtraT) + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte;
+    netto = costoPA + (modoPrepara === 'libera' ? costoExtra : costoET + costoExtraT) + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte + suppManTotale();
 
     // ── componenti extra (Art. 5) ──
     const extraRowsT = document.querySelectorAll('#tt-extra-rows .tt-extra-row');
@@ -2453,6 +2501,7 @@ function calcTariff() {
       ...(stupp>0?[{name:'Suppl. stupefacenti (Art. 8b): '+stupp+' × €2,50', val:suppSt}]:[]),
       ...(dop>0?[{name:'Suppl. doping (Art. 8c)', val:suppDop}]:[]),
       ...(notte>0?[{name:'Diritto addizionale notturno (Art. 9)', val:notte}]:[]),
+      ..._suppManRighe.filter(r=>r.desc&&r.importo>0).map(r=>({name:r.desc, val:r.importo, badge:'manuale', badgeType:'warn'})),
       {group:'Recipiente'},
       {name:'Flacone/contenitore — '+nFlac+' × '+fmtE(pFL), val:costoFL, badge:'al costo', badgeType:'ok'},
     ];
