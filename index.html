@@ -921,7 +921,7 @@ function showPage(id, btn) {
   if (id === 'scheda') aggiornaScheda();
   if (id === 'etichette') etiqDaScheda();
   if (id === 'inventario') ordiniRender();
-  if (id === 'tariffazione') { sincronizzaTariffazione(); }
+  if (id === 'tariffazione') { calcPrep(); sincronizzaTariffazione(); }
 }
 
 function setTipo(t, btn) {
@@ -2445,17 +2445,23 @@ function calcTariff() {
       costoPA  = grPA * pPA;
       const nomePA = document.getElementById('prep-pa-nome')?.value || 'Principio attivo';
       righeMaterie = [
-        {name: nomePA+' — '+fmt(grPA,3)+' g × '+fmtE(pPA)+'/g', val: costoPA},
+        {name: nomePA+' — '+fmt(grPA,3)+' g × '+fmtE(pPA)+'/g', val: costoPA,
+          badge: pPA===0?'⚠ prezzo mancante':'', badgeType:'warn'},
         ...liberaRigheExtra
           .filter(r => !r.isCapsule)
           .map(r => {
             const dispQty = r.isLiquido ? fmt(r.unit==='ml'?r.qty:r.qty/(getDensita(r.nome)||1),1)+' ml' : fmt(r.grams,2)+' g';
             const dispUnit = r.isLiquido ? '/ml' : '/g';
-            return {name: r.nome+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, val: r.costo};
+            return {name: r.nome+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, val: r.costo,
+              badge: r.prezzo===0?'⚠ prezzo mancante':'', badgeType:'warn'};
           }),
         ...liberaRigheExtra
           .filter(r => r.isCapsule)
-          .map(r => ({name: r.nome+' — '+r.qty+' pz × '+fmtE(r.prezzo)+'/pz', val: r.costo, badge:'al costo', badgeType:'ok'})),
+          .map(r => ({name: r.nome+' — '+r.qty+' pz × '+fmtE(r.prezzo)+'/pz', val: r.costo,
+            badge: r.prezzo===0?'⚠ prezzo mancante':'al costo', badgeType: r.prezzo===0?'warn':'ok'})),
+        ...(liberaRigheExtra.filter(r=>r.isCapsule).length===0
+          ? [{name:'⚠ Capsule vuote non selezionate — seleziona taglia per auto-compilare', val:0, badge:'mancante', badgeType:'warn'}]
+          : []),
       ];
       const costoTotMaterie = costoPA + liberaCostoExtra;
       netto = costoTotMaterie + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte + suppManTotale();
