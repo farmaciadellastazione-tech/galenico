@@ -1655,10 +1655,13 @@ function calcPrep() {
       liberaMlEt = 0;
     }
 
-    // Forza tipo tariffazione a liquida in modalità libera
-    if (tipoTariff !== 'liquida') {
-      const tarBtns = document.querySelectorAll('#page-tariffazione .seg-btn');
-      if (tarBtns[0]) setTipoTariff('liquida', tarBtns[0]);
+    // Sincronizza tipoTariff con tipoPrep
+    const _mapTT = {soluzione:'liquida', sospensione:'sospensione', unguento:'semisolida', polvere:'polvere', capsule:'capsule'};
+    const _tipoTariffAtteso = _mapTT[tipoPrep] || 'liquida';
+    if (tipoTariff !== _tipoTariffAtteso) {
+      const _tarBtns = document.querySelectorAll('#page-tariffazione .seg-btn');
+      const _btnIdx  = {liquida:0, sospensione:1, semisolida:2, polvere:3, capsule:4}[_tipoTariffAtteso];
+      if (_btnIdx !== undefined && _tarBtns[_btnIdx]) setTipoTariff(_tipoTariffAtteso, _tarBtns[_btnIdx]);
     }
     sincronizzaTariffazione();
     return;
@@ -2186,8 +2189,8 @@ function calcTariff() {
   const percEtTariff = parseFloat(document.getElementById('t-et-perc')?.value)||0;
   const compAutoEt = 0; // etanolo: costo materia prima al prezzo acquisto, non conta come comp. aggiuntivo Art.5
   // In modalità libera: conta tutte le sostanze, base 2 incluse nel prezzo base
-  const comp = modoPrepara === 'libera'
-    ? Math.max(0, liberaGetIngr().length - 2)  // oltre le prime 2
+  const comp = modoPrepara === 'libera' && tipoTariff !== 'capsule'
+    ? Math.max(0, liberaGetIngr().length - 2)  // oltre le prime 2 (non per capsule)
     : compManuale + compAutoEt;
   const op    = parseInt(document.getElementById('t-op').value)||0;
   const stupp = parseInt(document.getElementById('t-stupp').value)||0;
@@ -2200,8 +2203,11 @@ function calcTariff() {
   } else {
     const _paNome = document.getElementById('prep-pa-nome')?.value || document.getElementById('t-pa-nome')?.value || '';
     _hRilevato = hasHazard(getHDaInventario(_paNome));
-    // Etanolo H225 → rileva sempre
-    if (!_hRilevato && percEtTariff > 0) _hRilevato = true;
+    // Etanolo H225 → rileva se presente in preparazione (soluzione idroalcolica)
+    if (!_hRilevato && (tipoTariff === 'liquida' || tipoTariff === 'sospensione')) {
+      const _percEtPrep = parseFloat(document.getElementById('perc-et')?.value||'0')||0;
+      if (_percEtPrep > 0) _hRilevato = true;
+    }
   }
   const suppH = _hRilevato ? 2.50 : 0;
   const suppSt = stupp*2.50, suppDop = dop*2.50;
@@ -2662,7 +2668,11 @@ function aggiornaScheda() {
     _hS = liberaRighe.some(r => r.nome && hasHazard(r.h || getHDaInventario(r.nome)));
   } else {
     _hS = hasHazard(getHDaInventario(nomePA));
-    if (!_hS && tipoScheda === 'soluzione') _hS = true; // etanolo → H sempre
+    // Etanolo → H per soluzioni e sospensioni idroalcoliche
+    if (!_hS && (tipoScheda === 'soluzione' || tipoScheda === 'sospensione')) {
+      const _percEtS = parseFloat(document.getElementById('perc-et')?.value||'0')||0;
+      if (_percEtS > 0) _hS = true;
+    }
   }
   const suppH  = _hS ? 2.50 : 0;
   const inc40  = baseB * 0.40;
