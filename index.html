@@ -2586,7 +2586,8 @@ function calcTariff() {
     const costoB  = baseB + addComp + addOp;
     const inc40   = costoB * 0.40;
 
-    netto = (modoPrepara === 'libera' ? liberaCostoExtra : costoPA + costoET + costoExtraT) + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte + suppManTotale();
+    const _costoExtraTPeek = modoPrepara !== 'libera' ? Array.from(document.querySelectorAll('#tt-extra-rows .tt-extra-row')).reduce((s,row)=>{const n=row.querySelector('.t-extra-nome').value.trim(),q=parseFloat(row.querySelector('.t-extra-qty').value)||0,p=parseFloat(row.querySelector('.t-extra-prezzo').value)||0;return s+(n&&q>0&&p>0?q*p:0);},0) : 0;
+    netto = (modoPrepara === 'libera' ? liberaCostoExtra : costoPA + costoET + _costoExtraTPeek) + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte + suppManTotale();
 
     // ── componenti extra (Art. 5) ──
     const extraRowsT = document.querySelectorAll('#tt-extra-rows .tt-extra-row');
@@ -2599,7 +2600,7 @@ function calcTariff() {
       if (nome && qty>0 && prez>0) extraRowsArr.push({nome,qty,unit,prez,costo:qty*prez});
     });
     const costoExtraT = extraRowsArr.reduce((s,e)=>s+e.costo,0);
-    if (modoPrepara !== 'libera') netto += costoExtraT; // extra manuali solo in perc mode
+    // netto già calcolato sopra con _costoExtraTPeek (stesso valore)
 
     const nomeVoce = {
       liquida:    'Soluzioni (voce 1)',
@@ -3189,7 +3190,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 27;
+const APP_VERSION = 28;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
