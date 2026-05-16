@@ -933,6 +933,24 @@ const INV_HARDCODED = [
 
 const INV_OBBLIGATORIE = new Set(['carbone attivo','potassio ioduro','acqua depurata','acqua purificata','alcool etilico','etanolo']);
 
+function getHDaInventario(nome) {
+  if (!nome) return '';
+  const inv = invLoadMerged();
+  const q = invNominalizza(nome);
+  const found = inv.find(s => invNominalizza(s.nome).includes(q) || q.includes(invNominalizza(s.nome)));
+  return found ? (found.h || '') : '';
+}
+
+function hasHazard(hStr) {
+  // Ritorna true se c'è almeno un codice H che giustifica supplemento Art.8a
+  // Escludi H4xx puramente ambientali senza rischio umano diretto
+  if (!hStr) return false;
+  return hStr.split(',').some(h => {
+    h = h.trim();
+    return h && !h.startsWith('H4'); // H2xx H3xx = fisici/salute
+  });
+}
+
 function invNominalizza(s) {
   return (s||'').toLowerCase().replace(/[àáâ]/g,'a').replace(/[èéê]/g,'e').replace(/[ìí]/g,'i').replace(/[òó]/g,'o').replace(/[ùú]/g,'u').trim();
 }
@@ -1228,7 +1246,7 @@ function liberaCercaComp(i, q) {
       seen.add(key);
       // Cerca lotto in inventario
       const invFound = inv.find(s => invNominalizza(s.nome).includes(key) || key.includes(invNominalizza(s.nome)));
-      candidates.push({nome, prezzo: ALLEGATO_A[k], fonte:'allegatoA', lotto: invFound?.lottoInt || invFound?.lotto || ''});
+      candidates.push({nome, prezzo: ALLEGATO_A[k], fonte:'allegatoA', lotto: invFound?.lottoInt || invFound?.lotto || '', h: invFound?.h || ''});
     });
 
     // Poi cerca in inventario (solo sostanze non già trovate in All.A)
@@ -1237,7 +1255,7 @@ function liberaCercaComp(i, q) {
       const key = invNominalizza(s.nome);
       if (seen.has(key)) return;
       seen.add(key);
-      candidates.push({nome: s.nome, prezzo: s.prezzo||0, fonte:'inventario', lotto: s.lottoInt || s.lotto || ''});
+      candidates.push({nome: s.nome, prezzo: s.prezzo||0, fonte:'inventario', lotto: s.lottoInt || s.lotto || '', h: s.h || ''});
     });
 
     if (!candidates.length) { dd.innerHTML = '<span style="font-size:11px;color:var(--text-faint)">nessun risultato</span>'; return; }
@@ -1246,7 +1264,7 @@ function liberaCercaComp(i, q) {
       const prezzoLabel = s.prezzo>0 ? ' — €'+s.prezzo.toFixed(4)+'/g' : '';
       const fonteLabel = s.fonte==='allegatoA' ? ' <span style="color:var(--accent)">✓All.A</span>' : '';
       const lottoLabel = s.lotto ? ' <span style="color:var(--text-faint)">lotto:'+s.lotto+'</span>' : '';
-      return `<button onclick="liberaSelComp(${i},'${s.nome.replace(/'/g,"\\'")}',${s.prezzo||0},'${s.fonte}','${s.lotto||''}')"
+      return `<button onclick="liberaSelComp(${i},'${s.nome.replace(/'/g,"\\'")}',${s.prezzo||0},'${s.fonte}','${s.lotto||''}','${(s.h||'').replace(/'/g,"\\'")}' )"
         style="font-size:11px;padding:2px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">
         ${s.nome}${prezzoLabel}${fonteLabel}${lottoLabel}
       </button>`;
@@ -1254,11 +1272,12 @@ function liberaCercaComp(i, q) {
   }, 300);
 }
 
-function liberaSelComp(i, nome, prezzo, fonte, lotto) {
+function liberaSelComp(i, nome, prezzo, fonte, lotto, h) {
   liberaRighe[i].nome = nome;
   liberaRighe[i].prezzoAcq = prezzo;
   liberaRighe[i].fonte = fonte;
   liberaRighe[i].lotto = lotto || '';
+  liberaRighe[i].h = h || getHDaInventario(nome);
   liberaRighe[i].densita = null;
   liberaRenderRighe();
   calcPrep();
@@ -2031,7 +2050,17 @@ function calcTariff() {
   const stupp = parseInt(document.getElementById('t-stupp').value)||0;
   const dop   = parseInt(document.getElementById('t-dop').value)||0;
   const notte = parseFloat(document.getElementById('t-notte').value)||0;
-  const suppH = 2.50;
+  // suppH auto: €2,50 se almeno un ingrediente ha codici H di pericolo per la salute (Art. 8a)
+  let _hRilevato = false;
+  if (modoPrepara === 'libera') {
+    _hRilevato = liberaRighe.some(r => r.nome && hasHazard(r.h || getHDaInventario(r.nome)));
+  } else {
+    const _paNome = document.getElementById('prep-pa-nome')?.value || document.getElementById('t-pa-nome')?.value || '';
+    _hRilevato = hasHazard(getHDaInventario(_paNome));
+    // Etanolo H225 → rileva sempre
+    if (!_hRilevato && percEtTariff > 0) _hRilevato = true;
+  }
+  const suppH = _hRilevato ? 2.50 : 0;
   const suppSt = stupp*2.50, suppDop = dop*2.50;
 
   let rows = [], netto = 0;
@@ -2078,7 +2107,7 @@ function calcTariff() {
       ...(op>0?[{name:'Op. tecnologiche aggiuntive: '+op+' × €2,30', val:addOp}]:[]),
       {name:'Incremento 40% su costi preparazione (Art. 7)', val:inc40},
       {group:'Supplementi e diritti'},
-      {name:'Suppl. sostanza pericolosa H (Art. 8a)', val:suppH, badge:'verifica H', badgeType:'warn'},
+      ...(suppH>0 ? [{name:'Suppl. sostanza pericolosa H (Art. 8a)', val:suppH, badge:'H rilevato', badgeType:'warn'}] : [{name:'Nessuna sostanza pericolosa H — suppl. Art. 8a non applicato', val:0, badge:'ok', badgeType:'ok'}]),
       ...(stupp>0?[{name:'Suppl. stupefacenti (Art. 8b): '+stupp+' × €2,50', val:suppSt}]:[]),
       ...(dop>0?[{name:'Suppl. doping (Art. 8c)', val:suppDop}]:[]),
       ...(notte>0?[{name:'Diritto addizionale notturno (Art. 9)', val:notte}]:[]),
@@ -2175,7 +2204,7 @@ function calcTariff() {
       ...(op>0?[{name:'Op. tecnologiche aggiuntive: '+op+' × €2,30', val:addOp}]:[]),
       {name:'Incremento 40% su costi preparazione (Art. 7)', val:inc40},
       {group:'Supplementi e diritti'},
-      {name:'Suppl. sostanza pericolosa H (Art. 8a)', val:suppH, badge:'verifica H', badgeType:'warn'},
+      ...(suppH>0 ? [{name:'Suppl. sostanza pericolosa H (Art. 8a)', val:suppH, badge:'H rilevato', badgeType:'warn'}] : [{name:'Nessuna sostanza pericolosa H — suppl. Art. 8a non applicato', val:0, badge:'ok', badgeType:'ok'}]),
       ...(stupp>0?[{name:'Suppl. stupefacenti (Art. 8b): '+stupp+' × €2,50', val:suppSt}]:[]),
       ...(dop>0?[{name:'Suppl. doping (Art. 8c)', val:suppDop}]:[]),
       ...(notte>0?[{name:'Diritto addizionale notturno (Art. 9)', val:notte}]:[]),
@@ -2485,7 +2514,14 @@ function aggiornaScheda() {
   }
 
   // ═══════ calcolo tariff ═══════
-  const suppH  = 2.50;
+  let _hS = false;
+  if (modoPrepara === 'libera') {
+    _hS = liberaRighe.some(r => r.nome && hasHazard(r.h || getHDaInventario(r.nome)));
+  } else {
+    _hS = hasHazard(getHDaInventario(nomePA));
+    if (!_hS && tipoScheda === 'soluzione') _hS = true; // etanolo → H sempre
+  }
+  const suppH  = _hS ? 2.50 : 0;
   const inc40  = baseB * 0.40;
   const nettoMaterie = modoPrepara === 'libera' ? (costoPA + liberaCostoExtra) : (costoPA + costoET + costoExtra);
   const netto  = nettoMaterie + baseB + inc40 + suppH + costoFL_s;
@@ -2508,7 +2544,7 @@ function aggiornaScheda() {
   tariffRows.push(
     {n:'All. B — '+nomeVoceB, v:baseB},
     {n:'Incremento 40% (Art. 7)', v:inc40},
-    {n:'Suppl. H — PA pericoloso (Art. 8a)', v:suppH},
+    ...(suppH>0 ? [{n:'Suppl. sostanza pericolosa H (Art. 8a)', v:suppH}] : [{n:'Nessun H rilevato — Art. 8a non applicato', v:0}]),
     {n:'Recipiente', v:costoFL_s},
   );
 
