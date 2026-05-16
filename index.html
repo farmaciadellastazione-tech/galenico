@@ -366,9 +366,10 @@
       </div>
     </div>
     <div class="field-row" id="row-libera-conc" style="margin-bottom:8px">
-      <span class="field-label">Concentrazione dichiarata</span>
-      <input type="number" id="libera-conc" value="" min="0" max="100" step="0.1" style="width:90px" oninput="calcPrep()">
-      <span class="field-note">% p/v — inserisci tu</span>
+      <span class="field-label">Concentrazione</span>
+      <input type="text" id="libera-conc" value="" readonly
+        style="width:90px;background:var(--accent-light);border:1px solid var(--border);border-radius:var(--radius);padding:4px 8px;font-family:var(--mono);font-size:13px;color:var(--accent);text-align:right">
+      <span class="field-note" id="libera-conc-note">% — calcolata automaticamente</span>
     </div>
     <div id="libera-righe" style="margin-top:6px"></div>
     <div style="font-size:11px;color:var(--text-faint);margin-top:6px">La concentrazione dichiarata va in scheda e tariffazione. L'acqua va inserita come ingrediente ma non modifica la concentrazione.</div>
@@ -1239,6 +1240,9 @@ function setModoPrepara(modo, btn) {
   document.getElementById('prep-modo-libera').style.display = modo === 'libera' ? '' : 'none';
   const capExtra = document.getElementById('prep-caps-extra');
   if (capExtra) capExtra.style.display = (modo === 'libera' && tipoPrep === 'capsule') ? '' : 'none';
+  // In libera mode: nascondi campo PA (ogni sostanza ha il suo prezzo)
+  const cardPaEl = document.getElementById('tariff-card-pa');
+  if (cardPaEl) cardPaEl.style.display = modo === 'libera' ? 'none' : '';
   const rowConc2 = document.getElementById('row-libera-conc');
   if (rowConc2) rowConc2.style.display = tipoPrep === 'capsule' ? 'none' : '';
   // In libera mode: nasconde componenti extra manuali tariffazione (vengono da liberaRigheExtra)
@@ -1275,6 +1279,10 @@ function liberaRemoveRiga(i) {
 }
 
 function liberaRenderRighe() {
+  // Per polvere e capsule: forza unità g se era ml
+  if (tipoPrep === 'polvere' || tipoPrep === 'capsule') {
+    liberaRighe.forEach(r => { if (r.unit === 'ml') r.unit = 'g'; });
+  }
   const container = document.getElementById('libera-righe');
   if (!container) return;
   // Non rifare il DOM se ci sono campi con focus — aggiorna solo i valori visualizzati
@@ -1308,7 +1316,7 @@ function liberaRenderRighe() {
       <select onchange="liberaRighe[${i}].unit=this.value; calcPrep()"
         style="font-family:var(--mono);font-size:13px;padding:3px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">
         <option value="g" ${r.unit==='g'?'selected':''}>g</option>
-        <option value="ml" ${r.unit==='ml'?'selected':''}>ml</option>
+        ${(tipoPrep!=='polvere'&&tipoPrep!=='capsule')?'<option value="ml" '+(r.unit==='ml'?'selected':'')+'>ml</option>':''}
       </select>
       <span data-conv="${i}" style="font-size:11px;color:var(--accent)">${convNote}</span>
       <button onclick="liberaRemoveRiga(${i})" style="font-size:11px;padding:2px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">✕</button>
@@ -1386,15 +1394,28 @@ function liberaCalcTotale() {
   // Calcola totale g e concentrazione PA
   const ingr = liberaGetIngr();
   let totG = 0, paG = 0;
+  let paFound = false;
   ingr.forEach((r, i) => {
     const q = parseFloat(r.qty)||0;
     const densita = getDensita(r.nome);
     const grams = r.unit === 'ml' && densita ? q * densita : q;
     totG += grams;
-    if (i === 0) paG = grams; // prima sostanza = PA per il calcolo concentrazione
+    // "Principale" = prima sostanza trovata in All.A, oppure riga 0
+    const qNorm = invNominalizza(r.nome);
+    const inAllegato = Object.keys(ALLEGATO_A).some(k => k.includes(qNorm) || qNorm.includes(k.split(' ')[0]));
+    if ((inAllegato && !paFound) || (i === 0 && !paFound)) { paG = grams; paFound = !!inAllegato || i===0; }
   });
-  const concDich = parseFloat(document.getElementById('libera-conc')?.value)||0;
-  const conc = concDich > 0 ? concDich : (totG > 0 ? (paG / totG * 100) : 0);
+  // Percentuali per ogni sostanza
+  const conc = totG > 0 ? (paG / totG * 100) : 0;
+  // Aggiorna campo e nota con unità corretta per il tipo
+  const _concEl = document.getElementById('libera-conc');
+  const _concNote = document.getElementById('libera-conc-note');
+  if (_concEl) _concEl.value = conc > 0 ? fmt(conc,2) : '';
+  if (_concNote) {
+    if (tipoPrep === 'polvere') _concNote.textContent = '% p/p — calcolata (PA/totale)';
+    else if (tipoPrep === 'capsule') _concNote.textContent = 'mg/cps — vedi sotto';
+    else _concNote.textContent = '% p/v — calcolata (PA/totale)';
+  }
   return {totG, paG, conc, ingr};
 }
 
@@ -1684,8 +1705,7 @@ function calcPrep() {
 
     // Componenti extra per tariffazione: escludi PA, acqua, etanolo
     // (etanolo è già contato auto in calcTariff, acqua non conta)
-    const compsPerTariff = ingr.filter((r, _ri) => {
-      if (_ri === 0) return false; // prima sostanza = PA
+    const compsPerTariff = ingr.filter((r) => {
       const n = invNominalizza(r.nome);
       if (n.includes('acqua')) return false;
       if (n.includes('etanolo') || n.includes('alcool') || n.includes('alcol')) return false;
@@ -1701,7 +1721,6 @@ function calcPrep() {
     liberaCostoExtra = 0;
 
     ingr.forEach((r, _ri) => {
-      if (_ri === 0) return; // prima sostanza = PA
       const q = parseFloat(r.qty)||0;
       const densita = getDensita(r.nome);
       const grams = r.unit === 'ml' && densita ? q * densita : q;
@@ -2407,7 +2426,7 @@ function calcTariff() {
         return true;
       }).length
     : null;
-  const comp = _liberaCompCount !== null ? Math.max(0, _liberaCompCount - 1) : compManuale + compAutoEt;
+  const comp = _liberaCompCount !== null ? Math.max(0, _liberaCompCount - 2) : compManuale + compAutoEt; // DM: base include 2 sostanze
   const op    = parseInt(document.getElementById('t-op').value)||0;
   const stupp = parseInt(document.getElementById('t-stupp').value)||0;
   const dop   = parseInt(document.getElementById('t-dop').value)||0;
@@ -2537,8 +2556,8 @@ function calcTariff() {
     const grPA   = modoPrepara === 'libera' ? liberaGrPA : qt*conc/100;
     const mlET96s = (percEt > 0 && qt > 0 && (tipoTariff === 'liquida' || tipoTariff === 'sospensione')) ? qt * percEt / 96 : 0;
     const nFlac  = 1;
-    const costoPA  = grPA*pPA;
-    const costoET  = mlET96s * pET;
+    const costoPA  = modoPrepara === 'libera' ? 0 : grPA*pPA; // libera: costo PA in liberaRigheExtra
+    const costoET  = modoPrepara === 'libera' ? 0 : mlET96s * pET; // libera: etanolo in liberaRigheExtra
     const costoFL  = nFlac*pFL;
     const costoExtra = modoPrepara === 'libera' ? liberaCostoExtra : 0;
 
@@ -2567,7 +2586,7 @@ function calcTariff() {
     const costoB  = baseB + addComp + addOp;
     const inc40   = costoB * 0.40;
 
-    netto = costoPA + (modoPrepara === 'libera' ? costoExtra : costoET + costoExtraT) + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte + suppManTotale();
+    netto = (modoPrepara === 'libera' ? liberaCostoExtra : costoPA + costoET + costoExtraT) + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte + suppManTotale();
 
     // ── componenti extra (Art. 5) ──
     const extraRowsT = document.querySelectorAll('#tt-extra-rows .tt-extra-row');
@@ -2595,17 +2614,16 @@ function calcTariff() {
 
     rows = [
       {group:'Materie prime'},
-      // PA con nome reale
-      {name:(document.getElementById('prep-pa-nome')?.value||'Principio attivo')+' — '+fmt(grPA,2)+' g × '+fmtE(pPA)+'/g', val:costoPA},
-      ...(mlET96s>0 && modoPrepara !== 'libera' ?[{name:'Etanolo 96° — '+fmt(mlET96s,1)+' ml × '+fmtE(pET)+'/ml', val:costoET}]:[]),
-      // In modalità libera: tutti gli altri ingredienti con nome reale
       ...(modoPrepara === 'libera'
         ? liberaRigheExtra.map(r => {
             const dispQty = r.isLiquido ? fmt(r.unit==='ml'?r.qty:r.qty/(getDensita(r.nome)||1),1)+' ml' : fmt(r.grams,2)+' g';
             const dispUnit = r.isLiquido ? '/ml' : '/g';
-            return {name: r.nome+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, val: r.costo};
+            const badge = r.prezzo===0 ? '⚠ prezzo mancante' : '';
+            return {name: r.nome+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, val: r.costo, badge, badgeType:'warn'};
           })
         : [
+            {name:(document.getElementById('prep-pa-nome')?.value||'Principio attivo')+' — '+fmt(grPA,2)+' g × '+fmtE(pPA)+'/g', val:costoPA},
+            ...(mlET96s>0?[{name:'Etanolo 96° — '+fmt(mlET96s,1)+' ml × '+fmtE(pET)+'/ml', val:costoET}]:[]),
             ...extraRowsArr.map(e=>({name:e.nome+' — '+fmt(e.qty,3)+' '+e.unit+' × '+fmtE(e.prez)+'/'+e.unit+' (Art. 5)', val:e.costo})),
           ]
       ),
@@ -2739,8 +2757,7 @@ function aggiornaScheda() {
     let qt, conc, percEt, grPA, mlET96s;
     if (modoPrepara === 'libera' && liberaRighe.length > 0) {
       const {totG, paG, conc: concCalcA, ingr} = liberaCalcTotale();
-      const concDichA = parseFloat(document.getElementById('libera-conc')?.value)||0;
-      qt = totG; conc = concDichA > 0 ? concDichA : concCalcA; grPA = paG;
+      qt = totG; conc = concCalcA; grPA = paG; // conc sempre auto-calcolata
       const etRiga = ingr.find(r => { const n=invNominalizza(r.nome); return n.includes('etanolo')||n.includes('alcool')||n.includes('alcol'); });
       mlET96s = etRiga ? (parseFloat(etRiga.qty)||0) / 0.807 : 0;
       percEt = mlET96s > 0 ? mlET96s / qt * 96 : 0;
@@ -3090,8 +3107,7 @@ function compilaScheda() {
     if (modoPrepara === 'libera') {
       // Modalità formula libera: leggi da liberaRighe
       const {totG, paG, conc: concCalcS, ingr} = liberaCalcTotale();
-      const concDichS = parseFloat(document.getElementById('libera-conc')?.value)||0;
-      const concL = concDichS > 0 ? concDichS : concCalcS;
+      const concL = concCalcS; // conc sempre auto-calcolata
       const concStr = concL > 0 ? fmt(concL,1) + '% ' : '';
       const tipoStr = tipoPrep === 'soluzione' ? 'Soluzione' : tipoPrep === 'unguento' ? 'Unguento' : tipoPrep === 'polvere' ? 'Polvere' : 'Sospensione';
       const prepNome = nomePA ? nomePA + ' ' + concStr + tipoStr : tipoStr;
