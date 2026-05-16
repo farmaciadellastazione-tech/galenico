@@ -326,6 +326,11 @@
   <div id="prep-caps-extra" class="card" style="display:none">
     <div class="card-title">Parametri capsula</div>
     <div class="field-row">
+      <span class="field-label">Numero capsule</span>
+      <input type="number" id="caps-ncaps-lib" value="" min="1" max="1000" step="1" oninput="calcPrep()">
+      <span class="field-note">pz</span>
+    </div>
+    <div class="field-row">
       <span class="field-label">Taglia capsula</span>
       <select id="caps-taglia-lib" onchange="calcPrep()">
         <option value="0">0 — 680 mg</option>
@@ -336,11 +341,18 @@
       </select>
       <span class="field-note">capacità indicativa</span>
     </div>
-    <div class="field-row">
-      <span class="field-label">Numero capsule</span>
-      <input type="number" id="caps-ncaps-lib" value="" min="1" max="1000" step="1" oninput="calcPrep()">
-      <span class="field-note">pz</span>
+    <div class="field-row" style="align-items:flex-start">
+      <span class="field-label">Capsule vuote</span>
+      <div style="flex:1">
+        <input type="text" id="caps-vuote-cerca" placeholder="es. capsule taglia 0"
+          style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
+          oninput="capsVuoteCerca(this.value)">
+        <div id="caps-vuote-sug" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px"></div>
+        <div id="caps-vuote-sel" style="font-size:12px;color:var(--accent);margin-top:4px;font-family:var(--mono)"></div>
+      </div>
     </div>
+    <input type="hidden" id="caps-vuote-prezzo" value="0">
+    <input type="hidden" id="caps-vuote-nome" value="">
   </div>
 
   <!-- MODALITÀ FORMULA LIBERA -->
@@ -961,6 +973,10 @@ const INV_HARDCODED = [
   { nome:'Lanolina anidra',         h:'',               unit:'g',  prezzo:0.041,   lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
   { nome:'Clobazam',                h:'H302,H361',      unit:'g',  prezzo:0,       lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
   { nome:'Flacone ambrato 125ml',   h:'',               unit:'pz', prezzo:1.55,    lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
+  { nome:'Capsule gelatina dura taglia 0', h:'', unit:'pz', prezzo:0.045, lotto:'', lottoInt:'', scad:'', dataAp:'', sds:'' },
+  { nome:'Capsule gelatina dura taglia 1', h:'', unit:'pz', prezzo:0.038, lotto:'', lottoInt:'', scad:'', dataAp:'', sds:'' },
+  { nome:'Capsule gelatina dura taglia 2', h:'', unit:'pz', prezzo:0.032, lotto:'', lottoInt:'', scad:'', dataAp:'', sds:'' },
+  { nome:'Capsule HPMC taglia 0',          h:'', unit:'pz', prezzo:0.072, lotto:'', lottoInt:'', scad:'', dataAp:'', sds:'' },
   { nome:'Amido di riso',           h:'',               unit:'g',  prezzo:0.0042,  lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
   { nome:'Lattosio monoidrato',     h:'',               unit:'g',  prezzo:0.0055,  lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
   { nome:'Mentolo naturale',         h:'H228,H317,H411', unit:'g',  prezzo:0.128,   lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
@@ -1497,26 +1513,39 @@ function calcPrep() {
       ];
 
     } else if (tipoPrep === 'capsule') {
-      // Capsule in modalità libera: usa taglia e n°capsule dal pannello caps-extra
+      // Capsule in modalità libera: taglia e n°capsule dal pannello caps-extra
+      // Le capsule vuote NON partecipano al peso (totG = solo PA + eccipienti)
       const capVolMap = {0:680, 1:500, 2:380, 3:280, 4:200};
-      const taglia = parseInt(document.getElementById('caps-taglia-lib')?.value||'0')||0;
-      const nCaps  = parseInt(document.getElementById('caps-ncaps-lib')?.value||'0')||0;
-      const capVol = capVolMap[taglia] || 680;
-      const grTot  = totG; // totale ingredienti pesati
-      const mgCps  = nCaps > 0 ? (grTot / nCaps * 1000) : 0;
-      // Aggiorna anche i campi standard capsule per compilaScheda
+      const taglia   = parseInt(document.getElementById('caps-taglia-lib')?.value||'0')||0;
+      const nCaps    = parseInt(document.getElementById('caps-ncaps-lib')?.value||'0')||0;
+      const capVol   = capVolMap[taglia] || 680;
+      const grTot    = totG; // solo ingredienti (PA + eccipienti), capsule escluse
+      const mgCps    = nCaps > 0 ? (grTot / nCaps * 1000) : 0;
+      const prezCps  = parseFloat(document.getElementById('caps-vuote-prezzo')?.value||'0')||0;
+      const nomeCps  = document.getElementById('caps-vuote-nome')?.value || 'Capsule vuote';
+      const costoCps = nCaps * prezCps;
+      // Propaga a campi standard capsule per compilaScheda e tariffazione
       if (document.getElementById('n-caps') && nCaps) document.getElementById('n-caps').value = nCaps;
       if (document.getElementById('taglia-caps')) document.getElementById('taglia-caps').value = taglia;
       if (document.getElementById('mg-pa-cps') && paG && nCaps) document.getElementById('mg-pa-cps').value = fmt(paG/nCaps*1000,2);
+      const tCps = document.getElementById('t-cpsvuote');
+      if (tCps && prezCps > 0) { tCps.value = prezCps.toFixed(4); }
+      const tNcaps = document.getElementById('t-ncaps');
+      if (tNcaps && nCaps > 0) { tNcaps.value = nCaps; }
+      // Formula display: ingredienti + capsule (con nota "non partecipa al peso")
       items.push({name:'Taglia capsula', val:String(taglia), unit:''});
       if (nCaps > 0) items.push({name:'Numero capsule', val:String(nCaps), unit:'pz'});
       if (mgCps > 0) items.push({name:'Massa per capsula', val:fmt(mgCps,1), unit:'mg'});
+      if (prezCps > 0) items.push({name:nomeCps+' (al costo, escluse dal peso)', val:'€'+fmt(costoCps,2), unit:''});
       if (mgCps > capVol * 1.05) items.push({name:'⚠ Supera capacità taglia '+taglia, val:fmt(capVol,0), unit:'mg max'});
+      // Aggiorna il costo totale capsule in liberaCostoExtra (per tariffazione)
+      liberaCostoExtra += costoCps;
+      liberaRigheExtra.push({nome: nomeCps, qty: nCaps, unit:'pz', grams:0, mlQty:0, prezzo:prezCps, costo:costoCps, isLiquido:false, isCapsule:true});
       proc = [
         ...pesate,
-        'Eseguire la prova volumetrica con la miscela nell\'opercolatrice da '+nCaps+' capsule taglia '+taglia+'.',
-        'Miscelare PA ed eccipienti per almeno 5 minuti fino ad omogeneità cromatica.',
         ...(hasCrystalline ? ['Setacciare i componenti cristallini al setaccio n° 355 µm prima della miscelazione. <em>(Op. tecnologica aggiuntiva — Art. 6)</em>'] : []),
+        'Miscelare PA ed eccipienti per almeno 5 minuti fino ad omogeneità cromatica.',
+        'Eseguire la prova volumetrica nell\'opercolatrice da '+nCaps+' capsule taglia '+taglia+'.',
         'Riempire le capsule. Controllare il peso di almeno 5 capsule (atteso: '+fmt(mgCps,1)+' mg/cps).',
         'Chiudere le capsule. Conservare in flacone ben chiuso. Etichettare.',
       ];
@@ -2098,6 +2127,36 @@ function tarCercaPA(nome) {
     .filter(([k]) => k.includes(q) || q.includes(k.split(' ')[0]))
     .sort((a,b) => a[0].length - b[0].length)
     .slice(0, 6);
+}
+
+function capsVuoteCerca(q) {
+  const dd = document.getElementById('caps-vuote-sug');
+  if (!dd) return;
+  if (!q || q.length < 2) { dd.innerHTML = ''; return; }
+  const inv = invLoadMerged();
+  const qNorm = invNominalizza(q);
+  const res = inv.filter(s => invNominalizza(s.nome).includes(qNorm) && s.unit === 'pz').slice(0,6);
+  dd.innerHTML = res.map(s =>
+    `<button onclick="capsVuoteSel('${s.nome.replace(/'/g,"\\'")}',${s.prezzo||0})"
+      style="font-size:11px;padding:2px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">
+      ${s.nome}${s.prezzo>0?' — €'+s.prezzo.toFixed(4)+'/pz':''}
+    </button>`
+  ).join('');
+}
+
+function capsVuoteSel(nome, prezzo) {
+  document.getElementById('caps-vuote-cerca').value = nome;
+  document.getElementById('caps-vuote-prezzo').value = prezzo;
+  document.getElementById('caps-vuote-nome').value = nome;
+  document.getElementById('caps-vuote-sug').innerHTML = '';
+  const nCaps = parseInt(document.getElementById('caps-ncaps-lib')?.value||'0')||0;
+  const costoTot = nCaps * prezzo;
+  document.getElementById('caps-vuote-sel').textContent =
+    nome + (prezzo>0 ? ' — €'+prezzo.toFixed(4)+'/pz' + (nCaps>0?' × '+nCaps+' = €'+costoTot.toFixed(2):'') : '');
+  // Propaga prezzo a tariffazione
+  const tCps = document.getElementById('t-cpsvuote');
+  if (tCps) { tCps.value = prezzo > 0 ? prezzo.toFixed(4) : ''; calcTariff(); }
+  calcPrep();
 }
 
 function tarCercaFlacone() {
