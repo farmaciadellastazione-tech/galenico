@@ -1035,7 +1035,7 @@ function invLoadMerged() {
   const merged = INV_HARDCODED.map(h => ({ ...h, _hardcoded: true }));
   stored.forEach(s => {
     const idx = merged.findIndex(h => invNominalizza(h.nome) === invNominalizza(s.nome));
-    if (idx >= 0) merged[idx] = { ...merged[idx], ...s, h: s.h || merged[idx].h, _hardcoded: false }; // preserva H codes hardcoded se stored è vuoto
+    if (idx >= 0) merged[idx] = { ...merged[idx], ...s, h: s.h || merged[idx].h, prezzo: s.prezzo || merged[idx].prezzo, _hardcoded: false }; // preserva H codes e prezzo hardcoded se stored è vuoto
     else merged.push({ ...s, _hardcoded: false });
   });
   return merged;
@@ -2440,30 +2440,42 @@ function calcTariff() {
     let grPA, costoPA, righeMaterie;
 
     if (modoPrepara === 'libera') {
-      // Libera: PA e eccipienti da liberaRigheExtra, capsule vuote già incluse
-      grPA     = liberaGrPA;
-      costoPA  = grPA * pPA;
+      // Libera: PA e eccipienti da liberaRigheExtra
+      grPA    = liberaGrPA;
+      costoPA = grPA * pPA;
       const nomePA = document.getElementById('prep-pa-nome')?.value || 'Principio attivo';
+
+      // Capsule vuote: leggi direttamente dal DOM come fonte primaria affidabile
+      const _prezCpsDom  = parseFloat(document.getElementById('caps-vuote-prezzo')?.value||'0')||0;
+      const _nomeCpsDom  = document.getElementById('caps-vuote-nome')?.value || '';
+      const _nCapsLibera = parseInt(document.getElementById('caps-ncaps-lib')?.value||'0')||nCaps;
+      // Usa liberaRigheExtra per capsule se presente, altrimenti costruisce dal DOM
+      const _capEntry = liberaRigheExtra.find(r => r.isCapsule);
+      const _prezCps  = _capEntry?.prezzo || _prezCpsDom;
+      const _nomeCps  = _capEntry?.nome  || _nomeCpsDom || 'Capsule vuote';
+      const _qtaCps   = _capEntry?.qty   || _nCapsLibera;
+      const _costoCps = _qtaCps * _prezCps;
+
+      // Eccipienti: da liberaRigheExtra (non capsule)
+      const _eccipienti = liberaRigheExtra.filter(r => !r.isCapsule);
+      const _costoEccipienti = _eccipienti.reduce((s,r) => s+r.costo, 0);
+
+      const costoTotMaterie = costoPA + _costoEccipienti + _costoCps;
+
       righeMaterie = [
         {name: nomePA+' — '+fmt(grPA,3)+' g × '+fmtE(pPA)+'/g', val: costoPA,
-          badge: pPA===0?'⚠ prezzo mancante':'', badgeType:'warn'},
-        ...liberaRigheExtra
-          .filter(r => !r.isCapsule)
-          .map(r => {
+          badge: pPA===0?'⚠ inserire prezzo in inventario':'', badgeType:'warn'},
+        ..._eccipienti.map(r => {
             const dispQty = r.isLiquido ? fmt(r.unit==='ml'?r.qty:r.qty/(getDensita(r.nome)||1),1)+' ml' : fmt(r.grams,2)+' g';
             const dispUnit = r.isLiquido ? '/ml' : '/g';
             return {name: r.nome+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, val: r.costo,
-              badge: r.prezzo===0?'⚠ prezzo mancante':'', badgeType:'warn'};
+              badge: r.prezzo===0?'⚠ inserire prezzo in inventario':'', badgeType:'warn'};
           }),
-        ...liberaRigheExtra
-          .filter(r => r.isCapsule)
-          .map(r => ({name: r.nome+' — '+r.qty+' pz × '+fmtE(r.prezzo)+'/pz', val: r.costo,
-            badge: r.prezzo===0?'⚠ prezzo mancante':'al costo', badgeType: r.prezzo===0?'warn':'ok'})),
-        ...(liberaRigheExtra.filter(r=>r.isCapsule).length===0
-          ? [{name:'⚠ Capsule vuote non selezionate — seleziona taglia per auto-compilare', val:0, badge:'mancante', badgeType:'warn'}]
-          : []),
+        _qtaCps > 0
+          ? {name: _nomeCps+' — '+_qtaCps+' pz × '+fmtE(_prezCps)+'/pz', val: _costoCps,
+              badge: _prezCps===0?'⚠ inserire prezzo in inventario':'al costo', badgeType: _prezCps===0?'warn':'ok'}
+          : {name:'⚠ Capsule vuote — seleziona taglia per auto-compilare', val:0, badge:'mancante', badgeType:'warn'},
       ];
-      const costoTotMaterie = costoPA + liberaCostoExtra;
       netto = costoTotMaterie + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte + suppManTotale();
     } else {
       // Modalità perc: usa campi manuali tariffazione
