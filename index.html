@@ -921,6 +921,7 @@ function showPage(id, btn) {
   if (id === 'scheda') aggiornaScheda();
   if (id === 'etichette') etiqDaScheda();
   if (id === 'inventario') ordiniRender();
+  if (id === 'tariffazione') { sincronizzaTariffazione(); }
 }
 
 function setTipo(t, btn) {
@@ -1227,8 +1228,20 @@ function setModoPrepara(modo, btn) {
   document.getElementById('prep-modo-libera').style.display = modo === 'libera' ? '' : 'none';
   const capExtra = document.getElementById('prep-caps-extra');
   if (capExtra) capExtra.style.display = (modo === 'libera' && tipoPrep === 'capsule') ? '' : 'none';
-  if (modo === 'libera' && liberaRighe.length === 0) {
-    liberaAddRiga(true); // prima riga = PA
+  // In libera mode: nasconde componenti extra manuali tariffazione (vengono da liberaRigheExtra)
+  // Mantiene visibile flacone e PA
+  const ttExtraRows = document.getElementById('tt-extra-rows');
+  if (ttExtraRows) ttExtraRows.style.display = modo === 'libera' ? 'none' : '';
+  const ttExtraTitle = document.querySelector('#tariff-card-extra .tariff-group-title');
+  if (ttExtraTitle) ttExtraTitle.style.display = modo === 'libera' ? 'none' : '';
+  const ttLiquida = document.getElementById('tt-liquida');
+  if (ttLiquida) ttLiquida.style.display = (modo === 'libera' || tipoTariff === 'capsule') ? 'none' : '';
+  if (modo === 'libera') {
+    if (liberaRighe.length === 0) liberaAddRiga(true); // prima riga = PA
+    // Pulisce i campi extra manuali di tariffazione per evitare doppi conteggi
+    document.querySelectorAll('#tt-extra-rows .t-extra-nome').forEach(el => el.value = '');
+    document.querySelectorAll('#tt-extra-rows .t-extra-qty').forEach(el => el.value = '');
+    document.querySelectorAll('#tt-extra-rows .t-extra-prezzo').forEach(el => el.value = '');
   }
   calcPrep();
 }
@@ -2140,7 +2153,7 @@ function setTipoTariff(t, btn) {
   document.querySelectorAll('#page-tariffazione .seg-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   const isLiquida = t === 'liquida' || t === 'sospensione' || t === 'semisolida' || t === 'polvere';
-  document.getElementById('tt-liquida').style.display  = isLiquida ? '' : 'none';
+  document.getElementById('tt-liquida').style.display  = (isLiquida && modoPrepara !== 'libera') ? '' : 'none';
   document.getElementById('tt-capsule').style.display  = t === 'capsule' ? '' : 'none';
   const qtLabel = document.querySelector('#tt-liquida .field-label');
   if (qtLabel) qtLabel.textContent = (t === 'liquida' || t === 'sospensione') ? 'Quantità totale (ml)' : 'Quantità totale (g)';
@@ -2490,7 +2503,7 @@ function calcTariff() {
       if (nome && qty>0 && prez>0) extraRowsArr.push({nome,qty,unit,prez,costo:qty*prez});
     });
     const costoExtraT = extraRowsArr.reduce((s,e)=>s+e.costo,0);
-    netto += costoExtraT;
+    if (modoPrepara !== 'libera') netto += costoExtraT; // extra manuali solo in perc mode
 
     const nomeVoce = {
       liquida:    'Soluzioni (voce 1)',
@@ -2597,7 +2610,7 @@ function setTipoScheda(t, btn) {
     if (tarBtns[idx]) tarBtns[idx].classList.add('active');
     // aggiorna visibilità campi tariff
     const isLiquida = tipoTariff === 'liquida' || tipoTariff === 'sospensione' || tipoTariff === 'semisolida' || tipoTariff === 'polvere';
-    document.getElementById('tt-liquida').style.display  = isLiquida ? '' : 'none';
+    document.getElementById('tt-liquida').style.display  = (isLiquida && modoPrepara !== 'libera') ? '' : 'none';
     document.getElementById('tt-capsule').style.display  = tipoTariff === 'capsule' ? '' : 'none';
     // tt-row-et rimosso
   }
