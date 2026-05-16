@@ -388,7 +388,7 @@
     <div class="card-title">Procedura</div>
     <ul class="procedure-list" id="procedura"></ul>
   </div>
-  <div class="alert alert-warn"><span class="alert-icon">!</span><span>Verificare sempre la compatibilità con FU XII e Codex. Etichettare <strong>USO ESTERNO</strong>. Conservazione al riparo dalla luce, T° ambiente.</span></div>
+  <div class="alert alert-warn" id="alert-uso-prep"><span class="alert-icon">!</span><span id="alert-uso-prep-testo">Verificare sempre la compatibilità con FU XII e Codex. Conservazione al riparo dalla luce, T° ambiente.</span></div>
   <div style="text-align:right;margin-top:0.5rem">
     <button class="btn-add" onclick="showPage('tariffazione', document.querySelector('.nav-btn[onclick*=tariffazione]'))">Vai alla tariffazione →</button>
   </div>
@@ -945,6 +945,13 @@ function setTipo(t, btn) {
   // Concentrazione non ha senso per capsule (è per soluzioni)
   const rowConc = document.getElementById('row-libera-conc');
   if (rowConc) rowConc.style.display = t === 'capsule' ? 'none' : '';
+  // Alert uso: specifico per tipo
+  const alertUsoPre = document.getElementById('alert-uso-prep-testo');
+  if (alertUsoPre) {
+    if (t === 'capsule' || t === 'polvere') alertUsoPre.textContent = 'Verificare compatibilità con FU XII. Capsule/polveri per USO ORALE — etichettare con posologia e scadenza.';
+    else if (t === 'soluzione' || t === 'sospensione') alertUsoPre.textContent = 'Verificare compatibilità con FU XII. Etichettare con USO ESTERNO o ORALE secondo prescrizione. Conservare al riparo dalla luce.';
+    else alertUsoPre.textContent = 'Verificare compatibilità con FU XII. Etichettare USO ESTERNO. Conservazione al riparo dalla luce, T° ambiente.';
+  }
   // Suggerisce la modalità di default al primo cambio tipo, senza bloccare il ritorno
   // Polvere/unguento: default libera solo se non si era già in perc esplicitamente
   if ((t === 'polvere' || t === 'unguento') && modoPrepara !== 'perc') {
@@ -1028,7 +1035,7 @@ function invLoadMerged() {
   const merged = INV_HARDCODED.map(h => ({ ...h, _hardcoded: true }));
   stored.forEach(s => {
     const idx = merged.findIndex(h => invNominalizza(h.nome) === invNominalizza(s.nome));
-    if (idx >= 0) merged[idx] = { ...merged[idx], ...s, _hardcoded: false };
+    if (idx >= 0) merged[idx] = { ...merged[idx], ...s, h: s.h || merged[idx].h, _hardcoded: false }; // preserva H codes hardcoded se stored è vuoto
     else merged.push({ ...s, _hardcoded: false });
   });
   return merged;
@@ -1939,7 +1946,10 @@ function sincronizzaTariffazione() {
     // t-et-perc rimosso
     // etanolo trattato come qualsiasi sostanza
   } else {
-    if (document.getElementById('t-ncaps') && document.getElementById('n-caps')) document.getElementById('t-ncaps').value = document.getElementById('n-caps').value;
+    const _nCapsEl = document.getElementById('n-caps');
+    const _nCapsLib = document.getElementById('caps-ncaps-lib');
+    const _nCapsVal = (_nCapsEl?.value) || (_nCapsLib?.value) || '';
+    if (document.getElementById('t-ncaps')) document.getElementById('t-ncaps').value = _nCapsVal;
     if (document.getElementById('t-mgpa')  && document.getElementById('mg-pa-cps')) document.getElementById('t-mgpa').value  = document.getElementById('mg-pa-cps').value;
     // Auto-lookup prezzo eccipiente capsule da inventario
     if (modoPrepara !== 'libera') {
