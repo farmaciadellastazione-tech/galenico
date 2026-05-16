@@ -332,7 +332,7 @@
     </div>
     <div class="field-row">
       <span class="field-label">Taglia capsula</span>
-      <select id="caps-taglia-lib" onchange="calcPrep()">
+      <select id="caps-taglia-lib" onchange="capsTagliaChanged(this.value)">
         <option value="0">0 — 680 mg</option>
         <option value="1">1 — 500 mg</option>
         <option value="2">2 — 380 mg</option>
@@ -365,7 +365,7 @@
         <button class="btn-add" style="font-size:12px;padding:4px 12px" onclick="liberaAddRiga()">+ Ingrediente</button>
       </div>
     </div>
-    <div class="field-row" style="margin-bottom:8px">
+    <div class="field-row" id="row-libera-conc" style="margin-bottom:8px">
       <span class="field-label">Concentrazione dichiarata</span>
       <input type="number" id="libera-conc" value="" min="0" max="100" step="0.1" style="width:90px" oninput="calcPrep()">
       <span class="field-note">% p/v — inserisci tu</span>
@@ -942,6 +942,9 @@ function setTipo(t, btn) {
   // Pannello capsule extra in modalità libera
   const capExtra = document.getElementById('prep-caps-extra');
   if (capExtra) capExtra.style.display = (t === 'capsule' && modoPrepara === 'libera') ? '' : 'none';
+  // Concentrazione non ha senso per capsule (è per soluzioni)
+  const rowConc = document.getElementById('row-libera-conc');
+  if (rowConc) rowConc.style.display = t === 'capsule' ? 'none' : '';
   // Suggerisce la modalità di default al primo cambio tipo, senza bloccare il ritorno
   // Polvere/unguento: default libera solo se non si era già in perc esplicitamente
   if ((t === 'polvere' || t === 'unguento') && modoPrepara !== 'perc') {
@@ -1229,6 +1232,8 @@ function setModoPrepara(modo, btn) {
   document.getElementById('prep-modo-libera').style.display = modo === 'libera' ? '' : 'none';
   const capExtra = document.getElementById('prep-caps-extra');
   if (capExtra) capExtra.style.display = (modo === 'libera' && tipoPrep === 'capsule') ? '' : 'none';
+  const rowConc2 = document.getElementById('row-libera-conc');
+  if (rowConc2) rowConc2.style.display = tipoPrep === 'capsule' ? 'none' : '';
   // In libera mode: nasconde componenti extra manuali tariffazione (vengono da liberaRigheExtra)
   // Mantiene visibile flacone e PA
   const ttExtraRows = document.getElementById('tt-extra-rows');
@@ -2227,6 +2232,27 @@ function suppManRender() {
 
 function suppManTotale() {
   return _suppManRighe.reduce((s,r) => s + (parseFloat(r.importo)||0), 0);
+}
+
+function capsTagliaChanged(taglia) {
+  // Auto-cerca capsule vuote in inventario per la taglia selezionata
+  const inv = invLoadMerged();
+  const found = inv.filter(s => {
+    const n = invNominalizza(s.nome);
+    return (n.includes('capsul') || n.includes('cps')) && n.includes('taglia') && n.includes(taglia) && s.unit === 'pz';
+  });
+  if (found.length > 0 && found[0].prezzo > 0) {
+    // Auto-seleziona la prima capsule trovata per questa taglia
+    capsVuoteSel(found[0].nome, found[0].prezzo);
+    document.getElementById('caps-vuote-cerca').value = found[0].nome;
+  } else {
+    // Nessuna capsule in inventario per questa taglia — svuota selezione
+    document.getElementById('caps-vuote-prezzo').value = 0;
+    document.getElementById('caps-vuote-nome').value = '';
+    document.getElementById('caps-vuote-sel').textContent = 'Nessuna capsule taglia '+taglia+' in inventario — aggiungila';
+    document.getElementById('caps-vuote-sug').innerHTML = '';
+  }
+  calcPrep();
 }
 
 function capsVuoteCerca(q) {
