@@ -917,13 +917,14 @@ function setTipo(t, btn) {
   // Pannello capsule extra in modalità libera
   const capExtra = document.getElementById('prep-caps-extra');
   if (capExtra) capExtra.style.display = (t === 'capsule' && modoPrepara === 'libera') ? '' : 'none';
-  // Polvere e unguento: passa automaticamente a modalità libera
-  if (t === 'polvere' || t === 'unguento') {
+  // Suggerisce la modalità di default al primo cambio tipo, senza bloccare il ritorno
+  // Polvere/unguento: default libera solo se non si era già in perc esplicitamente
+  if ((t === 'polvere' || t === 'unguento') && modoPrepara !== 'perc') {
     if (liberaBtn && modoPrepara !== 'libera') setModoPrepara('libera', liberaBtn);
-  } else if (t === 'soluzione') {
+  } else if (t === 'soluzione' && modoPrepara !== 'libera') {
     if (percBtn && modoPrepara !== 'perc') setModoPrepara('perc', percBtn);
   }
-  // Capsule: resta nel modo corrente
+  // In tutti i casi: l'utente può sempre cliccare manualmente l'altro modo
   calcPrep();
 }
 
