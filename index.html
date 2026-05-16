@@ -1247,6 +1247,9 @@ function setModoPrepara(modo, btn) {
   if (ttExtraRows) ttExtraRows.style.display = modo === 'libera' ? 'none' : '';
   const ttExtraTitle = document.querySelector('#tariff-card-extra .tariff-group-title');
   if (ttExtraTitle) ttExtraTitle.style.display = modo === 'libera' ? 'none' : '';
+  // Nascondi anche la card comp-extra in preparazione (inutile in libera: usa le righe)
+  const cardCompExtra = document.getElementById('card-comp-extra');
+  if (cardCompExtra) cardCompExtra.style.display = modo === 'libera' ? 'none' : '';
   const ttLiquida = document.getElementById('tt-liquida');
   if (ttLiquida) ttLiquida.style.display = (modo === 'libera' || tipoTariff === 'capsule') ? 'none' : '';
   if (modo === 'libera') {
@@ -1586,9 +1589,7 @@ function calcPrep() {
       if (mgCps > 0) items.push({name:'Massa per capsula', val:fmt(mgCps,1), unit:'mg'});
       if (prezCps > 0) items.push({name:nomeCps+' (al costo, escluse dal peso)', val:'€'+fmt(costoCps,2), unit:''});
       if (mgCps > capVol * 1.05) items.push({name:'⚠ Supera capacità taglia '+taglia, val:fmt(capVol,0), unit:'mg max'});
-      // Aggiorna il costo totale capsule in liberaCostoExtra (per tariffazione)
-      liberaCostoExtra += costoCps;
-      liberaRigheExtra.push({nome: nomeCps, qty: nCaps, unit:'pz', grams:0, mlQty:0, prezzo:prezCps, costo:costoCps, isLiquido:false, isCapsule:true});
+      // N.B. capsule aggiunte a liberaRigheExtra DOPO il loop ingredienti (vedi sotto)
       proc = [
         ...pesate,
         ...(hasCrystalline ? ['Setacciare i componenti cristallini al setaccio n° 355 µm prima della miscelazione. <em>(Op. tecnologica aggiuntiva — Art. 6)</em>'] : []),
@@ -1738,6 +1739,17 @@ function calcPrep() {
       liberaMlEt = etRigaPerTariff.unit === 'ml' ? qEt : qEt / 0.807;
     } else {
       liberaMlEt = 0;
+    }
+    // Capsule vuote: aggiunge DOPO il loop ingredienti (così non viene azzerata col reset)
+    if (tipoPrep === 'capsule') {
+      const _prezCpsPost  = parseFloat(document.getElementById('caps-vuote-prezzo')?.value||'0')||0;
+      const _nomeCpsPost  = document.getElementById('caps-vuote-nome')?.value || 'Capsule vuote';
+      const _nCapsPost    = parseInt(document.getElementById('caps-ncaps-lib')?.value||'0')||0;
+      const _costoCpsPost = _nCapsPost * _prezCpsPost;
+      if (_nCapsPost > 0 || _prezCpsPost > 0) {
+        liberaCostoExtra += _costoCpsPost;
+        liberaRigheExtra.push({nome:_nomeCpsPost, qty:_nCapsPost, unit:'pz', grams:0, mlQty:0, prezzo:_prezCpsPost, costo:_costoCpsPost, isLiquido:false, isCapsule:true});
+      }
     }
 
     // Sincronizza tipoTariff con tipoPrep
