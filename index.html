@@ -1912,11 +1912,35 @@ function sincronizzaTariffazione() {
   } else {
     if (document.getElementById('t-ncaps') && document.getElementById('n-caps')) document.getElementById('t-ncaps').value = document.getElementById('n-caps').value;
     if (document.getElementById('t-mgpa')  && document.getElementById('mg-pa-cps')) document.getElementById('t-mgpa').value  = document.getElementById('mg-pa-cps').value;
+    // Auto-lookup prezzo eccipiente capsule da inventario
+    if (modoPrepara !== 'libera') {
+      const eccNome = document.getElementById('eccip-nome')?.value?.trim() || '';
+      if (eccNome) {
+        const eccTrovato = invGetPrezzo(eccNome);
+        const tEccip = document.getElementById('t-eccip');
+        if (tEccip && eccTrovato && eccTrovato.prezzo > 0) tEccip.value = eccTrovato.prezzo.toFixed(4);
+      }
+    }
   }
   // Sincronizza componenti extra: conta preparazione (escluso etanolo che è auto)
   const nCompsPrep = typeof prepGetComps === 'function' ? prepGetComps().length : 0;
   const tComp = document.getElementById('t-comp');
   if (tComp) tComp.value = nCompsPrep;
+  // Auto-lookup eccipienti nella prima riga componenti extra per tipi non-capsule perc mode
+  if (modoPrepara !== 'libera' && tipoPrep !== 'capsule') {
+    const _eccNome = document.getElementById('eccip-nome')?.value?.trim() || '';
+    if (_eccNome) {
+      const _eccTr = invGetPrezzo(_eccNome);
+      const _extraRows = document.querySelectorAll('#tt-extra-rows .tt-extra-row');
+      if (_extraRows.length > 0 && _eccTr && _eccTr.prezzo > 0) {
+        const _r = _extraRows[0];
+        const _nomeEl = _r.querySelector('.t-extra-nome');
+        const _prezEl = _r.querySelector('.t-extra-prezzo');
+        if (_nomeEl && !_nomeEl.value) _nomeEl.value = _eccNome;
+        if (_prezEl && !_prezEl.value) _prezEl.value = _eccTr.prezzo.toFixed(4);
+      }
+    }
+  }
   calcTariff();
 }
 
@@ -2378,7 +2402,11 @@ function calcTariff() {
     } else {
       // Modalità perc: usa campi manuali tariffazione
       const pEccip  = parseFloat(document.getElementById('t-eccip').value)||0;
-      const grEccip = parseFloat(document.getElementById('t-ncaps').dataset?.grEccip || 0);
+      // grEccip: stima da taglia capsula − mgPA (capacità − dose PA)
+      const _tagliaCps = parseInt(document.getElementById('taglia-caps')?.value||'0')||0;
+      const _capVolMap = {0:680,1:500,2:380,3:280,4:200};
+      const _capVolMg  = _capVolMap[_tagliaCps] || 680;
+      const grEccip = Math.max(0, (_capVolMg - mgPAcps) * nCaps / 1000);
       grPA     = (mgPAcps * nCaps) / 1000;
       costoPA  = grPA * pPA;
       const costoEccip = grEccip * pEccip;
