@@ -3190,7 +3190,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 30;
+const APP_VERSION = 31;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -3738,8 +3738,9 @@ function aiGetSystemPrompt() {
     'IMPORTANTE: rispondi SEMPRE con la formula completa anche se alcune sostanze non sono in inventario. ' +
     'Alla fine aggiungi: DA ORDINARE: [sostanze mancanti dall\'inventario] ' +
     'Quando proponi una formula usa SEMPRE questo formato:\n' +
+    'TIPO: [soluzione|sospensione|unguento|polvere|capsule]\n' +
     'FORMULA:\n- [sostanza]: [quantit\u00e0] [unit\u00e0]\nPROCEDURA:\n1. [passo]\nNOTE: [avvertenze]\n' +
-    'Per liquidi usa ml, per solidi usa g. Elenca ogni componente su riga separata con trattino.\n\n' +
+    'TIPO \u00e8 obbligatorio e deve essere uno dei 5 valori esatti sopra (minuscolo). Per liquidi usa ml, per solidi usa g. Elenca ogni componente su riga separata con trattino.\n\n' +
     invTxt;
 }
 
@@ -3747,9 +3748,12 @@ function aiParseFormula(text) {
   const lines = text.split('\n');
   const comps = [];
   let inFormula = false;
+  let tipo = null;
+  const tipoMatch = text.match(/^TIPO\s*:\s*(soluzione|sospensione|unguento|polvere|capsule)\b/im);
+  if (tipoMatch) tipo = tipoMatch[1].toLowerCase();
   for (const line of lines) {
     if (/^FORMULA\s*:/i.test(line.trim())) { inFormula = true; continue; }
-    if (/^PROCEDURA\s*:/i.test(line.trim()) || /^NOTE\s*:/i.test(line.trim()) || /^DA ORDINARE/i.test(line.trim())) inFormula = false;
+    if (/^TIPO\s*:/i.test(line.trim()) || /^PROCEDURA\s*:/i.test(line.trim()) || /^NOTE\s*:/i.test(line.trim()) || /^DA ORDINARE/i.test(line.trim())) inFormula = false;
     if (inFormula) {
       const m = line.match(/^[-\u2022]\s*(.+?):\s*([\d.,]+)\s*([a-zA-Z%\u00b0\u00b5]+)?/);
       if (m) {
@@ -3779,10 +3783,15 @@ function aiParseFormula(text) {
       if (t) daOrdinare.push(t);
     });
   }
-  return {comps, daOrdinare};
+  // Fallback TIPO se assente: euristica da unità
+  if (!tipo && comps.length) {
+    const hasML = comps.some(c => c.unit === 'ml');
+    tipo = hasML ? 'soluzione' : 'polvere';
+  }
+  return {comps, daOrdinare, tipo};
 }
 
-function aiRenderImportCard(comps, daOrdinare) {
+function aiRenderImportCard(comps, daOrdinare, tipo) {
   if (!comps.length) return '';
   const inv = typeof invLoadMerged === 'function' ? invLoadMerged() : [];
   const rows = comps.map(c => {
@@ -3799,17 +3808,21 @@ function aiRenderImportCard(comps, daOrdinare) {
       '</div>';
   }).join('');
   const compsJson = JSON.stringify(comps).replace(/"/g,'&quot;');
+  const tipoEnc = (tipo || '').replace(/[^a-z]/g,'');
+  const tipoLabel = tipo
+    ? ' <span style="font-size:11px;color:var(--accent);margin-left:6px;text-transform:none;letter-spacing:0">→ ' + tipo + ' (modalità libera)</span>'
+    : '';
   let ordinareHtml = '';
   if (daOrdinare && daOrdinare.length) {
     ordinareHtml = '<div style="margin-top:8px;padding:6px 8px;background:#fff3cd;border-radius:var(--radius);font-size:12px;color:#856404">' +
       '\u26a0 <strong>Da ordinare:</strong> ' + daOrdinare.join(', ') + '</div>';
   }
   return '<div style="margin-top:8px;padding:8px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius)">' +
-    '<div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">Componenti — clicca per aggiungere alla Preparazione</div>' +
+    '<div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">Componenti — clicca per importare in Preparazione' + tipoLabel + '</div>' +
     rows +
     ordinareHtml +
-    '<button onclick="aiImportaTutti(' + compsJson + ')" ' +
-      'style="margin-top:8px;font-size:12px;padding:4px 14px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;width:100%">Aggiungi tutti</button>' +
+    '<button onclick="aiImportaTutti(' + compsJson + ',\'' + tipoEnc + '\')" ' +
+      'style="margin-top:8px;font-size:12px;padding:4px 14px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;width:100%">Porta in Preparazione (libera)</button>' +
     '</div>';
 }
 
@@ -3825,8 +3838,74 @@ function aiImportaComp(nome, qty, unit) {
   if (prepBtn) showPage('preparazione', prepBtn);
 }
 
-function aiImportaTutti(comps) {
-  comps.forEach(c => aiImportaComp(c.nome, c.qty, c.unit));
+function aiImportaTutti(comps, tipo) {
+  if (!comps || !comps.length) return;
+  // 1) Vai in Preparazione
+  const prepNavBtn = document.querySelector('.nav-btn[onclick*="preparazione"]');
+  if (prepNavBtn) showPage('preparazione', prepNavBtn);
+
+  // 2) Imposta tipoPrep — ordine bottoni: soluzione(0), unguento(1), capsule(2), polvere(3), sospensione(4)
+  const tipoOk = ['soluzione','sospensione','unguento','polvere','capsule'];
+  let tipoTarget = tipoOk.includes(tipo) ? tipo : null;
+  if (!tipoTarget) {
+    // fallback euristico se l'AI non ha dato TIPO
+    const hasML = comps.some(c => c.unit === 'ml');
+    tipoTarget = hasML ? 'soluzione' : 'polvere';
+  }
+  const tipoIdx = {soluzione:0, unguento:1, capsule:2, polvere:3, sospensione:4}[tipoTarget];
+  const tipoBtns = document.querySelectorAll('#tariff-card-tipo .seg .seg-btn');
+  if (tipoBtns[tipoIdx]) setTipo(tipoTarget, tipoBtns[tipoIdx]);
+
+  // 3) Forza modalità libera (setTipo la attiva di default solo per polvere/unguento)
+  const liberaBtn = document.getElementById('modo-libera-btn');
+  if (liberaBtn && modoPrepara !== 'libera') setModoPrepara('libera', liberaBtn);
+
+  // 4) Popola liberaRighe da zero con i comps, facendo lookup Allegato A + inventario
+  const inv = typeof invLoadMerged === 'function' ? invLoadMerged() : [];
+  liberaRighe = comps.map((c, i) => {
+    const qNorm = invNominalizza(c.nome);
+    const chiaveAll = Object.keys(ALLEGATO_A).find(k => k.includes(qNorm) || qNorm.includes(k.split(' ')[0]));
+    const invFound = inv.find(s => invNominalizza(s.nome).includes(qNorm) || qNorm.includes(invNominalizza(s.nome)));
+    let nomeFinal = c.nome;
+    let prezzoAcq = 0;
+    let fonte = 'art5';
+    if (chiaveAll) {
+      nomeFinal = chiaveAll.charAt(0).toUpperCase() + chiaveAll.slice(1);
+      prezzoAcq = ALLEGATO_A[chiaveAll];
+      fonte = 'allegatoA';
+    } else if (invFound) {
+      nomeFinal = invFound.nome;
+      prezzoAcq = invFound.prezzo || 0;
+      fonte = 'inventario';
+    }
+    let unit = c.unit === 'ml' ? 'ml' : 'g';
+    if (tipoTarget === 'polvere' || tipoTarget === 'capsule') unit = 'g';
+    return {
+      nome: nomeFinal,
+      qty: String(c.qty),
+      unit,
+      isPa: i === 0,
+      densita: null,
+      prezzoAcq,
+      fonte,
+      lotto: invFound?.lottoInt || invFound?.lotto || '',
+      h: invFound?.h || getHDaInventario(nomeFinal),
+    };
+  });
+  if (typeof liberaRenderRighe === 'function') liberaRenderRighe();
+
+  // 5) Per capsule: prova a leggere n° capsule dal contesto comps (es. se l'AI scrive "Capsule vuote: 30")
+  //    altrimenti l'utente le imposta manualmente.
+  if (tipoTarget === 'capsule') {
+    const capsRiga = comps.find(c => /capsul/i.test(c.nome));
+    if (capsRiga) {
+      const nEl = document.getElementById('caps-ncaps-lib');
+      if (nEl && !nEl.value) nEl.value = parseInt(capsRiga.qty) || '';
+    }
+  }
+
+  // 6) Ricalcola tutto (calcPrep in libera mode propaga a tariffazione)
+  if (typeof calcPrep === 'function') calcPrep();
 }
 
 let aiHistory = [];
@@ -3928,7 +4007,7 @@ async function aiChiama(userMsg) {
       const parsed = aiParseFormula(reply);
       if (parsed.comps.length > 0 || parsed.daOrdinare.length > 0) {
         const card = document.createElement('div');
-        card.innerHTML = aiRenderImportCard(parsed.comps, parsed.daOrdinare);
+        card.innerHTML = aiRenderImportCard(parsed.comps, parsed.daOrdinare, parsed.tipo);
         document.getElementById('ai-messages').appendChild(card);
         document.getElementById('ai-messages').scrollTop = 99999;
         // Aggiungi automaticamente alla lista ordini
