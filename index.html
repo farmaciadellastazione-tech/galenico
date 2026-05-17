@@ -1747,7 +1747,7 @@ function calcPrep() {
       const qtPerCosto = isLiquido && !chiaveAll ? (r.unit === 'ml' ? q : q/densita) : grams;
       const costo = qtPerCosto * prezzo;
       if (prezzo > 0) liberaCostoExtra += costo;
-      liberaRigheExtra.push({nome: r.nome, qty: q, unit: r.unit, grams, mlQty, prezzo, costo, isLiquido: isLiquido && !chiaveAll});
+      liberaRigheExtra.push({nome: r.nome, qty: q, unit: r.unit, grams, mlQty, prezzo, costo, isLiquido: isLiquido && !chiaveAll, isPa: _ri === 0});
     });
     const etRigaPerTariff = ingr.find(r => {
       const n = invNominalizza(r.nome);
@@ -2487,8 +2487,8 @@ function calcTariff() {
       const _qtaCps   = _capEntry?.qty   || _nCapsLibera;
       const _costoCps = _qtaCps * _prezCps;
 
-      // Eccipienti: da liberaRigheExtra (non capsule)
-      const _eccipienti = liberaRigheExtra.filter(r => !r.isCapsule);
+      // Eccipienti: da liberaRigheExtra (escludi PA, già contato come costoPA, e capsule)
+      const _eccipienti = liberaRigheExtra.filter(r => !r.isCapsule && !r.isPa);
       const _costoEccipienti = _eccipienti.reduce((s,r) => s+r.costo, 0);
 
       const costoTotMaterie = costoPA + _costoEccipienti + _costoCps;
@@ -3190,7 +3190,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 29;
+const APP_VERSION = 30;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
