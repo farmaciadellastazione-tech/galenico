@@ -2957,14 +2957,14 @@ function aggiornaScheda() {
   }
   const suppH  = _hS ? 2.50 : 0;
   const inc40  = baseB * 0.40;
-  const nettoMaterie = modoPrepara === 'libera' ? (costoPA + liberaCostoExtra) : (costoPA + costoET + costoExtra);
+  // In libera mode il PA è già incluso in liberaCostoExtra / liberaRigheExtra: non sommarlo né mostrarlo due volte
+  const _costoPA_eff = modoPrepara === 'libera' ? 0 : costoPA;
+  const nettoMaterie = modoPrepara === 'libera' ? liberaCostoExtra : (costoPA + costoET + costoExtra);
   const netto  = nettoMaterie + baseB + inc40 + suppH + costoFL_s;
   const iva    = netto * 0.10;
   const totale = prezzo > 0 ? prezzo : netto + iva;
 
-  let tariffRows = [
-    {n: nomePA + ' — ' + fmt(costoPA/Math.max(pPA,0.0001),3) + ' g × ' + fmtE(pPA) + '/g', v: costoPA},
-  ];
+  let tariffRows = [];
   if (modoPrepara === 'libera') {
     liberaRigheExtra.forEach(r => {
       const dispQty = r.isLiquido ? fmt(r.unit==='ml'?r.qty:r.qty/(getDensita(r.nome)||1),1)+' ml' : fmt(r.grams,2)+' g';
@@ -2972,6 +2972,7 @@ function aggiornaScheda() {
       tariffRows.push({n: r.nome+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, v: r.costo});
     });
   } else {
+    tariffRows.push({n: nomePA + ' — ' + fmt(_costoPA_eff/Math.max(pPA,0.0001),3) + ' g × ' + fmtE(pPA) + '/g', v: _costoPA_eff});
 // etanolo in liberaRigheExtra
     extra.forEach(e => tariffRows.push({n:e.nome+' '+fmt(e.qty,3)+' '+e.unit+' × '+fmtE(e.prez)+'/'+e.unit, v:e.costo}));
   }
@@ -3190,7 +3191,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 31;
+const APP_VERSION = 32;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
