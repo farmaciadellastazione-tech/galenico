@@ -238,7 +238,9 @@
     <button class="nav-btn" onclick="showPage('etichette',this)">Etichette</button>
     <button class="nav-btn" onclick="showPage('formulario',this)">🤖 AI</button>
   </nav>
-  <div id="app-version-badge" style="margin-left:auto;font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:99px;background:#ccc;color:#333;white-space:nowrap;cursor:default" title="Versione app"></div>
+  <button onclick="resetRicetta()" title="Azzera ricetta corrente (Preparazione, Tariffazione, Scheda)"
+    style="margin-left:auto;font-size:12px;font-family:var(--sans);padding:5px 12px;border:1px solid #d9b3b3;border-radius:var(--radius);background:#fdf2f2;color:#7d3c0c;cursor:pointer;white-space:nowrap">↺ Nuova ricetta</button>
+  <div id="app-version-badge" style="margin-left:8px;font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:99px;background:#ccc;color:#333;white-space:nowrap;cursor:default" title="Versione app"></div>
 </header>
 
 <main>
@@ -269,7 +271,7 @@
     <div class="card-title">Parametri</div>
     <div class="field-row">
       <span class="field-label">Principio attivo</span>
-      <input type="text" id="prep-pa-nome" placeholder="es. Minoxidil" style="width:220px;" list="pa-suggestions" oninput="sincronizzaPA()">
+      <input type="text" id="prep-pa-nome" placeholder="" style="width:220px;" list="pa-suggestions" oninput="sincronizzaPA()">
       <datalist id="pa-suggestions"></datalist>
     </div>
     <div class="field-row">
@@ -290,11 +292,11 @@
     <div class="field-row" id="row-taglia" style="display:none">
       <span class="field-label">Taglia capsula</span>
       <select id="taglia-caps" onchange="calcPrep()">
-        <option value="0">0 — 680 mg</option>
-        <option value="1">1 — 500 mg</option>
-        <option value="2">2 — 380 mg</option>
-        <option value="3">3 — 280 mg</option>
-        <option value="4">4 — 200 mg</option>
+        <option value="0">0 — 500 mg</option>
+        <option value="1">1 — 400 mg</option>
+        <option value="2">2 — 300 mg</option>
+        <option value="3">3 — 210 mg</option>
+        <option value="4">4 — 150 mg</option>
       </select>
       <span class="field-note">capacità indicativa</span>
     </div>
@@ -310,7 +312,7 @@
     </div>
     <div class="field-row" id="row-eccip-nome" style="display:none">
       <span class="field-label">Eccipiente principale</span>
-      <input type="text" id="eccip-nome" value="" placeholder="es. Lattosio monoidrato" style="width:220px;" oninput="calcPrep()">
+      <input type="text" id="eccip-nome" value="" placeholder="" style="width:220px;" oninput="calcPrep()">
     </div>
     <div class="field-row" id="row-diluente" style="display:none">
       <span class="field-label">Diluente sospensione</span>
@@ -327,24 +329,24 @@
     <div class="card-title">Parametri capsula</div>
     <div class="field-row">
       <span class="field-label">Numero capsule</span>
-      <input type="number" id="caps-ncaps-lib" value="" min="1" max="1000" step="1" oninput="calcPrep()">
+      <input type="number" id="caps-ncaps-lib" value="" min="1" max="1000" step="1" oninput="capsScaleOnNCapsChange()">
       <span class="field-note">pz</span>
     </div>
     <div class="field-row">
       <span class="field-label">Taglia capsula</span>
       <select id="caps-taglia-lib" onchange="capsTagliaChanged(this.value)">
-        <option value="0">0 — 680 mg</option>
-        <option value="1">1 — 500 mg</option>
-        <option value="2">2 — 380 mg</option>
-        <option value="3">3 — 280 mg</option>
-        <option value="4">4 — 200 mg</option>
+        <option value="0">0 — 500 mg</option>
+        <option value="1">1 — 400 mg</option>
+        <option value="2">2 — 300 mg</option>
+        <option value="3">3 — 210 mg</option>
+        <option value="4">4 — 150 mg</option>
       </select>
       <span class="field-note">capacità indicativa</span>
     </div>
     <div class="field-row" style="align-items:flex-start">
       <span class="field-label">Capsule vuote</span>
       <div style="flex:1">
-        <input type="text" id="caps-vuote-cerca" placeholder="es. capsule taglia 0"
+        <input type="text" id="caps-vuote-cerca" placeholder=""
           style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
           oninput="capsVuoteCerca(this.value)">
         <div id="caps-vuote-sug" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px"></div>
@@ -420,7 +422,7 @@
 
     <!-- campi per capsule -->
     <div id="tt-capsule" style="display:none">
-      <div class="field-row"><span class="field-label">Numero capsule</span><input type="number" id="t-ncaps" value="" step="1" min="1" max="1000" oninput="calcTariff()"></div>
+      <div class="field-row"><span class="field-label">Numero capsule</span><input type="number" id="t-ncaps" value="" step="1" min="1" max="1000" oninput="tariffNCapsChange()"></div>
       <div class="field-row"><span class="field-label">Dosaggio PA (mg/cps)</span><input type="number" id="t-mgpa" value="" step="0.1" min="0" oninput="calcTariff()"></div>
       <div class="field-row"><span class="field-label">Costo eccipiente (€/g)</span><input type="number" id="t-eccip" value="" step="0.001" min="0" oninput="calcTariff()"><span class="field-note">prezzo acquisto</span></div>
       <div class="field-row"><span class="field-label">Costo capsule vuote (€/cps)</span><input type="number" id="t-cpsvuote" value="" step="0.001" min="0" oninput="calcTariff()"><span class="field-note">prezzo acquisto</span></div>
@@ -431,7 +433,7 @@
     <div class="card-title">Principio attivo — ricerca Allegato A</div>
     <div class="field-row">
       <span class="field-label">Sostanza</span>
-      <input type="text" id="t-pa-nome" placeholder="es. Acido salicilico" oninput="tarRicercaPA()" style="width:220px;">
+      <input type="text" id="t-pa-nome" placeholder="" oninput="tarRicercaPA()" style="width:220px;">
       <span class="field-note" id="t-pa-fonte" style="font-size:12px"></span>
     </div>
     <div id="t-pa-suggerimenti" style="margin:4px 0 8px 0;display:flex;flex-wrap:wrap;gap:4px"></div>
@@ -452,7 +454,7 @@
     <div class="field-row" style="align-items:flex-start">
       <span class="field-label">Cerca flacone in inventario</span>
       <div style="flex:1">
-        <input type="text" id="t-fl-cerca" placeholder="es. flacone 125" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)" oninput="tarCercaFlacone()">
+        <input type="text" id="t-fl-cerca" placeholder="" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)" oninput="tarCercaFlacone()">
         <div id="t-fl-suggerimenti" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px"></div>
       </div>
     </div>
@@ -544,15 +546,15 @@
     <div id="s-row-mgpa" style="display:none"><div class="field-row"><span class="field-label">Dosaggio PA (mg/cps)</span><input type="number" id="s-mgpa" value="" step="0.1" min="0" oninput="aggiornaScheda()"></div></div>
     <div id="s-row-taglia" style="display:none"><div class="field-row"><span class="field-label">Taglia capsula</span>
       <select id="s-taglia" onchange="aggiornaScheda()">
-        <option value="0">0 — 680 mg</option>
-        <option value="1">1 — 500 mg</option>
-        <option value="2">2 — 380 mg</option>
-        <option value="3">3 — 280 mg</option>
-        <option value="4">4 — 200 mg</option>
+        <option value="0">0 — 500 mg</option>
+        <option value="1">1 — 400 mg</option>
+        <option value="2">2 — 300 mg</option>
+        <option value="3">3 — 210 mg</option>
+        <option value="4">4 — 150 mg</option>
       </select></div></div>
-    <div id="s-row-eccip" style="display:none"><div class="field-row"><span class="field-label">Eccipiente</span><input type="text" id="s-eccip" value="" placeholder="es. Lattosio monoidrato" style="width:220px;" oninput="aggiornaScheda()"></div></div>
+    <div id="s-row-eccip" style="display:none"><div class="field-row"><span class="field-label">Eccipiente</span><input type="text" id="s-eccip" value="" placeholder="" style="width:220px;" oninput="aggiornaScheda()"></div></div>
     <!-- comuni -->
-    <div class="field-row"><span class="field-label">Principio attivo (nome)</span><input type="text" id="s-pa-nome" value="" placeholder="es. Acido salicilico" style="width:220px;" oninput="aggiornaScheda()"></div>
+    <div class="field-row"><span class="field-label">Principio attivo (nome)</span><input type="text" id="s-pa-nome" value="" placeholder="" style="width:220px;" oninput="aggiornaScheda()"></div>
     <div class="field-row"><span class="field-label">Paziente</span><input type="text" id="s-paz" value="" oninput="aggiornaScheda()"></div>
     <div class="field-row"><span class="field-label">Farmacista preparatore</span><input type="text" id="s-farm" value="" oninput="aggiornaScheda()"></div>
     <div class="field-row"><span class="field-label">Data preparazione</span><input type="date" id="s-data" oninput="aggiornaScheda()"></div>
@@ -596,7 +598,7 @@
     <div class="inv-form" style="grid-template-columns:2fr 2fr;margin-bottom:8px">
       <div>
         <label>Sostanza</label>
-        <input type="text" id="inv-nome-libero" placeholder="es. Minoxidil, Etanolo 96°..."
+        <input type="text" id="inv-nome-libero" placeholder=""
           autocomplete="off"
           style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
           oninput="invCercaNome(this.value)">
@@ -604,7 +606,7 @@
       </div>
       <div>
         <label>Frasi H (da SDS)</label>
-        <input type="text" id="inv-h" placeholder="es. H302, H318, H335" autocomplete="off"
+        <input type="text" id="inv-h" placeholder="" autocomplete="off"
           style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">
       </div>
     </div>
@@ -613,11 +615,11 @@
     <div class="inv-form" style="grid-template-columns:1fr 1fr 1fr 1fr 80px 110px 110px;margin-bottom:8px">
       <div>
         <label>Lotto fornitore</label>
-        <input type="text" id="inv-lotto" placeholder="es. F2300213" oninput="invAggiornaSDS()">
+        <input type="text" id="inv-lotto" placeholder="" oninput="invAggiornaSDS()">
       </div>
       <div>
         <label>Lotto interno</label>
-        <input type="text" id="inv-lotto-int" placeholder="es. n5/2024">
+        <input type="text" id="inv-lotto-int" placeholder="">
       </div>
       <div>
         <label>Scadenza</label>
@@ -625,7 +627,7 @@
       </div>
       <div>
         <label>Qtà confezione</label>
-        <input type="number" id="inv-qty" placeholder="es. 250" min="0" step="0.1" oninput="invCalcolaPrezzo()">
+        <input type="number" id="inv-qty" placeholder="" min="0" step="0.1" oninput="invCalcolaPrezzo()">
       </div>
       <div>
         <label>Unità</label>
@@ -637,7 +639,7 @@
       </div>
       <div>
         <label>Prezzo bolla (€)</label>
-        <input type="number" id="inv-prezzo-bolla" placeholder="es. 45.00" min="0" step="0.01" oninput="invCalcolaPrezzo()">
+        <input type="number" id="inv-prezzo-bolla" placeholder="" min="0" step="0.01" oninput="invCalcolaPrezzo()">
       </div>
       <div>
         <label>€ / <span id="inv-unit-label">g</span> <small style="color:var(--text-faint)">(calc.)</small></label>
@@ -649,7 +651,7 @@
     <div class="inv-form" style="grid-template-columns:1fr 1fr 1fr 1fr;margin-bottom:8px">
       <div>
         <label>N° DDT</label>
-        <input type="text" id="inv-ddt-num" placeholder="es. 2024/0158">
+        <input type="text" id="inv-ddt-num" placeholder="">
       </div>
       <div>
         <label>Data DDT</label>
@@ -667,7 +669,7 @@
     <div class="inv-form" style="grid-template-columns:2fr 1fr 1fr;margin-bottom:8px">
       <div>
         <label>URL scheda tecnica (SDS)</label>
-        <input type="url" id="inv-sds" placeholder="es. https://www.farmalabor.it/certificati/...">
+        <input type="url" id="inv-sds" placeholder="">
       </div>
       <div>
         <label>Codice a barre / EAN</label>
@@ -675,7 +677,7 @@
       </div>
       <div>
         <label>Minimo ordinabile (g/ml)</label>
-        <input type="number" id="inv-min-order" placeholder="es. 100" min="0" step="1">
+        <input type="number" id="inv-min-order" placeholder="" min="0" step="1">
       </div>
     </div>
 
@@ -721,15 +723,15 @@
       </div>
       <div class="full">
         <label>Paziente / sig.</label>
-        <input type="text" id="e-paziente" placeholder="es. Rossi Mario" oninput="etiqAggiorna()">
+        <input type="text" id="e-paziente" placeholder="" oninput="etiqAggiorna()">
       </div>
       <div class="full">
         <label>Preparazione</label>
-        <input type="text" id="e-nome" placeholder="es. Minoxidil 5% soluzione" oninput="etiqAggiorna()">
+        <input type="text" id="e-nome" placeholder="" oninput="etiqAggiorna()">
       </div>
       <div>
         <label>Quantità</label>
-        <input type="text" id="e-qty" placeholder="es. 125 ml" oninput="etiqAggiorna()">
+        <input type="text" id="e-qty" placeholder="" oninput="etiqAggiorna()">
       </div>
       <div>
         <label>Uso</label>
@@ -741,7 +743,7 @@
       </div>
       <div>
         <label>Data prep. (gg/mm/aaaa)</label>
-        <input type="text" id="e-data" placeholder="es. 11/05/2026" oninput="etiqAggiorna()">
+        <input type="text" id="e-data" placeholder="" oninput="etiqAggiorna()">
       </div>
       <div>
         <label>Validità (mesi)</label>
@@ -749,11 +751,11 @@
       </div>
       <div>
         <label>Prezzo (€)</label>
-        <input type="number" id="e-prezzo" step="0.01" placeholder="es. 12.50" oninput="etiqAggiorna()">
+        <input type="number" id="e-prezzo" step="0.01" placeholder="" oninput="etiqAggiorna()">
       </div>
       <div>
         <label>Frasi H</label>
-        <input type="text" id="e-h" placeholder="es. H302, H318, H335" oninput="etiqAggiorna()">
+        <input type="text" id="e-h" placeholder="" oninput="etiqAggiorna()">
       </div>
     </div>
     <div style="margin-top:0.5rem">
@@ -799,7 +801,7 @@
 <div class="page" id="page-formulario">
   <div style="margin-bottom:4px"><button onclick="showPage('preparazione', document.querySelector('.nav-btn[onclick*=preparazione]'))" style="font-size:12px;padding:3px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer;color:var(--text-faint)">← Preparazione</button></div>
   <h1>Formulario AI</h1>
-  <p class="subtitle">Assistente galenico — Groq llama-3.1-8b · solo farmacopea e preparazioni magistrali</p>
+  <p class="subtitle">Assistente galenico — Groq gpt-oss-120b · solo farmacopea e preparazioni magistrali</p>
 
   <div class="card">
     <div class="card-title">Chiave API Groq</div>
@@ -831,7 +833,7 @@
     <div class="card-title">Nuova preparazione</div>
     <div class="field-row" style="margin-bottom:0.75rem">
       <span class="field-label">Nome preparazione</span>
-      <input type="text" id="ai-prep-nome" placeholder="es. Minoxidil 5% soluzione cutanea" style="flex:1">
+      <input type="text" id="ai-prep-nome" placeholder="" style="flex:1">
     </div>
     <div class="field-row" style="margin-bottom:0.75rem">
       <span class="field-label">Forma farmaceutica</span>
@@ -874,7 +876,7 @@
         <div class="ai-msg assistant">Ciao! Sono l'assistente galenico. Inserisci il nome e la forma farmaceutica della preparazione, poi clicca <strong>"Chiedi all'AI la formula"</strong> — oppure scrivi direttamente una domanda.</div>
       </div>
       <div class="ai-input-row">
-        <textarea id="ai-input" placeholder="es. Aumenta la concentrazione a 5%, sostituisci la lanolina..." rows="1"
+        <textarea id="ai-input" placeholder="" rows="1"
           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiInvia()}"
           oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
         <button id="ai-send-btn" onclick="aiInvia()" title="Invia (Invio)">↑</button>
@@ -961,6 +963,16 @@ function setTipo(t, btn) {
     if (percBtn && modoPrepara !== 'perc') setModoPrepara('perc', percBtn);
   }
   // In tutti i casi: l'utente può sempre cliccare manualmente l'altro modo
+  // Auto-popola capsule vuote se l'utente entra in modalità capsule e il prezzo è ancora 0
+  // (es. dopo un reset). Il select disabilitato per taglia unica non scatena onchange.
+  if (t === 'capsule') {
+    const capSel = document.getElementById('caps-taglia-lib');
+    const prezzoAtt = parseFloat(document.getElementById('caps-vuote-prezzo')?.value||'0')||0;
+    if (capSel && capSel.value && prezzoAtt === 0 && typeof capsTagliaChanged === 'function') {
+      capsTagliaChanged(capSel.value); // chiama già calcPrep al suo interno
+      return;
+    }
+  }
   calcPrep();
 }
 
@@ -1008,6 +1020,29 @@ const INV_HARDCODED = [
 ];
 
 const INV_OBBLIGATORIE = new Set(['carbone attivo','potassio ioduro','acqua depurata','acqua purificata','alcool etilico','etanolo']);
+
+// La capsuliera accetta solo una taglia → unica taglia abilitata.
+// Per riabilitare le altre: aggiungi i valori (es. ['0','1','2','3','4']).
+const CAPSULE_TAGLIE_ATTIVE = ['0'];
+
+function initCapsuleTaglie() {
+  ['taglia-caps','caps-taglia-lib','s-taglia'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    Array.from(sel.options).forEach(opt => {
+      if (!CAPSULE_TAGLIE_ATTIVE.includes(opt.value)) opt.remove();
+    });
+    if (sel.options.length) sel.value = sel.options[0].value;
+    // Se rimane una sola taglia il dropdown diventa di sola lettura (un click non offre alternative)
+    if (sel.options.length === 1) sel.setAttribute('disabled', 'disabled');
+  });
+  // Auto-trigger la ricerca capsule in inventario: i setvalue programmatici sopra
+  // non fanno scattare onchange, quindi caps-vuote-prezzo resterebbe a 0
+  const capSelLib = document.getElementById('caps-taglia-lib');
+  if (capSelLib && capSelLib.value && typeof capsTagliaChanged === 'function') {
+    capsTagliaChanged(capSelLib.value);
+  }
+}
 
 function getHDaInventario(nome) {
   if (!nome) return '';
@@ -1587,10 +1622,11 @@ function calcPrep() {
     } else if (tipoPrep === 'capsule') {
       // Capsule in modalità libera: taglia e n°capsule dal pannello caps-extra
       // Le capsule vuote NON partecipano al peso (totG = solo PA + eccipienti)
-      const capVolMap = {0:680, 1:500, 2:380, 3:280, 4:200};
+      // Capienze pratiche (densità polveri ~0.7 g/mL), non massimi teorici (densità 1.0)
+      const capVolMap = {0:500, 1:400, 2:300, 3:210, 4:150};
       const taglia   = parseInt(document.getElementById('caps-taglia-lib')?.value||'0')||0;
       const nCaps    = parseInt(document.getElementById('caps-ncaps-lib')?.value||'0')||0;
-      const capVol   = capVolMap[taglia] || 680;
+      const capVol   = capVolMap[taglia] || 500;
       const grTot    = totG; // solo ingredienti (PA + eccipienti), capsule escluse
       const mgCps    = nCaps > 0 ? (grTot / nCaps * 1000) : 0;
       const prezCps  = parseFloat(document.getElementById('caps-vuote-prezzo')?.value||'0')||0;
@@ -1703,18 +1739,10 @@ function calcPrep() {
       if (document.getElementById('perc-et')) document.getElementById('perc-et').value = '0';
     }
 
-    // Componenti extra per tariffazione: escludi PA, acqua, etanolo
-    // (etanolo è già contato auto in calcTariff, acqua non conta)
-    const compsPerTariff = ingr.filter((r) => {
-      const n = invNominalizza(r.nome);
-      if (n.includes('acqua')) return false;
-      if (n.includes('etanolo') || n.includes('alcool') || n.includes('alcol')) return false;
-      return true;
-    });
-    prepComps = compsPerTariff.map(r => ({
-      nome: r.nome, qty: r.qty, unit: r.unit,
-      prezzoAcq: r.prezzoAcq||0, fonte: r.fonte||'art5'
-    }));
+    // NB: prepComps è la lista perc-mode dei componenti extra (popolata via prepAddComp).
+    // In libera mode NON va contaminata con ingredienti libera, altrimenti se l'utente switcha
+    // a perc la tariffazione legge prepComps.length come "componenti aggiuntivi" (era il bug del 2 d'ufficio).
+    // Il conteggio extra per la tariffazione in libera viene fatto in calcTariff via _liberaCompCount.
 
     liberaGrPA = paG;
     liberaRigheExtra = [];
@@ -1844,7 +1872,7 @@ function calcPrep() {
     const nCaps   = parseInt(document.getElementById('n-caps').value) || 0;
     const mgPAcps = parseFloat(document.getElementById('mg-pa-cps').value) || 0;
     const taglia  = document.getElementById('taglia-caps').value;
-    const capVol  = {0:680, 1:500, 2:380, 3:280, 4:200}[taglia] || 680; // mg capacità
+    const capVol  = {0:500, 1:400, 2:300, 3:210, 4:150}[taglia] || 500; // mg capacità pratica (densità ~0.7 g/mL)
     const eccipNome = document.getElementById('eccip-nome').value.trim() || 'Eccipiente';
 
     const mgEccipcps = Math.max(0, capVol - mgPAcps);
@@ -1992,10 +2020,13 @@ function sincronizzaTariffazione() {
       }
     }
   }
-  // Sincronizza componenti extra: conta preparazione (escluso etanolo che è auto)
-  const nCompsPrep = typeof prepGetComps === 'function' ? prepGetComps().length : 0;
-  const tComp = document.getElementById('t-comp');
-  if (tComp) tComp.value = nCompsPrep;
+  // Sincronizza componenti extra solo in modalità perc — in libera il calcolo viene
+  // da liberaRighe (vedi _liberaCompCount in calcTariff), prepComps è irrilevante.
+  if (modoPrepara !== 'libera') {
+    const nCompsPrep = typeof prepGetComps === 'function' ? prepGetComps().length : 0;
+    const tComp = document.getElementById('t-comp');
+    if (tComp) tComp.value = nCompsPrep;
+  }
   // Auto-lookup eccipienti nella prima riga componenti extra per tipi non-capsule perc mode
   if (modoPrepara !== 'libera' && tipoPrep !== 'capsule') {
     const _eccNome = document.getElementById('eccip-nome')?.value?.trim() || '';
@@ -2261,7 +2292,7 @@ function suppManRender() {
   if (!cont) return;
   cont.innerHTML = _suppManRighe.map((r, i) => `
     <div style="display:flex;gap:6px;align-items:center;padding:3px 0">
-      <input type="text" value="${r.desc}" placeholder="es. Suppl. Art.8a aggiuntivo — polverizzazione CBD"
+      <input type="text" value="${r.desc}" placeholder=""
         style="flex:3;font-family:var(--mono);font-size:12px;padding:3px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
         oninput="_suppManRighe[${i}].desc=this.value;calcTariff()">
       <input type="number" value="${r.importo||''}" placeholder="€" step="0.10" min="0"
@@ -2273,6 +2304,42 @@ function suppManRender() {
 
 function suppManTotale() {
   return _suppManRighe.reduce((s,r) => s + (parseFloat(r.importo)||0), 0);
+}
+
+// Tracking del numero capsule precedente per auto-scaling delle quantità in libera mode
+let _prevCapsNCaps = null;
+
+// Cambio numero capsule dalla pagina Tariffazione: in libera mode propaga a caps-ncaps-lib
+// e fa scattare lo scaling delle quantità in liberaRighe (sennò il tariff legge da caps-ncaps-lib
+// che resterebbe invariato e il prezzo non cambierebbe).
+function tariffNCapsChange() {
+  if (tipoPrep === 'capsule' && modoPrepara === 'libera') {
+    const newN = parseInt(document.getElementById('t-ncaps').value) || 0;
+    const capsEl = document.getElementById('caps-ncaps-lib');
+    if (capsEl) {
+      capsEl.value = newN > 0 ? newN : '';
+      capsScaleOnNCapsChange(); // scala liberaRighe e chiama calcPrep (che ricalcola anche il tariff)
+      return;
+    }
+  }
+  calcTariff();
+}
+
+function capsScaleOnNCapsChange() {
+  const newN = parseInt(document.getElementById('caps-ncaps-lib').value) || 0;
+  // Scaling attivo solo in libera + capsule, con valore precedente noto e diverso da quello attuale
+  if (tipoPrep === 'capsule' && modoPrepara === 'libera'
+      && _prevCapsNCaps && _prevCapsNCaps > 0 && newN > 0 && _prevCapsNCaps !== newN
+      && Array.isArray(liberaRighe) && liberaRighe.length > 0) {
+    const ratio = newN / _prevCapsNCaps;
+    liberaRighe.forEach(r => {
+      const q = parseFloat(r.qty) || 0;
+      if (q > 0) r.qty = String(parseFloat((q * ratio).toFixed(4)));
+    });
+    if (typeof liberaRenderRighe === 'function') liberaRenderRighe();
+  }
+  _prevCapsNCaps = newN > 0 ? newN : _prevCapsNCaps;
+  calcPrep();
 }
 
 function capsTagliaChanged(taglia) {
@@ -2417,7 +2484,8 @@ function calcTariff() {
   const compAutoEt = 0; // etanolo: costo materia prima al prezzo acquisto, non conta come comp. aggiuntivo Art.5
   // In modalità libera: conta tutte le sostanze, base 2 incluse nel prezzo base
   // Comp in libera: esclude PA (indice 0), acqua ed etanolo (solventi standard non extra)
-  const _liberaCompCount = modoPrepara === 'libera' && tipoTariff !== 'capsule'
+  // Vale anche per capsule (PA + eccipiente già nella base voce Allegato B)
+  const _liberaCompCount = modoPrepara === 'libera'
     ? liberaGetIngr().filter((r, i) => {
         if (i === 0) return false; // PA
         const n = invNominalizza(r.nome);
@@ -2513,8 +2581,8 @@ function calcTariff() {
       const pEccip  = parseFloat(document.getElementById('t-eccip').value)||0;
       // grEccip: stima da taglia capsula − mgPA (capacità − dose PA)
       const _tagliaCps = parseInt(document.getElementById('taglia-caps')?.value||'0')||0;
-      const _capVolMap = {0:680,1:500,2:380,3:280,4:200};
-      const _capVolMg  = _capVolMap[_tagliaCps] || 680;
+      const _capVolMap = {0:500,1:400,2:300,3:210,4:150};
+      const _capVolMg  = _capVolMap[_tagliaCps] || 500;
       const grEccip = Math.max(0, (_capVolMg - mgPAcps) * nCaps / 1000);
       grPA     = (mgPAcps * nCaps) / 1000;
       costoPA  = grPA * pPA;
@@ -2929,7 +2997,7 @@ function aggiornaScheda() {
     const nCaps   = parseInt(document.getElementById('s-ncaps').value)||0;
     const mgPAcps = parseFloat(document.getElementById('s-mgpa').value)||0;
     const taglia  = document.getElementById('s-taglia').value;
-    const capVol  = {0:680,1:500,2:380,3:280,4:200}[taglia]||680;
+    const capVol  = {0:500,1:400,2:300,3:210,4:150}[taglia]||500;
     const eccip   = document.getElementById('s-eccip').value.trim()||'Eccipiente';
     const mgEccipcps = Math.max(0, capVol - mgPAcps);
     const grPA    = (mgPAcps * nCaps)/1000;
@@ -3212,7 +3280,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 33;
+const APP_VERSION = 44;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -3516,7 +3584,7 @@ function invModifica(lsIdx) {
         </div>
         <div>
           <label style="font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:2px">Minimo ordinabile</label>
-          <input id="mod-min-order" type="number" value="${item.minOrd||''}" min="0" step="1" placeholder="es. 100" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff">
+          <input id="mod-min-order" type="number" value="${item.minOrd||''}" min="0" step="1" placeholder="" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff">
         </div>
         <div>
           <label style="font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:2px">Quantità</label>
@@ -3524,7 +3592,7 @@ function invModifica(lsIdx) {
         </div>
         <div>
           <label style="font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:2px">Prezzo bolla (€)</label>
-          <input id="mod-prezzo-bolla" type="number" value="${item.prezzoBolla||''}" min="0" step="0.01" placeholder="es. 45.00" oninput="invCalcolaPrezzoMod()" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff">
+          <input id="mod-prezzo-bolla" type="number" value="${item.prezzoBolla||''}" min="0" step="0.01" placeholder="" oninput="invCalcolaPrezzoMod()" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff">
         </div>
         <div>
           <label style="font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:2px">€ / ${item.unit||'g'} <span id="mod-unit-label" style="display:none">${item.unit||'g'}</span>(calc.)</label>
@@ -3762,8 +3830,30 @@ function aiGetSystemPrompt() {
     'Quando proponi una formula usa SEMPRE questo formato:\n' +
     'TIPO: [soluzione|sospensione|unguento|polvere|capsule]\n' +
     'FORMULA:\n- [sostanza]: [quantit\u00e0] [unit\u00e0]\nPROCEDURA:\n1. [passo]\nNOTE: [avvertenze]\n' +
-    'TIPO \u00e8 obbligatorio e deve essere uno dei 5 valori esatti sopra (minuscolo). Per liquidi usa ml, per solidi usa g. Elenca ogni componente su riga separata con trattino.\n\n' +
+    'TIPO \u00e8 obbligatorio e deve essere uno dei 5 valori esatti sopra (minuscolo). Per liquidi usa ml, per solidi usa g. Elenca ogni componente su riga separata con trattino.\n' +
+    'CAPSULE \u2014 REGOLE DI CALCOLO (RIGIDE, NON DEROGABILI):\n' +
+    '  1. In questa farmacia \u00e8 disponibile SOLO la taglia 0 (cifra zero, MAI lettera O). Usa sempre "Capsule gelatina dura taglia 0" o "Capsule HPMC taglia 0".\n' +
+    '  2. Se l\'utente non specifica il numero di capsule, CHIEDI prima di rispondere. Non assumere un numero a caso.\n' +
+    '  3. Massa totale batch (g) = numero_capsule \u00d7 0,5  (capienza pratica taglia 0 = 500 mg).\n' +
+    '  4. Massa PA (g) = numero_capsule \u00d7 dose_mg_per_capsula \u00f7 1000.\n' +
+    '  5. Massa eccipiente (g) = massa_totale \u2212 massa_PA.\n' +
+    '  6. Usa UN SOLO eccipiente per preparazione, MAI due insieme. Preferenza in ordine: (a) "Eccipiente tipo II Vivaldi" se presente in inventario (eccipiente completo ottimizzato per opercolatrici), (b) "Lattosio monoidrato", (c) "Amido di riso".\n' +
+    '  7. Le unit\u00e0 nella FORMULA devono essere SEMPRE in grammi (g) per le polveri di una preparazione a capsule, MAI in mg.\n' +
+    '  8. Esempio per 60 capsule di finasteride 1 mg:\n' +
+    '     - Finasteride: 0,060 g  (= 60 cps \u00d7 1 mg \u00f7 1000)\n' +
+    '     - Eccipiente tipo II Vivaldi: 29,94 g  (= 60 \u00d7 0,5 \u2212 0,060)\n' +
+    '     - Capsule gelatina dura taglia 0: 60 pz\n' +
+    'DOSAGGI STANDARD (preparazione magistrale italiana):\n' +
+    '  - finasteride orale: 1 mg/cps (alopecia androgenetica). Max 5 mg/cps.\n' +
+    '  - dutasteride orale: 0,5 mg/cps. Max 2,5 mg/cps.\n' +
+    '  - minoxidil: solo soluzioni topiche 2\u20135% p/v (mai in capsule).\n' +
+    'SANITY CHECK: prima di scrivere la FORMULA, verifica che (massa_PA \u00f7 massa_totale) \u00d7 100 sia coerente con la dose richiesta. Se la percentuale supera il 50%, ricontrolla i calcoli.\n\n' +
     invTxt;
+}
+
+// Corregge confusione lettera O / cifra 0 dopo "taglia"
+function aiNormCapsule(nome) {
+  return (nome || '').replace(/(taglia)\s+o\b/gi, '$1 0');
 }
 
 function aiParseFormula(text) {
@@ -3779,7 +3869,7 @@ function aiParseFormula(text) {
     if (inFormula) {
       const m = line.match(/^[-\u2022]\s*(.+?):\s*([\d.,]+)\s*([a-zA-Z%\u00b0\u00b5]+)?/);
       if (m) {
-        const nome = m[1].trim();
+        const nome = aiNormCapsule(m[1].trim());
         const qty  = m[2].replace(',','.');
         const uRaw = (m[3]||'').toLowerCase();
         // Se l\'AI specifica ml/l usa ml, se g usa g
@@ -3787,11 +3877,14 @@ function aiParseFormula(text) {
         let unit;
         if (uRaw.startsWith('ml') || uRaw === 'l') unit = 'ml';
         else if (uRaw === 'g' || uRaw === 'mg') unit = 'g';
+        else if (uRaw === 'pz' || uRaw === 'pezzi' || uRaw === 'cps' || uRaw === 'caps' || uRaw === 'capsule' || uRaw === 'capsula') unit = 'pz';
         else {
           // prova con la densità
           const d = typeof getDensita === 'function' ? getDensita(nome) : null;
           unit = d ? 'ml' : 'g';
         }
+        // Override: se il nome contiene "capsul" o è "cps" forza unit=pz (l'AI a volte dimentica)
+        if (/\bcapsul|^cps\b/i.test(nome)) unit = 'pz';
         comps.push({nome, qty, unit});
       }
     }
@@ -3801,7 +3894,7 @@ function aiParseFormula(text) {
   const doMatch = text.match(/DA ORDINARE:\s*(.+)/i);
   if (doMatch) {
     doMatch[1].split(',').forEach(s => {
-      const t = s.trim();
+      const t = aiNormCapsule(s.trim());
       if (t) daOrdinare.push(t);
     });
   }
@@ -3882,9 +3975,18 @@ function aiImportaTutti(comps, tipo) {
   const liberaBtn = document.getElementById('modo-libera-btn');
   if (liberaBtn && modoPrepara !== 'libera') setModoPrepara('libera', liberaBtn);
 
-  // 4) Popola liberaRighe da zero con i comps, facendo lookup Allegato A + inventario
+  // 4) Popola liberaRighe da zero con i comps, facendo lookup Allegato A + inventario.
+  //    Per capsule: escludi la riga "Capsule ..." (non è un ingrediente in peso, va in caps-ncaps-lib).
+  //    Pulisce prepComps (lista perc-mode): in libera non serve, e se l'utente ha cliccato
+  //    "+ Aggiungi" sui singoli ingredienti dalla card AI prima di "Porta in Preparazione",
+  //    prepComps.length inquinerebbe t-comp nella tariffazione.
+  prepComps = [];
+  if (typeof prepRenderComps === 'function') prepRenderComps();
   const inv = typeof invLoadMerged === 'function' ? invLoadMerged() : [];
-  liberaRighe = comps.map((c, i) => {
+  const compsForLibera = tipoTarget === 'capsule'
+    ? comps.filter(c => !/\bcapsul/i.test(c.nome) && c.unit !== 'pz')
+    : comps;
+  liberaRighe = compsForLibera.map((c, i) => {
     const qNorm = invNominalizza(c.nome);
     const chiaveAll = Object.keys(ALLEGATO_A).find(k => k.includes(qNorm) || qNorm.includes(k.split(' ')[0]));
     const invFound = inv.find(s => invNominalizza(s.nome).includes(qNorm) || qNorm.includes(invNominalizza(s.nome)));
@@ -3922,7 +4024,11 @@ function aiImportaTutti(comps, tipo) {
     const capsRiga = comps.find(c => /capsul/i.test(c.nome));
     if (capsRiga) {
       const nEl = document.getElementById('caps-ncaps-lib');
-      if (nEl && !nEl.value) nEl.value = parseInt(capsRiga.qty) || '';
+      const nVal = parseInt(capsRiga.qty) || 0;
+      if (nEl && !nEl.value && nVal > 0) {
+        nEl.value = nVal;
+        _prevCapsNCaps = nVal; // baseline per scaling: senza, il primo cambio non avrebbe riferimento
+      }
     }
   }
 
@@ -4010,7 +4116,7 @@ async function aiChiama(userMsg) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: 'openai/gpt-oss-120b',
         messages: [{ role: 'system', content: aiGetSystemPrompt() }].concat(aiHistory),
         temperature: 0.3,
         max_tokens: 800
@@ -4233,6 +4339,86 @@ function archRiapri(id) {
   showPage('scheda', navBtns[2]);
 }
 
+// ── Reset ricetta corrente (Preparazione + Tariffazione + Scheda) ──
+// Non tocca inventario, archivio schede, ordini, chiavi GitHub/Groq, cronologia AI.
+function resetRicetta() {
+  if (!confirm('Azzerare la ricetta corrente?\n\nVerranno cancellati i dati di Preparazione, Tariffazione e Scheda.\nInventario, archivio e ordini non saranno toccati.')) return;
+
+  // ── state moduli ──
+  tipoPrep = 'soluzione';
+  modoPrepara = 'perc';
+  liberaRighe = [];
+  liberaRigheExtra = [];
+  liberaGrPA = 0; liberaMlEt = 0; liberaCostoExtra = 0;
+  prepComps = [];
+  opTecnologicheDesc = '';
+  tipoTariff = 'liquida';
+  tarPADaAllegatoA = true;
+  _suppManRighe = [];
+  tipoScheda = 'soluzione';
+  _prevCapsNCaps = null;
+
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  const setHTML = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = v; };
+
+  // ── input preparazione ──
+  ['prep-pa-nome','qt','conc','mg-pa-cps','n-caps','eccip-nome',
+   'caps-ncaps-lib','caps-vuote-cerca','caps-vuote-nome','libera-conc'].forEach(id => setVal(id, ''));
+  setVal('perc-et', '0');
+  setVal('caps-vuote-prezzo', '0');
+  setVal('tipo-diluente', 'acqua');
+  setVal('taglia-caps', '0');
+  setVal('caps-taglia-lib', '0');
+  const cvSel = document.getElementById('caps-vuote-sel'); if (cvSel) cvSel.textContent = '';
+  setHTML('caps-vuote-sug', '');
+  setHTML('libera-righe', '');
+  setHTML('prep-comp-extra', '');
+  setHTML('formula-grid', '');
+  setHTML('procedura', '');
+  setHTML('alert-solub', '');
+
+  // ── input tariffazione ──
+  ['t-qt','t-conc','t-ncaps','t-mgpa','t-eccip','t-cpsvuote',
+   't-pa-nome','t-pa','t-fl','t-fl-cerca'].forEach(id => setVal(id, ''));
+  ['t-comp','t-op','t-stupp','t-dop','t-notte'].forEach(id => setVal(id, '0'));
+  document.querySelectorAll('#tt-extra-rows .t-extra-nome, #tt-extra-rows .t-extra-qty, #tt-extra-rows .t-extra-prezzo')
+    .forEach(el => el.value = '');
+  document.querySelectorAll('#tt-extra-rows .t-extra-unit').forEach(el => el.value = 'g');
+  const tpaFonte = document.getElementById('t-pa-fonte');
+  if (tpaFonte) { tpaFonte.textContent = ''; tpaFonte.style.color = ''; }
+  setHTML('t-pa-suggerimenti', '');
+  setHTML('t-fl-suggerimenti', '');
+  const tflFonte = document.getElementById('t-fl-fonte'); if (tflFonte) tflFonte.textContent = 'al costo';
+  setHTML('tariff-detail', '');
+  setHTML('tariff-totale', '');
+  setHTML('t-supp-manual-rows', '');
+  // sblocca eventuale read-only del prezzo PA da Allegato A
+  const tpaInput = document.getElementById('t-pa');
+  if (tpaInput) { tpaInput.readOnly = false; tpaInput.style.background = ''; }
+
+  // ── input scheda ──
+  ['s-num','s-prep','s-qt','s-conc','s-et','s-ncaps','s-mgpa','s-eccip',
+   's-pa-nome','s-paz','s-farm','s-data','s-prezzo',
+   's-lotto-as','s-lotto-et','s-lotto-ac','s-lotto-eccip'].forEach(id => setVal(id, ''));
+  setVal('s-mesi', '2');
+  setVal('s-taglia', '0');
+  setHTML('scheda-preview', '');
+
+  // ── ripristina segmenti (prima opzione = Soluzione/liquida) e ricalcola ──
+  const prepTipoBtn = document.querySelector('#page-preparazione .seg-btn');
+  const tarTipoBtn  = document.querySelector('#page-tariffazione .seg-btn');
+  const schTipoBtn  = document.querySelector('#scheda-inputs .seg-btn');
+  const modoPercBtn = document.getElementById('modo-perc-btn');
+  if (prepTipoBtn) setTipo('soluzione', prepTipoBtn);
+  if (modoPercBtn) setModoPrepara('perc', modoPercBtn);
+  if (tarTipoBtn)  setTipoTariff('liquida', tarTipoBtn);
+  if (schTipoBtn)  setTipoScheda('soluzione', schTipoBtn);
+
+  // vai a Preparazione
+  const prepNavBtn = document.querySelector('.nav-btn[onclick*="preparazione"]');
+  if (prepNavBtn) showPage('preparazione', prepNavBtn);
+}
+
 // Render archivio quando si apre la pagina
 const _origShowPage = showPage;
 showPage = function(id, btn) {
@@ -4246,6 +4432,7 @@ invSyncFromGist().then(() => invRender()).catch(() => invRender());
 etiqAggiorna();
 aiCaricaKey();
 popolaPASuggestions();
+initCapsuleTaglie();
 calcPrep();
 setTimeout(appRenderVersionBadge, 100);
 ordiniRender();
