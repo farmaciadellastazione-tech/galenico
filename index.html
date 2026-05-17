@@ -2878,28 +2878,49 @@ function aggiornaScheda() {
 
   // ═══════════ POLVERE ═══════════
   } else if (tipoScheda === 'polvere') {
-    const qt   = parseFloat(document.getElementById('s-qt').value)||0;
-    const conc = parseFloat(document.getElementById('s-conc').value)||0;
-    const grPA = qt*conc/100;
-    const eccip= document.getElementById('s-eccip').value.trim()||'Eccipiente';
-    const grEccip = qt - grPA;
+    let qt, grPA, eccip, grEccip;
+    if (modoPrepara === 'libera' && liberaRighe.length > 0) {
+      const {totG, paG, ingr: ingrL} = liberaCalcTotale();
+      qt = totG; grPA = paG; grEccip = Math.max(0, totG - paG);
+      eccip = ingrL.length > 1 ? ingrL.slice(1).map(r => r.nome).join(' + ') : 'Eccipiente';
 
-    formulaItems = [
-      {nome:nomePA, val:fmt(grPA,2), unit:'g'},
-      {nome:eccip, val:fmt(grEccip,2), unit:'g'},
-      {nome:'Totale polvere', val:fmt(qt,0), unit:'g'},
-    ];
-    proc = [
-      'Pesare <strong>'+fmt(grPA,2)+' g</strong> di '+nomePA+' su bilancia analitica.',
-      'Pesare <strong>'+fmt(grEccip,2)+' g</strong> di '+eccip+'.',
-      'Passare al setaccio n° 355 µm per omogeneizzare la granulometria.',
-      'Miscelare per geometria (porzioni successive) per almeno 5 minuti.',
-      'Trasferire in flacone/bustine. Etichettare con nome, concentrazione, data e scadenza.',
-    ];
-    lottiItems = [
-      {nome:nomePA, lotto:lottoAS},
-      {nome:eccip, lotto:document.getElementById('s-lotto-eccip').value||'—'},
-    ];
+      formulaItems = ingrL.map(r => ({nome: r.nome, val: r.qty, unit: r.unit}));
+      formulaItems.push({nome:'Totale polvere', val:fmt(totG,2), unit:'g'});
+
+      proc = [
+        ...ingrL.map(r => 'Pesare <strong>'+r.qty+' '+r.unit+'</strong> di '+r.nome+' su bilancia analitica.'),
+        'Passare al setaccio n° 355 µm per omogeneizzare la granulometria.',
+        'Miscelare per geometria (porzioni successive) per almeno 5 minuti.',
+        'Trasferire in flacone/bustine. Etichettare con nome, concentrazione, data e scadenza.',
+      ];
+      lottiItems = ingrL.map(r => {
+        const invFound = invLoadMerged().find(s => invNominalizza(s.nome).includes(invNominalizza(r.nome)));
+        return {nome: r.nome, lotto: r.lotto || invFound?.lottoInt || invFound?.lotto || '—'};
+      });
+    } else {
+      qt   = parseFloat(document.getElementById('s-qt').value)||0;
+      const conc = parseFloat(document.getElementById('s-conc').value)||0;
+      grPA = qt*conc/100;
+      eccip= document.getElementById('s-eccip').value.trim()||'Eccipiente';
+      grEccip = qt - grPA;
+
+      formulaItems = [
+        {nome:nomePA, val:fmt(grPA,2), unit:'g'},
+        {nome:eccip, val:fmt(grEccip,2), unit:'g'},
+        {nome:'Totale polvere', val:fmt(qt,0), unit:'g'},
+      ];
+      proc = [
+        'Pesare <strong>'+fmt(grPA,2)+' g</strong> di '+nomePA+' su bilancia analitica.',
+        'Pesare <strong>'+fmt(grEccip,2)+' g</strong> di '+eccip+'.',
+        'Passare al setaccio n° 355 µm per omogeneizzare la granulometria.',
+        'Miscelare per geometria (porzioni successive) per almeno 5 minuti.',
+        'Trasferire in flacone/bustine. Etichettare con nome, concentrazione, data e scadenza.',
+      ];
+      lottiItems = [
+        {nome:nomePA, lotto:lottoAS},
+        {nome:eccip, lotto:document.getElementById('s-lotto-eccip').value||'—'},
+      ];
+    }
     costoPA = grPA*pPA; costoFL_s = pFL;
     baseB = 6.65; nomeVoceB = 'Polveri (voce 5)';
 
@@ -3191,7 +3212,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 32;
+const APP_VERSION = 33;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
