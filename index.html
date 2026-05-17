@@ -6,24 +6,88 @@
 <title>Galenico — Preparazione & Tariffazione</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script>
+  // Applica subito il tema salvato per evitare flash di tema sbagliato
+  try {
+    const t = localStorage.getItem('gal_theme');
+    if (t === 'dark' || t === 'medium') document.documentElement.setAttribute('data-theme', t);
+  } catch(e) {}
+</script>
 <style>
   :root {
-    --bg: #f5f4f0;
-    --surface: #ffffff;
-    --border: #e0ddd6;
-    --border-strong: #c8c4bc;
-    --text: #1a1916;
+    /* Tema chiaro: crema tenue (meno contrasto del bianco puro) */
+    --bg: #efece5;
+    --surface: #faf8f3;
+    --border: #d9d4ca;
+    --border-strong: #bfbab0;
+    --text: #3a3833;
     --text-muted: #6b6860;
     --text-faint: #a8a49e;
-    --accent: #2d5a27;
-    --accent-light: #e8f0e6;
-    --accent-mid: #4a8f40;
+    --accent: #3a6b34;
+    --accent-light: #e2ecdf;
+    --accent-mid: #5a9251;
     --warn: #7a4a00;
-    --warn-bg: #fff4e0;
+    --warn-bg: #fbeed5;
+    --warn-border: #e8c840;
+    --accent-border: #c4d9c0;
+    --danger: #9b2020;
+    --danger-bg: #fff0f0;
+    --danger-border: #e0a0a0;
+    --row-scaduto: #fff8f8;
+    --row-in-scad: #fffbf0;
+    --badge-bg: #d3cfc5;
+    --badge-fg: #3a3833;
     --mono: 'DM Mono', monospace;
     --sans: 'DM Sans', sans-serif;
     --radius: 8px;
     --radius-lg: 14px;
+  }
+  [data-theme="medium"] {
+    /* Tortora tenue: intermedio tra chiaro e scuro */
+    --bg: #c8c2b3;
+    --surface: #d6d0bf;
+    --border: #b3ada0;
+    --border-strong: #948f84;
+    --text: #2e2c27;
+    --text-muted: #5a5750;
+    --text-faint: #7d796f;
+    --accent: #2d5a27;
+    --accent-light: #b8c9b4;
+    --accent-mid: #4a8f40;
+    --warn: #5a3500;
+    --warn-bg: #e0d0a8;
+    --warn-border: #a8923a;
+    --accent-border: #98ad94;
+    --danger: #7d1a1a;
+    --danger-bg: #e0c0c0;
+    --danger-border: #b88080;
+    --row-scaduto: #d6b8b8;
+    --row-in-scad: #d6cab0;
+    --badge-bg: #a8a298;
+    --badge-fg: #2e2c27;
+  }
+  [data-theme="dark"] {
+    --bg: #1e1c18;
+    --surface: #2a2723;
+    --border: #3d3a35;
+    --border-strong: #524e47;
+    --text: #d9d4c8;
+    --text-muted: #a0998d;
+    --text-faint: #76706a;
+    --accent: #7fb56e;
+    --accent-light: #2d3829;
+    --accent-mid: #98d186;
+    --warn: #e6b85a;
+    --warn-bg: #3d2f10;
+    --warn-border: #6a5224;
+    --accent-border: #3e5538;
+    --danger: #e08585;
+    --danger-bg: #3a1a1a;
+    --danger-border: #6a3030;
+    --row-scaduto: #3a1f1f;
+    --row-in-scad: #3a321a;
+    --badge-bg: #3d3a35;
+    --badge-fg: #a0998d;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: var(--sans); background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.6; min-height: 100vh; }
@@ -33,7 +97,7 @@
   nav { display: flex; gap: 4px; margin-left: auto; }
   .nav-btn { font-family: var(--sans); font-size: 13px; padding: 6px 14px; border: 1px solid transparent; border-radius: var(--radius); background: none; color: var(--text-muted); cursor: pointer; transition: all 0.15s; font-weight: 400; }
   .nav-btn:hover { background: var(--bg); }
-  .nav-btn.active { background: var(--accent-light); color: var(--accent); border-color: #c4d9c0; font-weight: 500; }
+  .nav-btn.active { background: var(--accent-light); color: var(--accent); border-color: var(--accent-border); font-weight: 500; }
   main { max-width: 820px; margin: 0 auto; padding: 2.5rem 1.5rem; }
   .page { display: none; }
   .page.active { display: block; }
@@ -65,8 +129,8 @@
   .procedure-list li:last-child { border-bottom: none; }
   .procedure-list li::before { content: counter(steps); font-family: var(--mono); font-size: 11px; font-weight: 500; width: 20px; height: 20px; min-width: 20px; border-radius: 50%; background: var(--accent-light); color: var(--accent); display: flex; align-items: center; justify-content: center; margin-top: 2px; }
   .alert { display: flex; gap: 10px; padding: 10px 14px; border-radius: var(--radius); font-size: 13px; line-height: 1.5; margin-bottom: 1rem; }
-  .alert-warn { background: var(--warn-bg); color: var(--warn); border: 1px solid #f0d090; }
-  .alert-info { background: var(--accent-light); color: var(--accent); border: 1px solid #c4d9c0; }
+  .alert-warn { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn-border); }
+  .alert-info { background: var(--accent-light); color: var(--accent); border: 1px solid var(--accent-border); }
   .alert-icon { font-size: 15px; margin-top: 1px; flex-shrink: 0; }
   .tariff-row { display: flex; justify-content: space-between; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
   .tariff-row:last-child { border-bottom: none; }
@@ -162,8 +226,8 @@
   .inv-table th { text-align:left; font-size:11px; font-family:var(--mono); color:var(--text-faint); text-transform:uppercase; letter-spacing:0.07em; padding:6px 8px; border-bottom:2px solid var(--border); }
   .inv-table td { padding:8px 8px; border-bottom:1px solid var(--border); vertical-align:middle; }
   .inv-table tr:last-child td { border-bottom:none; }
-  .inv-table tr.scaduto { background:#fff8f8; }
-  .inv-table tr.in-scadenza { background:#fffbf0; }
+  .inv-table tr.scaduto { background:var(--row-scaduto); }
+  .inv-table tr.in-scadenza { background:var(--row-in-scad); }
   .inv-nome { font-weight:500; }
   .inv-sub { font-size:11px; color:var(--text-faint); font-family:var(--mono); }
   .inv-qty { font-family:var(--mono); }
@@ -171,8 +235,8 @@
   .inv-scad { font-family:var(--mono); font-size:12px; }
   .tag-h { display:inline-block; font-size:9px; font-family:var(--mono); padding:1px 5px; border-radius:3px; background:var(--warn-bg); color:var(--warn); border:1px solid #f0d090; margin-right:2px; }
   .tag-ok { display:inline-block; font-size:9px; font-family:var(--mono); padding:1px 5px; border-radius:3px; background:var(--accent-light); color:var(--accent); border:1px solid #c4d9c0; }
-  .btn-del { font-size:11px; padding:2px 8px; border:1px solid #e0a0a0; border-radius:4px; background:none; color:#c05050; cursor:pointer; }
-  .btn-del:hover { background:#fff0f0; }
+  .btn-del { font-size:11px; padding:2px 8px; border:1px solid var(--danger-border); border-radius:4px; background:none; color:var(--danger); cursor:pointer; }
+  .btn-del:hover { background:var(--danger-bg); }
   .inv-form { display:grid; grid-template-columns:2fr 1fr 1fr 1fr 1fr; gap:8px; align-items:end; margin-bottom:1rem; }
   .inv-form select, .inv-form input { width:100%; font-family:var(--mono); font-size:13px; padding:5px 8px; border:1px solid var(--border-strong); border-radius:var(--radius); background:var(--bg); color:var(--text); }
   .inv-form label { font-size:11px; font-family:var(--mono); color:var(--text-faint); text-transform:uppercase; letter-spacing:0.05em; display:block; margin-bottom:3px; }
@@ -180,7 +244,7 @@
   .btn-add { font-family:var(--sans); font-size:13px; padding:7px 18px; background:var(--accent); color:#fff; border:none; border-radius:var(--radius); cursor:pointer; font-weight:500; }
   .btn-add:hover { opacity:0.88; }
   .alert-scad { display:flex; gap:8px; padding:9px 14px; border-radius:var(--radius); font-size:13px; margin-bottom:0.75rem; }
-  .alert-scad.err { background:#fff0f0; color:#9b2020; border:1px solid #e0a0a0; }
+  .alert-scad.err { background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger-border); }
   .alert-scad.warn { background:var(--warn-bg); color:var(--warn); border:1px solid #f0d090; }
 
   /* ETICHETTE */
@@ -239,8 +303,10 @@
     <button class="nav-btn" onclick="showPage('formulario',this)">🤖 AI</button>
   </nav>
   <button onclick="resetRicetta()" title="Azzera ricetta corrente (Preparazione, Tariffazione, Scheda)"
-    style="margin-left:auto;font-size:12px;font-family:var(--sans);padding:5px 12px;border:1px solid #d9b3b3;border-radius:var(--radius);background:#fdf2f2;color:#7d3c0c;cursor:pointer;white-space:nowrap">↺ Nuova ricetta</button>
-  <div id="app-version-badge" style="margin-left:8px;font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:99px;background:#ccc;color:#333;white-space:nowrap;cursor:default" title="Versione app"></div>
+    style="margin-left:auto;font-size:12px;font-family:var(--sans);padding:5px 12px;border:1px solid var(--danger-border);border-radius:var(--radius);background:var(--danger-bg);color:var(--danger);cursor:pointer;white-space:nowrap">↺ Nuova ricetta</button>
+  <button id="theme-toggle" onclick="toggleTheme()" title="Cambia tema chiaro/scuro"
+    style="margin-left:8px;font-size:14px;font-family:var(--sans);padding:4px 10px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text-muted);cursor:pointer;line-height:1">☾</button>
+  <div id="app-version-badge" style="margin-left:8px;font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:99px;background:var(--badge-bg);color:var(--badge-fg);white-space:nowrap;cursor:default" title="Versione app"></div>
 </header>
 
 <main>
@@ -258,16 +324,11 @@
       <button class="seg-btn" onclick="setTipo('polvere',this)">Polvere</button>
       <button class="seg-btn" onclick="setTipo('sospensione',this)">Sospensione</button>
     </div>
-    <!-- Selettore modalità -->
-    <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
-      <span style="font-size:12px;color:var(--text-faint)">Modalità:</span>
-      <button id="modo-perc-btn" class="seg-btn active" style="font-size:12px;padding:3px 12px" onclick="setModoPrepara('perc',this)">% concentrazione</button>
-      <button id="modo-libera-btn" class="seg-btn" style="font-size:12px;padding:3px 12px" onclick="setModoPrepara('libera',this)">Per ingredienti</button>
-    </div>
+    <!-- Selettore modalità rimosso in v46: modalità unica (libera con unità %) -->
   </div>
 
-  <!-- MODALITÀ % (default) -->
-  <div id="prep-modo-perc" class="card">
+  <!-- MODALITÀ % — DISMESSA: pannello nascosto, in fase 2 verrà rimosso col codice morto -->
+  <div id="prep-modo-perc" class="card" style="display:none">
     <div class="card-title">Parametri</div>
     <div class="field-row">
       <span class="field-label">Principio attivo</span>
@@ -358,14 +419,41 @@
   </div>
 
   <!-- MODALITÀ FORMULA LIBERA -->
-  <div id="prep-modo-libera" class="card" style="display:none">
+  <div id="prep-modo-libera" class="card">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
       <span>Ingredienti</span>
       <div style="display:flex;gap:6px">
-        <button onclick="setModoPrepara('perc', document.getElementById('modo-perc-btn'))"
-          style="font-size:12px;padding:3px 10px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer;color:var(--text-faint)">← % concentrazione</button>
         <button class="btn-add" style="font-size:12px;padding:4px 12px" onclick="liberaAddRiga()">+ Ingrediente</button>
       </div>
+    </div>
+    <div class="field-row" id="row-totale-prep" style="display:none;margin-bottom:8px;flex-wrap:wrap">
+      <span class="field-label">Totale preparazione</span>
+      <input type="number" id="totale-prep" value="" min="1" step="1" placeholder="es. 100"
+        style="width:80px;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
+        oninput="calcPrep()">
+      <select id="totale-prep-unit" onchange="calcPrep()"
+        style="font-family:var(--mono);font-size:13px;padding:4px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">
+        <option value="ml">ml</option>
+        <option value="g">g</option>
+      </select>
+      <span id="totale-prep-unit-fixed" style="display:none;font-family:var(--mono);font-size:13px;color:var(--text-faint);min-width:20px">g</span>
+      <span id="totale-prep-derived" style="font-size:12px;color:var(--accent);font-family:var(--mono);margin-left:8px"></span>
+    </div>
+    <div class="field-row" id="row-vol-soluzione" style="display:none;margin-bottom:8px;flex-wrap:wrap">
+      <span class="field-label">Volume soluzione</span>
+      <input type="number" id="vol-soluzione" min="0" step="0.1" placeholder="auto"
+        style="width:80px;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
+        onchange="volSoluzioneChanged()">
+      <span style="font-family:var(--mono);font-size:13px;color:var(--text-faint)">ml</span>
+      <span style="font-size:11px;color:var(--text-faint);margin-left:8px">modifica per scalare tutte le righe proporzionalmente</span>
+    </div>
+    <div class="field-row" id="row-grado-alc" style="display:none;margin-bottom:8px;flex-wrap:wrap">
+      <span class="field-label">Grado alcolico</span>
+      <input type="number" id="grado-alc" min="0" max="96" step="0.1" placeholder="0"
+        style="width:80px;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
+        onchange="gradoAlcChanged()">
+      <span style="font-family:var(--mono);font-size:13px;color:var(--text-faint)">% v/v</span>
+      <span style="font-size:11px;color:var(--text-faint);margin-left:8px">modifica per scalare etanolo (compensa con acqua)</span>
     </div>
     <div class="field-row" id="row-libera-conc" style="margin-bottom:8px">
       <span class="field-label">Concentrazione</span>
@@ -375,12 +463,6 @@
     </div>
     <div id="libera-righe" style="margin-top:6px"></div>
     <div style="font-size:11px;color:var(--text-faint);margin-top:6px">La concentrazione dichiarata va in scheda e tariffazione. L'acqua va inserita come ingrediente ma non modifica la concentrazione.</div>
-  </div>
-  <div class="card" id="card-comp-extra">
-      <button class="btn-add" style="font-size:12px;padding:4px 12px" onclick="prepAddComp()">+ Aggiungi</button>
-    </div>
-    <div id="prep-comp-extra" style="margin-top:4px"></div>
-    <div style="font-size:11px;color:var(--text-faint);margin-top:4px">Glicerolo, conservanti, cosolubilizzanti, eccipienti non standard — al prezzo di acquisto netto IVA.</div>
   </div>
   <div class="card">
     <div class="card-title">Formula calcolata</div>
@@ -400,7 +482,6 @@
 
 <!-- TARIFFAZIONE -->
 <div class="page" id="page-tariffazione">
-  <div style="margin-bottom:4px"><button onclick="showPage('preparazione', document.querySelector('.nav-btn[onclick*=preparazione]'))" style="font-size:12px;padding:3px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer;color:var(--text-faint)">← Preparazione</button></div>
   <h1>Tariffazione magistrale</h1>
   <p class="subtitle">D.M. 22 settembre 2017 (mod. D.M. 13 dicembre 2017) — IVA 10%</p>
 
@@ -521,7 +602,6 @@
 
 <!-- SCHEDA -->
 <div class="page" id="page-scheda">
-  <div style="margin-bottom:4px"><button onclick="showPage('preparazione', document.querySelector('.nav-btn[onclick*=preparazione]'))" style="font-size:12px;padding:3px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer;color:var(--text-faint)">← Preparazione</button></div>
   <h1>Scheda di lavorazione</h1>
   <p class="subtitle">Compilare i dati e stampare — oppure salva come PDF dal browser</p>
 
@@ -576,7 +656,6 @@
 
 <!-- INVENTARIO -->
 <div class="page" id="page-inventario">
-  <div style="margin-bottom:4px"><button onclick="showPage('preparazione', document.querySelector('.nav-btn[onclick*=preparazione]'))" style="font-size:12px;padding:3px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer;color:var(--text-faint)">← Preparazione</button></div>
   <h1>Inventario sostanze</h1>
   <p class="subtitle">Scorte, lotti e scadenze — dati salvati in locale</p>
 
@@ -589,7 +668,7 @@
     <div style="margin-bottom:10px;padding:10px 12px;background:var(--accent-light);border:1px solid #c4d9c0;border-radius:var(--radius)">
       <label style="font-size:11px;font-family:var(--mono);color:var(--accent);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:4px">📷 Scansiona QR Farmalabor (penna ottica)</label>
       <div style="display:flex;gap:8px;align-items:center">
-        <input type="text" id="inv-qr-raw" placeholder="punta la penna sul QR e scansiona..." style="flex:1;font-family:var(--mono);font-size:13px;padding:5px 10px;border:1px solid #b0d0b8;border-radius:var(--radius);background:#fff" oninput="invParseQR()">
+        <input type="text" id="inv-qr-raw" placeholder="punta la penna sul QR e scansiona..." style="flex:1;font-family:var(--mono);font-size:13px;padding:5px 10px;border:1px solid var(--accent-border);border-radius:var(--radius);background:var(--surface)" oninput="invParseQR()">
         <button onclick="invParseQR()" style="font-family:var(--sans);font-size:12px;padding:5px 12px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;white-space:nowrap">→ Estrai lotto</button>
         <button onclick="document.getElementById('inv-qr-raw').value='';invParseQR();" style="font-family:var(--sans);font-size:12px;padding:5px 10px;background:none;border:1px solid var(--border-strong);color:var(--text-muted);border-radius:var(--radius);cursor:pointer">✕</button>
       </div>
@@ -706,7 +785,6 @@
 
 <!-- ETICHETTE -->
 <div class="page" id="page-etichette">
-  <div style="margin-bottom:4px"><button onclick="showPage('preparazione', document.querySelector('.nav-btn[onclick*=preparazione]'))" style="font-size:12px;padding:3px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer;color:var(--text-faint)">← Preparazione</button></div>
   <h1>Stampa etichette Dymo</h1>
   <p class="subtitle">Formato 32×57 mm (S0722540) — due etichette in sequenza</p>
 
@@ -799,7 +877,6 @@
 
 <!-- FORMULARIO AI -->
 <div class="page" id="page-formulario">
-  <div style="margin-bottom:4px"><button onclick="showPage('preparazione', document.querySelector('.nav-btn[onclick*=preparazione]'))" style="font-size:12px;padding:3px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer;color:var(--text-faint)">← Preparazione</button></div>
   <h1>Formulario AI</h1>
   <p class="subtitle">Assistente galenico — Groq gpt-oss-120b · solo farmacopea e preparazioni magistrali</p>
 
@@ -891,7 +968,6 @@
 
 <!-- ARCHIVIO SCHEDE -->
 <div class="page" id="page-archivio">
-  <div style="margin-bottom:4px"><button onclick="showPage('preparazione', document.querySelector('.nav-btn[onclick*=preparazione]'))" style="font-size:12px;padding:3px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer;color:var(--text-faint)">← Preparazione</button></div>
   <h1>Archivio schede di lavorazione</h1>
   <p class="subtitle">Conservazione obbligatoria — D.M. 22/09/2017 e s.m.i. (G.U. n. 24 del 30/01/2018)</p>
 
@@ -955,13 +1031,24 @@ function setTipo(t, btn) {
     else if (t === 'soluzione' || t === 'sospensione') alertUsoPre.textContent = 'Verificare compatibilità con FU XII. Etichettare con USO ESTERNO o ORALE secondo prescrizione. Conservare al riparo dalla luce.';
     else alertUsoPre.textContent = 'Verificare compatibilità con FU XII. Etichettare USO ESTERNO. Conservazione al riparo dalla luce, T° ambiente.';
   }
-  // Suggerisce la modalità di default al primo cambio tipo, senza bloccare il ritorno
-  // Polvere/unguento: default libera solo se non si era già in perc esplicitamente
-  if ((t === 'polvere' || t === 'unguento') && modoPrepara !== 'perc') {
-    if (liberaBtn && modoPrepara !== 'libera') setModoPrepara('libera', liberaBtn);
-  } else if (t === 'soluzione' && modoPrepara !== 'libera') {
-    if (percBtn && modoPrepara !== 'perc') setModoPrepara('perc', percBtn);
+  // Modalità unica: nessun auto-switch.
+  // Totale preparazione: per soluzione mostra selettore ml/g, altrimenti label fissa 'g'
+  const totUnitSel = document.getElementById('totale-prep-unit');
+  const totUnitFix = document.getElementById('totale-prep-unit-fixed');
+  if (totUnitSel && totUnitFix) {
+    if (t === 'soluzione') {
+      totUnitSel.style.display = '';
+      totUnitFix.style.display = 'none';
+    } else {
+      totUnitSel.style.display = 'none';
+      totUnitSel.value = (t === 'sospensione') ? 'ml' : 'g';
+      totUnitFix.style.display = '';
+      totUnitFix.textContent = (t === 'sospensione') ? 'ml' : 'g';
+    }
   }
+  // Grado alcolico: visibile solo per soluzione
+  const rowGrado = document.getElementById('row-grado-alc');
+  if (rowGrado) rowGrado.style.display = (t === 'soluzione') ? '' : 'none';
   // In tutti i casi: l'utente può sempre cliccare manualmente l'altro modo
   // Auto-popola capsule vuote se l'utente entra in modalità capsule e il prezzo è ancora 0
   // (es. dopo un reset). Il select disabilitato per taglia unica non scatena onchange.
@@ -1104,7 +1191,7 @@ function invFiltraSostanze() {
   dd.innerHTML = filtrate.slice(0, 40).map(s => {
     const isObb = INV_OBBLIGATORIE.has(invNominalizza(s.nome));
     const isInv = s.src === 'inv';
-    const b1 = isObb ? '<span style="background:#fff0c0;color:#7a4a00;border:1px solid #e8c840;border-radius:3px;font-size:10px;padding:1px 5px;margin-left:6px">⚕ obbligatoria</span>' : '';
+    const b1 = isObb ? '<span style="background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-border);border-radius:3px;font-size:10px;padding:1px 5px;margin-left:6px">⚕ obbligatoria</span>' : '';
     const b2 = isInv ? '<span style="background:var(--accent-light);color:var(--accent);border:1px solid #c4d9c0;border-radius:3px;font-size:10px;padding:1px 5px;margin-left:4px">inv</span>' : '';
     return `<div onmousedown="invSelezionaSostanza('${s.nome.replace(/'/g,"\\'")}','${s.h}')"
       style="padding:7px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center"
@@ -1242,7 +1329,7 @@ function ordinaEmail() {
 }
 
 
-let modoPrepara = 'perc';
+let modoPrepara = 'libera'; // modalità unica — il selettore è stato dismesso
 let opTecnologicheDesc = ''; // descrizione op. aggiuntiva rilevata da calcPrep
 let liberaGrPA = 0;
 let liberaMlEt = 0;
@@ -1306,6 +1393,73 @@ function liberaAddRiga(isPa) {
   liberaRenderRighe();
 }
 
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme') || 'light';
+  // Ciclo: light → medium → dark → light
+  const order = ['light', 'medium', 'dark'];
+  const next = order[(order.indexOf(cur) + 1) % order.length];
+  if (next === 'light') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', next);
+  try { localStorage.setItem('gal_theme', next); } catch(e) {}
+  updateThemeToggleLabel();
+  if (typeof appRenderVersionBadge === 'function') appRenderVersionBadge();
+}
+
+function updateThemeToggleLabel() {
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  const cur = document.documentElement.getAttribute('data-theme') || 'light';
+  const map = {
+    light: { icon: '☀', title: 'Tema chiaro — click per medio' },
+    medium: { icon: '◐', title: 'Tema medio — click per scuro' },
+    dark: { icon: '☾', title: 'Tema scuro — click per chiaro' },
+  };
+  const m = map[cur] || map.light;
+  btn.textContent = m.icon;
+  btn.title = m.title;
+}
+
+function liberaSetPa(i) {
+  if (!liberaRighe[i]) return;
+  const wasPa = !!liberaRighe[i].isPa;
+  liberaRighe.forEach((r, j) => { r.isPa = (j === i && !wasPa); });
+  liberaRenderRighe();
+  calcPrep();
+}
+
+// ═══════════════════════════════════════════
+// MODAL CONFERMA (per switch modalità lossy)
+// ═══════════════════════════════════════════
+function showModal({title, body, yesLabel, noLabel}) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--bg);border:1px solid var(--border-strong);border-radius:var(--radius);padding:20px;max-width:500px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,0.3)';
+    const yesBtnHtml = yesLabel
+      ? `<button id="modal-yes" style="font-size:13px;padding:6px 14px;border:1px solid var(--accent);border-radius:var(--radius);background:var(--accent);color:white;cursor:pointer;font-weight:600">${yesLabel}</button>`
+      : '';
+    box.innerHTML = `
+      <div style="font-size:15px;font-weight:600;margin-bottom:12px;color:var(--text)">${title}</div>
+      <div style="font-size:13px;color:var(--text);white-space:pre-wrap;margin-bottom:18px;line-height:1.5">${body}</div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button id="modal-no" style="font-size:13px;padding:6px 14px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer;color:var(--text)">${noLabel||'Chiudi'}</button>
+        ${yesBtnHtml}
+      </div>`;
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    const cleanup = (val) => { try { document.body.removeChild(overlay); } catch(e){} document.removeEventListener('keydown', onKey); resolve(val); };
+    const onKey = (e) => { if (e.key === 'Escape') cleanup(false); };
+    document.addEventListener('keydown', onKey);
+    box.querySelector('#modal-no').onclick = () => cleanup(false);
+    const yesBtn = box.querySelector('#modal-yes');
+    if (yesBtn) yesBtn.onclick = () => cleanup(true);
+    overlay.onclick = (e) => { if (e.target === overlay) cleanup(false); };
+  });
+}
+
+// (Funzioni di conversione modalità rimosse in v46 — modalità unica)
+
 function liberaRemoveRiga(i) {
   if (liberaRighe.length <= 1) return;
   liberaRighe.splice(i, 1);
@@ -1318,6 +1472,15 @@ function liberaRenderRighe() {
   if (tipoPrep === 'polvere' || tipoPrep === 'capsule') {
     liberaRighe.forEach(r => { if (r.unit === 'ml') r.unit = 'g'; });
   }
+  // Mostra "Totale preparazione" solo se almeno una riga usa %
+  const anyPercent = liberaRighe.some(r => r.unit === '%');
+  const rowTot = document.getElementById('row-totale-prep');
+  if (rowTot) rowTot.style.display = anyPercent ? '' : 'none';
+  // Grado alcolico + Volume soluzione: visibili per soluzione (sempre)
+  const rowGrado = document.getElementById('row-grado-alc');
+  if (rowGrado) rowGrado.style.display = (tipoPrep === 'soluzione') ? '' : 'none';
+  const rowVol = document.getElementById('row-vol-soluzione');
+  if (rowVol) rowVol.style.display = (tipoPrep === 'soluzione') ? '' : 'none';
   const container = document.getElementById('libera-righe');
   if (!container) return;
   // Non rifare il DOM se ci sono campi con focus — aggiorna solo i valori visualizzati
@@ -1339,19 +1502,21 @@ function liberaRenderRighe() {
     const convNote = r.qty && densita
       ? (r.unit === 'g' ? ' → '+fmt(parseFloat(r.qty)/densita,1)+' ml' : ' → '+fmt(parseFloat(r.qty)*densita,2)+' g')
       : '';
-    const paLabel = '';
-    return `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;padding:6px 8px;border:1px solid var(--border-strong);border-radius:var(--radius)">
-      ${paLabel}
+    const paBtn = `<button type="button" onclick="liberaSetPa(${i})" title="${r.isPa?'Rimuovi marcatura PA':'Marca come Principio Attivo'}"
+        style="font-size:10px;padding:2px 7px;border:1px solid ${r.isPa?'var(--accent)':'var(--border-strong)'};border-radius:var(--radius);background:${r.isPa?'var(--accent)':'var(--bg)'};color:${r.isPa?'white':'var(--text-faint)'};cursor:pointer;font-weight:${r.isPa?'700':'500'};letter-spacing:0.5px">PA</button>`;
+    return `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;padding:6px 8px;border:1px solid ${r.isPa?'var(--accent)':'var(--border-strong)'};border-radius:var(--radius);background:${r.isPa?'rgba(0,0,0,0.02)':'transparent'}">
+      ${paBtn}
       <input type="text" value="${r.nome}" placeholder="Sostanza" autocomplete="off"
         style="width:180px;font-family:var(--mono);font-size:13px;padding:3px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
         oninput="liberaRighe[${i}].nome=this.value; liberaRighe[${i}].densita=null; liberaCercaComp(${i},this.value)">
       <input type="number" value="${r.qty}" placeholder="Quantità" min="0" step="0.1"
         style="width:75px;font-family:var(--mono);font-size:13px;padding:3px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
         oninput="liberaRighe[${i}].qty=this.value; calcPrep()">
-      <select onchange="liberaRighe[${i}].unit=this.value; calcPrep()"
+      <select onchange="liberaRighe[${i}].unit=this.value; liberaRenderRighe(); calcPrep()"
         style="font-family:var(--mono);font-size:13px;padding:3px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">
         <option value="g" ${r.unit==='g'?'selected':''}>g</option>
         ${(tipoPrep!=='polvere'&&tipoPrep!=='capsule')?'<option value="ml" '+(r.unit==='ml'?'selected':'')+'>ml</option>':''}
+        <option value="%" ${r.unit==='%'?'selected':''}>%</option>
       </select>
       <span data-conv="${i}" style="font-size:11px;color:var(--accent)">${convNote}</span>
       <button onclick="liberaRemoveRiga(${i})" style="font-size:11px;padding:2px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">✕</button>
@@ -1425,24 +1590,237 @@ function liberaGetIngr() {
   return liberaRighe.filter(r => r.nome && r.qty);
 }
 
+// Calcola grado alcolico (% v/v etanolo puro) e densità del preparato.
+// Per la conversione ml↔g del Totale preparazione (soluzione).
+// Convenzione: "etanolo" / "alcool" è considerato 96° (0.96 v/v di etanolo puro, d=0.807).
+// Densità soluzione idroalcolica: approssimazione lineare d = 1.0 - 0.211 × (grado/100).
+function calcSoluzioneInfo(totalePrep, totalePrepUnit) {
+  const ingr = liberaGetIngr();
+  // Somma ml di etanolo 96° nella formula (qualunque sia l'unità della riga)
+  let etanolo96Ml = 0;
+  ingr.forEach(r => {
+    const n = invNominalizza(r.nome);
+    if (!(n.includes('etanolo') || n.includes('alcool') || n.includes('alcol'))) return;
+    const q = parseFloat(r.qty)||0;
+    if (r.unit === 'ml') etanolo96Ml += q;
+    else if (r.unit === 'g') etanolo96Ml += q / 0.807;
+    else if (r.unit === '%' && totalePrep > 0) {
+      // Approssimazione: % p/v interpretata come ml di etanolo 96 per 100 ml totali
+      etanolo96Ml += totalePrep * q / 100;
+    }
+  });
+  const etanoloPuroMl = etanolo96Ml * 0.96;
+  let volumeMl, massaG, grado, densita;
+  if (totalePrepUnit === 'ml') {
+    volumeMl = totalePrep;
+    grado = volumeMl > 0 ? (etanoloPuroMl / volumeMl * 100) : 0;
+    densita = 1.0 - 0.211 * (grado / 100);
+    massaG = volumeMl * densita;
+  } else {
+    // Input in g: itera per convergere (densità ↔ volume sono interdipendenti via grado)
+    let d = 0.95;
+    for (let i = 0; i < 4; i++) {
+      volumeMl = totalePrep / d;
+      grado = volumeMl > 0 ? (etanoloPuroMl / volumeMl * 100) : 0;
+      d = 1.0 - 0.211 * (grado / 100);
+    }
+    densita = d;
+    massaG = totalePrep;
+  }
+  return { volumeMl, massaG, grado, densita, etanolo96Ml };
+}
+
+// Volume totale implicito = somma dei ml-equivalenti delle sole righe liquide.
+// I solidi senza densità (es. acido acetilsalicilico in g) sono ignorati: si dissolvono
+// nel solvente senza aumentare significativamente il volume.
+function liberaSommaVolumeLiquidi() {
+  const ingr = liberaGetIngr();
+  let sumMl = 0;
+  ingr.forEach(r => {
+    const q = parseFloat(r.qty)||0;
+    const densita = getDensita(r.nome);
+    if (r.unit === 'ml') sumMl += q;
+    else if (r.unit === 'g' && densita) sumMl += q / densita;
+    // % saltate: non risolvibili senza totale esplicito
+  });
+  return sumMl;
+}
+
+function aggiornaTotaleDerived() {
+  const totEl = document.getElementById('totale-prep');
+  const derivedEl = document.getElementById('totale-prep-derived');
+  const gradoEl = document.getElementById('grado-alc');
+  if (!derivedEl) return;
+  if (tipoPrep !== 'soluzione') {
+    derivedEl.textContent = '';
+    if (gradoEl && document.activeElement !== gradoEl) gradoEl.value = '';
+    return;
+  }
+  const tot = parseFloat(totEl?.value)||0;
+  const unit = document.getElementById('totale-prep-unit')?.value || 'ml';
+  // Totale "effettivo": esplicito se impostato, altrimenti somma liquidi della formula
+  let effectiveTot = tot;
+  let effectiveUnit = unit;
+  if (effectiveTot <= 0) {
+    effectiveTot = liberaSommaVolumeLiquidi();
+    effectiveUnit = 'ml';
+  }
+  if (effectiveTot <= 0) {
+    derivedEl.textContent = '';
+    if (gradoEl && document.activeElement !== gradoEl) gradoEl.value = '';
+    return;
+  }
+  const info = calcSoluzioneInfo(effectiveTot, effectiveUnit);
+  // Derived text (equivalente + densità): solo se totale esplicito
+  if (tot > 0) {
+    const altraUnita = unit === 'ml'
+      ? '= ' + fmt(info.massaG, 2) + ' g'
+      : '= ' + fmt(info.volumeMl, 2) + ' ml';
+    const densTxt = info.grado > 0 ? ' · d=' + fmt(info.densita, 3) : '';
+    derivedEl.textContent = altraUnita + densTxt;
+  } else {
+    derivedEl.textContent = '';
+  }
+  // Campo grado: sempre popolato quando soluzione + formula computabile
+  if (gradoEl && document.activeElement !== gradoEl) {
+    gradoEl.value = info.grado > 0 ? fmt(info.grado, 1).replace(',','.') : '';
+  }
+  // Volume soluzione: auto-fill con somma liquidi quando non in focus
+  const volEl = document.getElementById('vol-soluzione');
+  if (volEl && document.activeElement !== volEl) {
+    const vol = liberaSommaVolumeLiquidi();
+    volEl.value = vol > 0 ? fmt(vol, 1).replace(',','.') : '';
+  }
+}
+
+// True se la riga rappresenta un ingrediente che scala col volume.
+// Esclude contenitori (flacone/barattolo/...) e oggetti discreti (unit pz).
+function _isRigaScalabile(r) {
+  if (!r || !r.nome) return true;
+  if (r.unit === 'pz') return false;
+  const n = invNominalizza(r.nome);
+  return !['flacon','barattol','contenitor','recipient','vasett','fiala','blister','tubo','capsul'].some(k => n.includes(k));
+}
+
+// Scala tutte le righe (escluse contenitori/pz) per riportare il volume soluzione al valore inserito.
+// Analogo a capsScaleOnNCapsChange per le capsule.
+function volSoluzioneChanged() {
+  const el = document.getElementById('vol-soluzione');
+  if (!el) return;
+  const newVol = parseFloat(el.value)||0;
+  if (newVol <= 0) return;
+  const cur = liberaSommaVolumeLiquidi();
+  if (cur <= 0) return; // nessuna riga liquida da scalare
+  const ratio = newVol / cur;
+  if (Math.abs(ratio - 1) < 1e-4) return;
+  liberaRighe.forEach(r => {
+    if (!_isRigaScalabile(r)) return;
+    const q = parseFloat(r.qty)||0;
+    if (q > 0) r.qty = String(parseFloat((q * ratio).toFixed(4)));
+  });
+  liberaRenderRighe();
+  calcPrep();
+}
+
+// L'utente modifica il grado alcolico desiderato: ricalcola la quantità di etanolo 96
+// e compensa con la riga acqua (se presente) per mantenere il volume totale.
+function gradoAlcChanged() {
+  const gradoEl = document.getElementById('grado-alc');
+  if (!gradoEl) return;
+  const desiredGrado = parseFloat(gradoEl.value);
+  if (isNaN(desiredGrado) || desiredGrado < 0) return;
+  if (desiredGrado > 96) { alert('Grado alcolico massimo 96% v/v (etanolo 96°).'); return; }
+  const totEl = document.getElementById('totale-prep');
+  const tot = parseFloat(totEl?.value)||0;
+  const totUnit = document.getElementById('totale-prep-unit')?.value || 'ml';
+  // Volume in ml: esplicito (con conversione se in g) o implicito (somma liquidi)
+  let totMl;
+  if (tot > 0) {
+    if (totUnit === 'ml') totMl = tot;
+    else {
+      const dApprox = 1.0 - 0.211 * (desiredGrado / 100);
+      totMl = tot / dApprox;
+    }
+  } else {
+    totMl = liberaSommaVolumeLiquidi();
+    if (totMl <= 0) {
+      alert('Aggiungi prima dei liquidi alla formula o imposta "Totale preparazione".');
+      return;
+    }
+  }
+  // Ml di etanolo 96 necessari per raggiungere il grado desiderato
+  const newEtMl = totMl * desiredGrado / 100 / 0.96;
+  // Trova (o crea) la riga etanolo
+  let etIdx = liberaRighe.findIndex(r => {
+    const n = invNominalizza(r.nome || '');
+    return n.includes('etanolo') || n.includes('alcool') || n.includes('alcol');
+  });
+  if (etIdx < 0) {
+    liberaRighe.push({nome:'Etanolo 96', qty:'', unit:'ml', isPa:false, densita:null, prezzoAcq:0, fonte:null, lotto:'', h:'H225'});
+    etIdx = liberaRighe.length - 1;
+  }
+  // Ml attuali della riga etanolo
+  const rEt = liberaRighe[etIdx];
+  const qEt = parseFloat(rEt.qty)||0;
+  let oldEtMl;
+  if (rEt.unit === 'ml') oldEtMl = qEt;
+  else if (rEt.unit === 'g') oldEtMl = qEt / 0.807;
+  else if (rEt.unit === '%') oldEtMl = totMl * qEt / 100;
+  else oldEtMl = qEt;
+  const deltaMl = newEtMl - oldEtMl;
+  // Aggiorna etanolo (sempre in ml)
+  liberaRighe[etIdx].qty = String(parseFloat(newEtMl.toFixed(2)));
+  liberaRighe[etIdx].unit = 'ml';
+  // Compensa con la riga acqua, se presente
+  const acquaIdx = liberaRighe.findIndex(r => invNominalizza(r.nome || '').includes('acqua'));
+  if (acquaIdx >= 0) {
+    const rAc = liberaRighe[acquaIdx];
+    const qAc = parseFloat(rAc.qty)||0;
+    let oldAcMl;
+    if (rAc.unit === 'ml') oldAcMl = qAc;
+    else if (rAc.unit === 'g') oldAcMl = qAc; // densità 1
+    else if (rAc.unit === '%') oldAcMl = totMl * qAc / 100;
+    else oldAcMl = qAc;
+    const newAcMl = Math.max(0, oldAcMl - deltaMl);
+    liberaRighe[acquaIdx].qty = String(parseFloat(newAcMl.toFixed(2)));
+    liberaRighe[acquaIdx].unit = 'ml';
+  }
+  liberaRenderRighe();
+  calcPrep();
+}
+
 function liberaCalcTotale() {
   // Calcola totale g e concentrazione PA
   const ingr = liberaGetIngr();
+  // Totale preparazione (usato per risolvere righe con unità %)
+  const totalePrep = parseFloat(document.getElementById('totale-prep')?.value)||0;
+  // PA esplicito (marker isPa). Se nessuno marcato, fallback all'euristica precedente
+  // (prima sostanza Allegato A, altrimenti prima riga).
+  let paIdx = ingr.findIndex(r => r.isPa);
+  if (paIdx < 0) {
+    paIdx = ingr.findIndex(r => {
+      const qNorm = invNominalizza(r.nome);
+      return Object.keys(ALLEGATO_A).some(k => k.includes(qNorm) || qNorm.includes(k.split(' ')[0]));
+    });
+    if (paIdx < 0 && ingr.length > 0) paIdx = 0;
+  }
   let totG = 0, paG = 0;
-  let paFound = false;
   ingr.forEach((r, i) => {
     const q = parseFloat(r.qty)||0;
     const densita = getDensita(r.nome);
-    const grams = r.unit === 'ml' && densita ? q * densita : q;
+    let grams;
+    if (r.unit === '%') {
+      grams = totalePrep > 0 ? (totalePrep * q / 100) : 0;
+    } else if (r.unit === 'ml' && densita) {
+      grams = q * densita;
+    } else {
+      grams = q; // g, ml senza densità, pz
+    }
     totG += grams;
-    // "Principale" = prima sostanza trovata in All.A, oppure riga 0
-    const qNorm = invNominalizza(r.nome);
-    const inAllegato = Object.keys(ALLEGATO_A).some(k => k.includes(qNorm) || qNorm.includes(k.split(' ')[0]));
-    if ((inAllegato && !paFound) || (i === 0 && !paFound)) { paG = grams; paFound = !!inAllegato || i===0; }
+    if (i === paIdx) paG = grams;
   });
-  // Percentuali per ogni sostanza
-  const conc = totG > 0 ? (paG / totG * 100) : 0;
-  // Aggiorna campo e nota con unità corretta per il tipo
+  // Percentuale PA
+  const conc = totG > 0 && paG > 0 ? (paG / totG * 100) : 0;
   const _concEl = document.getElementById('libera-conc');
   const _concNote = document.getElementById('libera-conc-note');
   if (_concEl) _concEl.value = conc > 0 ? fmt(conc,2) : '';
@@ -1451,6 +1829,7 @@ function liberaCalcTotale() {
     else if (tipoPrep === 'capsule') _concNote.textContent = 'mg/cps — vedi sotto';
     else _concNote.textContent = '% p/v — calcolata (PA/totale)';
   }
+  aggiornaTotaleDerived();
   return {totG, paG, conc, ingr};
 }
 
@@ -1678,11 +2057,18 @@ function calcPrep() {
       tOpEl.value = opTecnologicheExtra;
       setTimeout(() => calcTariff(), 50);
     }
-    document.getElementById('formula-grid').innerHTML = items.map(i =>
-      '<div class="formula-item"><div class="formula-item-name">'+i.name+'</div><div class="formula-item-val">'+i.val+'<span class="formula-item-unit">'+i.unit+'</span></div></div>'
-    ).join('');
-    document.getElementById('alert-solub').innerHTML = '';
-    document.getElementById('procedura').innerHTML = proc.map(p => '<li>'+p+'</li>').join('');
+    // Se nessun ingrediente valido, sostituisci formula e procedura con placeholder
+    if (ingr.length === 0) {
+      document.getElementById('formula-grid').innerHTML = '<div style="color:var(--text-faint);font-size:13px;padding:8px 0">Aggiungi almeno un ingrediente con quantità per vedere la formula.</div>';
+      document.getElementById('alert-solub').innerHTML = '';
+      document.getElementById('procedura').innerHTML = '<li style="color:var(--text-faint);font-style:italic;list-style:none">La procedura comparirà quando aggiungerai gli ingredienti.</li>';
+    } else {
+      document.getElementById('formula-grid').innerHTML = items.map(i =>
+        '<div class="formula-item"><div class="formula-item-name">'+i.name+'</div><div class="formula-item-val">'+i.val+'<span class="formula-item-unit">'+i.unit+'</span></div></div>'
+      ).join('');
+      document.getElementById('alert-solub').innerHTML = '';
+      document.getElementById('procedura').innerHTML = proc.map(p => '<li>'+p+'</li>').join('');
+    }
 
     // Sincronizza PA name e qt/conc PRIMA di sincronizzaTariffazione
     // Propaga prima sostanza (anche senza qty) a prep-pa-nome e t-pa-nome
@@ -1748,15 +2134,34 @@ function calcPrep() {
     liberaRigheExtra = [];
     liberaCostoExtra = 0;
 
+    // Determina indice PA: marker esplicito → fallback Allegato A → prima riga
+    let _paIdx = ingr.findIndex(r => r.isPa);
+    if (_paIdx < 0) {
+      _paIdx = ingr.findIndex(r => {
+        const qN = invNominalizza(r.nome);
+        return Object.keys(ALLEGATO_A).some(k => k.includes(qN) || qN.includes(k.split(' ')[0]));
+      });
+      if (_paIdx < 0 && ingr.length > 0) _paIdx = 0;
+    }
+    const _totalePrep = parseFloat(document.getElementById('totale-prep')?.value)||0;
+
     ingr.forEach((r, _ri) => {
       const q = parseFloat(r.qty)||0;
       const densita = getDensita(r.nome);
-      const grams = r.unit === 'ml' && densita ? q * densita : q;
-      const mlQty  = r.unit === 'g' && densita ? q / densita : q; // ml effettivi
+      // Risolvi quantità in g/ml a seconda dell'unità (g, ml, %)
+      let grams, mlQty;
+      if (r.unit === '%') {
+        // % risolta contro "Totale preparazione" (unità totale presunta omogenea)
+        grams = _totalePrep > 0 ? (_totalePrep * q / 100) : 0;
+        mlQty = densita ? grams/densita : grams;
+      } else {
+        grams = r.unit === 'ml' && densita ? q * densita : q;
+        mlQty = r.unit === 'g' && densita ? q / densita : q;
+      }
       const qNorm = invNominalizza(r.nome);
       const chiaveAll = Object.keys(ALLEGATO_A).find(k => k.includes(qNorm) || qNorm.includes(k.split(' ')[0]));
       let prezzo = 0;
-      let isLiquido = !!densita && r.unit === 'g' || r.unit === 'ml';
+      let isLiquido = (!!densita && r.unit === 'g') || r.unit === 'ml';
       if (chiaveAll) {
         prezzo = ALLEGATO_A[chiaveAll]; // All.A sempre in €/g
         isLiquido = false; // usa grams
@@ -1764,18 +2169,22 @@ function calcPrep() {
         const invFound = invLoadMerged().find(s => invNominalizza(s.nome).includes(qNorm) || qNorm.includes(invNominalizza(s.nome)));
         if (invFound && invFound.prezzo > 0) {
           prezzo = invFound.prezzo;
-          // Se la sostanza è liquida e il prezzo è €/ml, usa ml
           isLiquido = (invFound.unit === 'ml' || !!densita);
         } else {
           prezzo = r.prezzoAcq||0;
           isLiquido = r.unit === 'ml';
         }
       }
-      // Calcola costo correttamente: €/g × g oppure €/ml × ml
-      const qtPerCosto = isLiquido && !chiaveAll ? (r.unit === 'ml' ? q : q/densita) : grams;
+      // Costo: per % usa quantità risolte; per altre unità mantiene la logica originale
+      let qtPerCosto;
+      if (r.unit === '%') {
+        qtPerCosto = isLiquido && !chiaveAll ? mlQty : grams;
+      } else {
+        qtPerCosto = isLiquido && !chiaveAll ? (r.unit === 'ml' ? q : q/densita) : grams;
+      }
       const costo = qtPerCosto * prezzo;
       if (prezzo > 0) liberaCostoExtra += costo;
-      liberaRigheExtra.push({nome: r.nome, qty: q, unit: r.unit, grams, mlQty, prezzo, costo, isLiquido: isLiquido && !chiaveAll, isPa: _ri === 0});
+      liberaRigheExtra.push({nome: r.nome, qty: q, unit: r.unit, grams, mlQty, prezzo, costo, isLiquido: isLiquido && !chiaveAll, isPa: _ri === _paIdx});
     });
     const etRigaPerTariff = ingr.find(r => {
       const n = invNominalizza(r.nome);
@@ -3280,7 +3689,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 44;
+const APP_VERSION = 58;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -3295,12 +3704,20 @@ const VER_COLORS = [
 function appRenderVersionBadge() {
   const badge = document.getElementById('app-version-badge');
   if (!badge) return;
+  badge.textContent = 'v' + APP_VERSION;
+  badge.title = 'Versione software ' + APP_VERSION;
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const header = document.getElementById('app-header');
+  if (isDark) {
+    // In dark theme, lascia che le CSS variables gestiscano badge e header
+    badge.style.background = '';
+    badge.style.color = '';
+    if (header) { header.style.background = ''; header.style.borderBottomColor = ''; }
+    return;
+  }
   const c = VER_COLORS[(APP_VERSION - 1) % VER_COLORS.length];
   badge.style.background = c.bg;
   badge.style.color = c.color;
-  badge.textContent = 'v' + APP_VERSION;
-  badge.title = 'Versione software ' + APP_VERSION;
-  const header = document.getElementById('app-header');
   if (header) {
     header.style.background = c.bg;
     header.style.borderBottomColor = c.color;
@@ -3548,51 +3965,51 @@ function invModifica(lsIdx) {
             const l=this.value.trim();
             const sEl=document.getElementById('mod-sds');
             if(l && !sEl.dataset.manual) sEl.value='http://www.farmalabor.it/certificati/'+l+'.pdf';
-          " style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff">
+          " style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface)">
         </div>
         <div>
           <label style="font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:2px">Lotto interno</label>
-          <input id="mod-lotto-int" type="text" value="${item.lottoInt||''}" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff">
+          <input id="mod-lotto-int" type="text" value="${item.lottoInt||''}" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface)">
         </div>
         <div>
           <label style="font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:2px">Scadenza</label>
-          <input id="mod-scad" type="month" value="${item.scad||''}" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff">
+          <input id="mod-scad" type="month" value="${item.scad||''}" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface)">
         </div>
         <div>
           <label style="font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:2px">N° DDT</label>
-          <input id="mod-ddt-num" type="text" value="${item.ddtNum||''}" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff">
+          <input id="mod-ddt-num" type="text" value="${item.ddtNum||''}" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface)">
         </div>
         <div>
           <label style="font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:2px">Data DDT</label>
-          <input id="mod-ddt-data" type="date" value="${item.ddtData||''}" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff">
+          <input id="mod-ddt-data" type="date" value="${item.ddtData||''}" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface)">
         </div>
         <div>
           <label style="font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:2px">Data apertura</label>
-          <input id="mod-data-ap" type="date" value="${item.dataAp||''}" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff">
+          <input id="mod-data-ap" type="date" value="${item.dataAp||''}" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface)">
         </div>
         <div>
           <label style="font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:2px">Data chiusura</label>
-          <input id="mod-data-ch" type="date" value="${item.dataCh||''}" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff">
+          <input id="mod-data-ch" type="date" value="${item.dataCh||''}" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface)">
         </div>
         <div style="grid-column:1/-1">
           <label style="font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:2px">URL scheda tecnica (SDS)</label>
-          <input id="mod-sds" type="url" value="${item.sds||''}" placeholder="https://..." oninput="this.dataset.manual='1'" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff">
+          <input id="mod-sds" type="url" value="${item.sds||''}" placeholder="https://..." oninput="this.dataset.manual='1'" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface)">
         </div>
         <div>
           <label style="font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:2px">Codice a barre / EAN</label>
-          <input id="mod-barcode" type="text" value="${item.barcode||''}" placeholder="Scansiona o digita" autocomplete="off" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff">
+          <input id="mod-barcode" type="text" value="${item.barcode||''}" placeholder="Scansiona o digita" autocomplete="off" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface)">
         </div>
         <div>
           <label style="font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:2px">Minimo ordinabile</label>
-          <input id="mod-min-order" type="number" value="${item.minOrd||''}" min="0" step="1" placeholder="" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff">
+          <input id="mod-min-order" type="number" value="${item.minOrd||''}" min="0" step="1" placeholder="" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface)">
         </div>
         <div>
           <label style="font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:2px">Quantità</label>
-          <input id="mod-qty" type="number" value="${item.qty||0}" min="0" step="0.1" oninput="invCalcolaPrezzoMod()" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff">
+          <input id="mod-qty" type="number" value="${item.qty||0}" min="0" step="0.1" oninput="invCalcolaPrezzoMod()" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface)">
         </div>
         <div>
           <label style="font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:2px">Prezzo bolla (€)</label>
-          <input id="mod-prezzo-bolla" type="number" value="${item.prezzoBolla||''}" min="0" step="0.01" placeholder="" oninput="invCalcolaPrezzoMod()" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff">
+          <input id="mod-prezzo-bolla" type="number" value="${item.prezzoBolla||''}" min="0" step="0.01" placeholder="" oninput="invCalcolaPrezzoMod()" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface)">
         </div>
         <div>
           <label style="font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:2px">€ / ${item.unit||'g'} <span id="mod-unit-label" style="display:none">${item.unit||'g'}</span>(calc.)</label>
@@ -3653,7 +4070,7 @@ function invRender() {
     const isObb = INV_OBBLIGATORIE.has(invNominalizza(item.nome));
     const hTags = item.h ? item.h.split(',').map(s=>s.trim()).filter(Boolean).map(s=>`<span class="tag-h">${s}</span>`).join('') : '';
     const chiusa = item.dataCh ? `<span class="tag-ok">chiusa ${fmtGiorno(item.dataCh)}</span>` : '';
-    const obbTag = isObb ? `<span style="background:#fff0c0;color:#7a4a00;border:1px solid #e8c840;border-radius:3px;font-size:10px;padding:1px 4px;margin-left:4px">⚕ obbligatoria</span>` : '';
+    const obbTag = isObb ? `<span style="background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-border);border-radius:3px;font-size:10px;padding:1px 4px;margin-left:4px">⚕ obbligatoria</span>` : '';
     rows += `<tr class="${cls}">
       <td><div class="inv-nome">${item.nome}${obbTag}</div><div>${hTags}${chiusa}</div></td>
       <td><div class="inv-lotto">${item.lotto||'—'}</div>${item.lottoInt?`<div class="inv-sub">int: ${item.lottoInt}</div>`:''}</td>
@@ -3676,7 +4093,7 @@ function invRender() {
       const cls = scadData && scadData < oggi ? 'scaduto' : (scadData && scadData < tra60 ? 'in-scadenza' : '');
       const isObb = INV_OBBLIGATORIE.has(invNominalizza(item.nome));
       const hTags = item.h ? item.h.split(',').map(s=>s.trim()).filter(Boolean).map(s=>`<span class="tag-h">${s}</span>`).join('') : '';
-      const obbTag = isObb ? `<span style="background:#fff0c0;color:#7a4a00;border:1px solid #e8c840;border-radius:3px;font-size:10px;padding:1px 4px;margin-left:4px">⚕ obbligatoria</span>` : '';
+      const obbTag = isObb ? `<span style="background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-border);border-radius:3px;font-size:10px;padding:1px 4px;margin-left:4px">⚕ obbligatoria</span>` : '';
       const nomeEnc = item.nome.replace(/'/g,"\\'");
       rows += `<tr class="${cls}" style="opacity:0.75">
         <td><div class="inv-nome">${item.nome}${obbTag}</div><div>${hTags}</div></td>
@@ -3857,17 +4274,21 @@ function aiNormCapsule(nome) {
 }
 
 function aiParseFormula(text) {
-  const lines = text.split('\n');
+  // Pre-pulizia: rimuovi marker markdown ** (l'AI spesso usa **FORMULA:**)
+  const cleanText = text.replace(/\*\*/g, '');
+  const lines = cleanText.split('\n');
   const comps = [];
   let inFormula = false;
   let tipo = null;
-  const tipoMatch = text.match(/^TIPO\s*:\s*(soluzione|sospensione|unguento|polvere|capsule)\b/im);
+  const tipoMatch = cleanText.match(/^TIPO\s*:\s*(soluzione|sospensione|unguento|polvere|capsule)\b/im);
   if (tipoMatch) tipo = tipoMatch[1].toLowerCase();
-  for (const line of lines) {
-    if (/^FORMULA\s*:/i.test(line.trim())) { inFormula = true; continue; }
-    if (/^TIPO\s*:/i.test(line.trim()) || /^PROCEDURA\s*:/i.test(line.trim()) || /^NOTE\s*:/i.test(line.trim()) || /^DA ORDINARE/i.test(line.trim())) inFormula = false;
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (/^FORMULA\s*:/i.test(line)) { inFormula = true; continue; }
+    if (/^TIPO\s*:/i.test(line) || /^PROCEDURA\s*:/i.test(line) || /^NOTE\s*:/i.test(line) || /^DA ORDINARE/i.test(line)) inFormula = false;
     if (inFormula) {
-      const m = line.match(/^[-\u2022]\s*(.+?):\s*([\d.,]+)\s*([a-zA-Z%\u00b0\u00b5]+)?/);
+      // Bullet accettati: - \u00b7 \u2022 *
+      const m = line.match(/^[-\u2022\u00b7*]\s*(.+?):\s*([\d.,]+)\s*([a-zA-Z%\u00b0\u00b5]+)?/);
       if (m) {
         const nome = aiNormCapsule(m[1].trim());
         const qty  = m[2].replace(',','.');
@@ -3891,7 +4312,7 @@ function aiParseFormula(text) {
   }
   // Estrai DA ORDINARE
   const daOrdinare = [];
-  const doMatch = text.match(/DA ORDINARE:\s*(.+)/i);
+  const doMatch = cleanText.match(/DA ORDINARE:\s*(.+)/i);
   if (doMatch) {
     doMatch[1].split(',').forEach(s => {
       const t = aiNormCapsule(s.trim());
@@ -3929,7 +4350,7 @@ function aiRenderImportCard(comps, daOrdinare, tipo) {
     : '';
   let ordinareHtml = '';
   if (daOrdinare && daOrdinare.length) {
-    ordinareHtml = '<div style="margin-top:8px;padding:6px 8px;background:#fff3cd;border-radius:var(--radius);font-size:12px;color:#856404">' +
+    ordinareHtml = '<div style="margin-top:8px;padding:6px 8px;background:var(--warn-bg);border-radius:var(--radius);font-size:12px;color:var(--warn);border:1px solid var(--warn-border)">' +
       '\u26a0 <strong>Da ordinare:</strong> ' + daOrdinare.join(', ') + '</div>';
   }
   return '<div style="margin-top:8px;padding:8px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius)">' +
@@ -4346,7 +4767,7 @@ function resetRicetta() {
 
   // ── state moduli ──
   tipoPrep = 'soluzione';
-  modoPrepara = 'perc';
+  modoPrepara = 'libera'; // modalità unica
   liberaRighe = [];
   liberaRigheExtra = [];
   liberaGrPA = 0; liberaMlEt = 0; liberaCostoExtra = 0;
@@ -4363,7 +4784,7 @@ function resetRicetta() {
 
   // ── input preparazione ──
   ['prep-pa-nome','qt','conc','mg-pa-cps','n-caps','eccip-nome',
-   'caps-ncaps-lib','caps-vuote-cerca','caps-vuote-nome','libera-conc'].forEach(id => setVal(id, ''));
+   'caps-ncaps-lib','caps-vuote-cerca','caps-vuote-nome','libera-conc','totale-prep','grado-alc','vol-soluzione'].forEach(id => setVal(id, ''));
   setVal('perc-et', '0');
   setVal('caps-vuote-prezzo', '0');
   setVal('tipo-diluente', 'acqua');
@@ -4410,7 +4831,8 @@ function resetRicetta() {
   const schTipoBtn  = document.querySelector('#scheda-inputs .seg-btn');
   const modoPercBtn = document.getElementById('modo-perc-btn');
   if (prepTipoBtn) setTipo('soluzione', prepTipoBtn);
-  if (modoPercBtn) setModoPrepara('perc', modoPercBtn);
+  if (liberaRighe.length === 0) liberaAddRiga();
+  liberaRenderRighe();
   if (tarTipoBtn)  setTipoTariff('liquida', tarTipoBtn);
   if (schTipoBtn)  setTipoScheda('soluzione', schTipoBtn);
 
@@ -4433,6 +4855,9 @@ etiqAggiorna();
 aiCaricaKey();
 popolaPASuggestions();
 initCapsuleTaglie();
+if (liberaRighe.length === 0) liberaAddRiga();
+liberaRenderRighe();
+updateThemeToggleLabel();
 calcPrep();
 setTimeout(appRenderVersionBadge, 100);
 ordiniRender();
