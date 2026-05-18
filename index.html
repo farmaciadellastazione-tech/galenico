@@ -3461,7 +3461,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 73;
+const APP_VERSION = 74;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -4424,6 +4424,14 @@ function aiReset() {
   document.getElementById('ai-messages').innerHTML =
     '<div class="ai-msg assistant">Nuova conversazione. Inserisci una preparazione o scrivi una domanda.</div>';
   document.getElementById('ai-prep-nome').value = '';
+  document.getElementById('ai-prep-qt').value = '100';
+  document.getElementById('ai-prep-dose').value = '';
+  // Ripristina dropdown ai default
+  const formaSel = document.getElementById('ai-prep-forma'); if (formaSel) formaSel.selectedIndex = 0;
+  const unitSel  = document.getElementById('ai-prep-unit');  if (unitSel)  unitSel.selectedIndex  = 0;
+  const dUnitSel = document.getElementById('ai-prep-dose-unit'); if (dUnitSel) dUnitSel.selectedIndex = 0;
+  // Svuota anche l'input chat libero, se presente
+  const inp = document.getElementById('ai-input'); if (inp) { inp.value = ''; inp.style.height = 'auto'; }
 }
 
 aiCaricaKey();
