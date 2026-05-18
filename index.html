@@ -321,6 +321,7 @@
       <button class="seg-btn active" onclick="setTipo('soluzione',this)">Soluzione</button>
       <button class="seg-btn" onclick="setTipo('unguento',this)">Unguento / crema</button>
       <button class="seg-btn" onclick="setTipo('capsule',this)">Capsule</button>
+      <button class="seg-btn" onclick="setTipo('cartine',this)">Cartine</button>
       <button class="seg-btn" onclick="setTipo('polvere',this)">Polvere</button>
       <button class="seg-btn" onclick="setTipo('sospensione',this)">Sospensione</button>
     </div>
@@ -418,6 +419,17 @@
     <input type="hidden" id="caps-vuote-nome" value="">
   </div>
 
+  <!-- PANNELLO CARTINE EXTRA (visibile solo in libera+cartine) -->
+  <div id="prep-cart-extra" class="card" style="display:none">
+    <div class="card-title">Parametri cartina</div>
+    <div class="field-row">
+      <span class="field-label">Numero cartine</span>
+      <input type="number" id="cart-ncart-lib" value="" min="1" max="1000" step="1" oninput="cartScaleOnNCartChange()">
+      <span class="field-note">pz</span>
+    </div>
+    <div style="font-size:11px;color:var(--text-faint);margin-top:4px">Il PA per cartina viene calcolato automaticamente da PA totale / N° cartine (vedi riepilogo formula).</div>
+  </div>
+
   <!-- MODALITÀ FORMULA LIBERA -->
   <div id="prep-modo-libera" class="card">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
@@ -492,7 +504,8 @@
       <button class="seg-btn" onclick="setTipoTariff('sospensione',this)">Sospensione/emulsione</button>
       <button class="seg-btn" onclick="setTipoTariff('semisolida',this)">Pomata / crema / gel</button>
       <button class="seg-btn" onclick="setTipoTariff('polvere',this)">Polvere</button>
-      <button class="seg-btn" onclick="setTipoTariff('capsule',this)">Capsule / bustine</button>
+      <button class="seg-btn" onclick="setTipoTariff('capsule',this)">Capsule</button>
+      <button class="seg-btn" onclick="setTipoTariff('cartine',this)">Cartine</button>
     </div>
 
     <!-- campi per liquida -->
@@ -507,6 +520,12 @@
       <div class="field-row"><span class="field-label">Dosaggio PA (mg/cps)</span><input type="number" id="t-mgpa" value="" step="0.1" min="0" oninput="calcTariff()"></div>
       <div class="field-row"><span class="field-label">Costo eccipiente (€/g)</span><input type="number" id="t-eccip" value="" step="0.001" min="0" oninput="calcTariff()"><span class="field-note">prezzo acquisto</span></div>
       <div class="field-row"><span class="field-label">Costo capsule vuote (€/cps)</span><input type="number" id="t-cpsvuote" value="" step="0.001" min="0" oninput="calcTariff()"><span class="field-note">prezzo acquisto</span></div>
+    </div>
+
+    <!-- campi per cartine -->
+    <div id="tt-cartine" style="display:none">
+      <div class="field-row"><span class="field-label">Numero cartine</span><input type="number" id="t-ncart" value="" step="1" min="1" max="1000" oninput="tariffNCartChange()"></div>
+      <div style="font-size:11px;color:var(--text-faint);margin-top:4px">PA ed eccipienti sono presi dalla Preparazione. Voce All. B 7: €22/120 cartine.</div>
     </div>
   </div>
 
@@ -1023,13 +1042,16 @@ function setTipo(t, btn) {
   // Pannello capsule extra in modalità libera
   const capExtra = document.getElementById('prep-caps-extra');
   if (capExtra) capExtra.style.display = (t === 'capsule' && modoPrepara === 'libera') ? '' : 'none';
-  // Concentrazione non ha senso per capsule (è per soluzioni)
+  // Pannello cartine extra in modalità libera (no taglia, no capsule vuote)
+  const cartExtra = document.getElementById('prep-cart-extra');
+  if (cartExtra) cartExtra.style.display = (t === 'cartine' && modoPrepara === 'libera') ? '' : 'none';
+  // Concentrazione non ha senso per capsule/cartine (è per soluzioni)
   const rowConc = document.getElementById('row-libera-conc');
-  if (rowConc) rowConc.style.display = t === 'capsule' ? 'none' : '';
+  if (rowConc) rowConc.style.display = (t === 'capsule' || t === 'cartine') ? 'none' : '';
   // Alert uso: specifico per tipo
   const alertUsoPre = document.getElementById('alert-uso-prep-testo');
   if (alertUsoPre) {
-    if (t === 'capsule' || t === 'polvere') alertUsoPre.textContent = 'Verificare compatibilità con FU XII. Capsule/polveri per USO ORALE — etichettare con posologia e scadenza.';
+    if (t === 'capsule' || t === 'cartine' || t === 'polvere') alertUsoPre.textContent = 'Verificare compatibilità con FU XII. Capsule/cartine/polveri per USO ORALE — etichettare con posologia e scadenza.';
     else if (t === 'soluzione' || t === 'sospensione') alertUsoPre.textContent = 'Verificare compatibilità con FU XII. Etichettare con USO ESTERNO o ORALE secondo prescrizione. Conservare al riparo dalla luce.';
     else alertUsoPre.textContent = 'Verificare compatibilità con FU XII. Etichettare USO ESTERNO. Conservazione al riparo dalla luce, T° ambiente.';
   }
@@ -1047,6 +1069,7 @@ function setTipo(t, btn) {
       totUnitFix.style.display = '';
       totUnitFix.textContent = (t === 'sospensione') ? 'ml' : 'g';
     }
+    // Nota: per cartine il "totale" rappresenta la massa complessiva di polvere divisa
   }
   // Grado alcolico: visibile solo per soluzione
   const rowGrado = document.getElementById('row-grado-alc');
@@ -1364,11 +1387,13 @@ function setModoPrepara(modo, btn) {
   document.getElementById('prep-modo-libera').style.display = modo === 'libera' ? '' : 'none';
   const capExtra = document.getElementById('prep-caps-extra');
   if (capExtra) capExtra.style.display = (modo === 'libera' && tipoPrep === 'capsule') ? '' : 'none';
+  const cartExtra = document.getElementById('prep-cart-extra');
+  if (cartExtra) cartExtra.style.display = (modo === 'libera' && tipoPrep === 'cartine') ? '' : 'none';
   // In libera mode: nascondi campo PA (ogni sostanza ha il suo prezzo)
   const cardPaEl = document.getElementById('tariff-card-pa');
   if (cardPaEl) cardPaEl.style.display = modo === 'libera' ? 'none' : '';
   const rowConc2 = document.getElementById('row-libera-conc');
-  if (rowConc2) rowConc2.style.display = tipoPrep === 'capsule' ? 'none' : '';
+  if (rowConc2) rowConc2.style.display = (tipoPrep === 'capsule' || tipoPrep === 'cartine') ? 'none' : '';
   // In libera mode: nasconde componenti extra manuali tariffazione (vengono da liberaRigheExtra)
   // Mantiene visibile flacone e PA
   const ttExtraRows = document.getElementById('tt-extra-rows');
@@ -2044,6 +2069,43 @@ function calcPrep() {
       } else {
         opTecnologicheDesc = 'setacciatura PA (Art. 6)';
       }
+    } else if (tipoPrep === 'cartine') {
+      // Cartine in modalità libera: numero cartine + dosaggio PA per cartina
+      // Nessuna taglia, nessuna capsula vuota — solo divisione di polvere in carte/bustine
+      const nCart  = parseInt(document.getElementById('cart-ncart-lib')?.value||'0')||0;
+      const grTot  = totG; // PA + eccipienti
+      const mgCart = nCart > 0 ? (grTot / nCart * 1000) : 0;
+      const mgPACart = nCart > 0 ? (paG / nCart * 1000) : 0;
+      // Propaga il numero cartine alla tariffazione (il dosaggio è derivato e mostrato in formula)
+      const tNcart = document.getElementById('t-ncart');
+      if (tNcart && nCart > 0) tNcart.value = nCart;
+      // Formula display
+      if (nCart > 0) items.push({name:'Numero cartine', val:String(nCart), unit:'pz'});
+      if (mgCart > 0) {
+        const massaUnit = mgCart >= 1000 ? 'g' : 'mg';
+        const massaVal  = mgCart >= 1000 ? fmt(mgCart/1000, 3) : fmt(mgCart, 1);
+        items.push({name:'Massa per cartina', val:massaVal, unit:massaUnit});
+      }
+      if (mgPACart > 0) {
+        const paUnit = mgPACart >= 1000 ? 'g' : 'mg';
+        const paVal  = mgPACart >= 1000 ? fmt(mgPACart/1000, 3) : fmt(mgPACart, 2);
+        items.push({name:'PA per cartina', val:paVal, unit:paUnit});
+      }
+      proc = [
+        ...pesate,
+        ...(hasCrystalline ? ['Setacciare i componenti cristallini al setaccio n° 355 µm prima della miscelazione. <em>(Op. tecnologica aggiuntiva — Art. 6)</em>'] : []),
+        'Miscelare PA ed eccipienti per almeno 5 minuti fino ad omogeneità cromatica.',
+        'Ripartire la polvere in <strong>'+nCart+' cartine</strong> di carta velina (atteso: '+(mgCart>=1000?fmt(mgCart/1000,3)+' g':fmt(mgCart,1)+' mg')+'/cartina, di cui PA '+(mgPACart>=1000?fmt(mgPACart/1000,3)+' g':fmt(mgPACart,2)+' mg')+').',
+        'Verificare il peso di almeno 3 cartine (tolleranza ±5%).',
+        'Piegare e sigillare. Conservare in scatola/contenitore opaco. Etichettare.',
+      ];
+      opTecnologicheExtra += 1; // setacciatura/ripartizione PA
+      if (hasCrystalline) {
+        opTecnologicheExtra += 1;
+        opTecnologicheDesc = 'polverizzazione + setacciatura PA (Art. 6) — 2 op.';
+      } else {
+        opTecnologicheDesc = 'setacciatura PA (Art. 6)';
+      }
     } else {
       // Generico per tipi non gestiti
       proc = [
@@ -2211,11 +2273,11 @@ function calcPrep() {
     }
 
     // Sincronizza tipoTariff con tipoPrep
-    const _mapTT = {soluzione:'liquida', sospensione:'sospensione', unguento:'semisolida', polvere:'polvere', capsule:'capsule'};
+    const _mapTT = {soluzione:'liquida', sospensione:'sospensione', unguento:'semisolida', polvere:'polvere', capsule:'capsule', cartine:'cartine'};
     const _tipoTariffAtteso = _mapTT[tipoPrep] || 'liquida';
     if (tipoTariff !== _tipoTariffAtteso) {
       const _tarBtns = document.querySelectorAll('#page-tariffazione .seg-btn');
-      const _btnIdx  = {liquida:0, sospensione:1, semisolida:2, polvere:3, capsule:4}[_tipoTariffAtteso];
+      const _btnIdx  = {liquida:0, sospensione:1, semisolida:2, polvere:3, capsule:4, cartine:5}[_tipoTariffAtteso];
       if (_btnIdx !== undefined && _tarBtns[_btnIdx]) setTipoTariff(_tipoTariffAtteso, _tarBtns[_btnIdx]);
     }
     sincronizzaTariffazione();
@@ -2404,13 +2466,16 @@ function sincronizzaTariffazione() {
       if (document.getElementById('t-pa-nome')) document.getElementById('t-pa-nome').value = nomePA;
     }
   }
-  const mapTipo = {soluzione:'liquida', unguento:'semisolida', capsule:'capsule', polvere:'polvere', sospensione:'sospensione'};
+  const mapTipo = {soluzione:'liquida', unguento:'semisolida', capsule:'capsule', cartine:'cartine', polvere:'polvere', sospensione:'sospensione'};
   if (mapTipo[tipoPrep] && mapTipo[tipoPrep] !== tipoTariff) {
     const tarBtns = document.querySelectorAll('#page-tariffazione .seg-btn');
-    const mapIdx  = {liquida:0, sospensione:1, semisolida:2, polvere:3, capsule:4};
+    const mapIdx  = {liquida:0, sospensione:1, semisolida:2, polvere:3, capsule:4, cartine:5};
     setTipoTariff(mapTipo[tipoPrep], tarBtns[mapIdx[mapTipo[tipoPrep]]]);
   }
-  if (tipoPrep !== 'capsule') {
+  if (tipoPrep === 'cartine') {
+    const _nCartLib = document.getElementById('cart-ncart-lib');
+    if (document.getElementById('t-ncart') && _nCartLib) document.getElementById('t-ncart').value = _nCartLib.value || '';
+  } else if (tipoPrep !== 'capsule') {
     if (document.getElementById('t-qt'))   document.getElementById('t-qt').value   = document.getElementById('qt').value;
     if (document.getElementById('t-conc')) document.getElementById('t-conc').value = document.getElementById('conc').value;
     // t-et-perc rimosso
@@ -2654,6 +2719,8 @@ function setTipoTariff(t, btn) {
   const isLiquida = t === 'liquida' || t === 'sospensione' || t === 'semisolida' || t === 'polvere';
   document.getElementById('tt-liquida').style.display  = (isLiquida && modoPrepara !== 'libera') ? '' : 'none';
   document.getElementById('tt-capsule').style.display  = t === 'capsule' ? '' : 'none';
+  const ttCartine = document.getElementById('tt-cartine');
+  if (ttCartine) ttCartine.style.display = t === 'cartine' ? '' : 'none';
   const qtLabel = document.querySelector('#tt-liquida .field-label');
   if (qtLabel) qtLabel.textContent = (t === 'liquida' || t === 'sospensione') ? 'Quantità totale (ml)' : 'Quantità totale (g)';
   const refMap = {
@@ -2662,6 +2729,7 @@ function setTipoTariff(t, btn) {
     semisolida:  'Rif.: D.M. 22/09/2017 e s.m.i. All. B voce 4 — Semisolide €13,30/50g (+€0,75/50g, comp.extra €0,75)',
     polvere:     'Rif.: D.M. 22/09/2017 e s.m.i. All. B voce 5 — Polveri €6,65 (comp.extra €0,75)',
     capsule:     'Rif.: D.M. 22/09/2017 e s.m.i. All. B voce 7 — Capsule €22,00/120 pz (comp.extra €0,60)',
+    cartine:     'Rif.: D.M. 22/09/2017 e s.m.i. All. B voce 7 — Cartine/bustine €22,00/120 pz (comp.extra €0,60)',
   };
   document.getElementById('tariff-ref').textContent = refMap[t] || '';
   calcTariff();
@@ -2750,6 +2818,37 @@ function capsScaleOnNCapsChange() {
     if (typeof liberaRenderRighe === 'function') liberaRenderRighe();
   }
   _prevCapsNCaps = newN > 0 ? newN : _prevCapsNCaps;
+  calcPrep();
+}
+
+let _prevCartNCart = null;
+
+function tariffNCartChange() {
+  if (tipoPrep === 'cartine' && modoPrepara === 'libera') {
+    const newN = parseInt(document.getElementById('t-ncart').value) || 0;
+    const cartEl = document.getElementById('cart-ncart-lib');
+    if (cartEl) {
+      cartEl.value = newN > 0 ? newN : '';
+      cartScaleOnNCartChange();
+      return;
+    }
+  }
+  calcTariff();
+}
+
+function cartScaleOnNCartChange() {
+  const newN = parseInt(document.getElementById('cart-ncart-lib').value) || 0;
+  if (tipoPrep === 'cartine' && modoPrepara === 'libera'
+      && _prevCartNCart && _prevCartNCart > 0 && newN > 0 && _prevCartNCart !== newN
+      && Array.isArray(liberaRighe) && liberaRighe.length > 0) {
+    const ratio = newN / _prevCartNCart;
+    liberaRighe.forEach(r => {
+      const q = parseFloat(r.qty) || 0;
+      if (q > 0) r.qty = String(parseFloat((q * ratio).toFixed(4)));
+    });
+    if (typeof liberaRenderRighe === 'function') liberaRenderRighe();
+  }
+  _prevCartNCart = newN > 0 ? newN : _prevCartNCart;
   calcPrep();
 }
 
@@ -2928,7 +3027,60 @@ function calcTariff() {
 
   let rows = [], netto = 0;
 
-  if (tipoTariff === 'capsule') {
+  if (tipoTariff === 'cartine') {
+    // ── CARTINE ── stessa voce 7 delle capsule (D.M. 22/09/2017), ma niente capsule vuote
+    // Dosaggio PA per cartina derivato da preparazione (PA totale / N° cartine)
+    const nCart   = parseInt(document.getElementById('t-ncart').value)||0;
+    const costoFL = pFL;
+
+    // All. B voce 7: base €22 per 120, −€1/10 in meno, +€2/10 in più
+    const diff10 = Math.ceil(Math.abs(nCart - 120) / 10);
+    let baseB = 22.00;
+    if (nCart < 120) baseB -= diff10 * 1.00;
+    else if (nCart > 120) baseB += diff10 * 2.00;
+    baseB = Math.max(0, baseB);
+
+    const addComp = Math.min(comp, 4) * 0.60;
+    const addOp   = op * 2.30;
+    const costoB  = baseB + addComp + addOp;
+    const inc40   = costoB * 0.40;
+
+    // Modalità unica (libera): PA + eccipienti da liberaRigheExtra (niente capsule vuote)
+    const grPA = liberaGrPA;
+    const costoPA = grPA * pPA;
+    const nomePA = document.getElementById('prep-pa-nome')?.value || 'Principio attivo';
+    const _eccipienti = liberaRigheExtra.filter(r => !r.isCapsule && !r.isPa);
+    const _costoEccipienti = _eccipienti.reduce((s,r) => s+r.costo, 0);
+    const righeMaterie = [
+      {name: nomePA+' — '+fmt(grPA,3)+' g × '+fmtE(pPA)+'/g', val: costoPA,
+        badge: pPA===0?'⚠ inserire prezzo in inventario':'', badgeType:'warn'},
+      ..._eccipienti.map(r => {
+        const dispQty = r.isLiquido ? fmt(r.unit==='ml'?r.qty:r.qty/(getDensita(r.nome)||1),1)+' ml' : fmt(r.grams,2)+' g';
+        const dispUnit = r.isLiquido ? '/ml' : '/g';
+        return {name: r.nome+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, val: r.costo,
+          badge: r.prezzo===0?'⚠ inserire prezzo in inventario':'', badgeType:'warn'};
+      }),
+    ];
+    netto = costoPA + _costoEccipienti + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte + suppManTotale();
+
+    rows = [
+      {group:'Materie prime'},
+      ...righeMaterie,
+      {group:'Costi di preparazione — All. B Cartine/bustine voce 7 (D.M. 22/09/2017)'},
+      {name:'Base '+nCart+' cartine (rif. 120: €22,00'+(nCart<120?' −'+fmt(diff10*1,2):nCart>120?' +'+fmt(diff10*2,2):'')+' €)', val:baseB},
+      ...(comp>0?[{name:'Componenti aggiuntivi: '+comp+' × €0,60', val:addComp}]:[]),
+      ...(op>0?[{name:'Op. tecnologiche aggiuntive: '+op+' × €2,30'+(opTecnologicheDesc?' ('+opTecnologicheDesc+')':''), val:addOp}]:[]),
+      {name:'Incremento 40% su costi preparazione (Art. 7)', val:inc40},
+      {group:'Supplementi e diritti'},
+      ...(suppH>0 ? [{name:'Suppl. sostanza pericolosa H (Art. 8a)', val:suppH, badge:'H rilevato', badgeType:'warn'}] : [{name:'Nessuna sostanza pericolosa H — suppl. Art. 8a non applicato', val:0, badge:'ok', badgeType:'ok'}]),
+      ...(stupp>0?[{name:'Suppl. stupefacenti (Art. 8b): '+stupp+' × €2,50', val:suppSt}]:[]),
+      ...(dop>0?[{name:'Suppl. doping (Art. 8c)', val:suppDop}]:[]),
+      ...(notte>0?[{name:'Diritto addizionale notturno (Art. 9)', val:notte}]:[]),
+      {group:'Contenitore'},
+      {name:'Scatola/contenitore', val:costoFL, badge:'al costo', badgeType:'ok'},
+    ];
+
+  } else if (tipoTariff === 'capsule') {
     // ── CAPSULE ── All. B DM 2017
     const nCaps     = parseInt(document.getElementById('t-ncaps').value)||0;
     const mgPAcps   = parseFloat(document.getElementById('t-mgpa').value)||0;
@@ -3576,7 +3728,8 @@ function compilaScheda() {
   document.getElementById('s-num').value = numScheda;
 
   // 2. Sincronizza tipo da Preparazione → Scheda
-  const mapTipoPrep = {soluzione:'soluzione', unguento:'unguento', capsule:'capsule', polvere:'polvere', sospensione:'sospensione'};
+  // Cartine: mappa a polvere (la scheda non ha template dedicato; la formula calcolata già riporta n° cartine)
+  const mapTipoPrep = {soluzione:'soluzione', unguento:'unguento', capsule:'capsule', cartine:'polvere', polvere:'polvere', sospensione:'sospensione'};
   if (mapTipoPrep[tipoPrep]) {
     tipoScheda = mapTipoPrep[tipoPrep];
     // clicca il bottone corrispondente nella Scheda
@@ -3691,7 +3844,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 60;
+const APP_VERSION = 63;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -4382,15 +4535,15 @@ function aiImportaTutti(comps, tipo) {
   const prepNavBtn = document.querySelector('.nav-btn[onclick*="preparazione"]');
   if (prepNavBtn) showPage('preparazione', prepNavBtn);
 
-  // 2) Imposta tipoPrep — ordine bottoni: soluzione(0), unguento(1), capsule(2), polvere(3), sospensione(4)
-  const tipoOk = ['soluzione','sospensione','unguento','polvere','capsule'];
+  // 2) Imposta tipoPrep — ordine bottoni: soluzione(0), unguento(1), capsule(2), cartine(3), polvere(4), sospensione(5)
+  const tipoOk = ['soluzione','sospensione','unguento','polvere','capsule','cartine'];
   let tipoTarget = tipoOk.includes(tipo) ? tipo : null;
   if (!tipoTarget) {
     // fallback euristico se l'AI non ha dato TIPO
     const hasML = comps.some(c => c.unit === 'ml');
     tipoTarget = hasML ? 'soluzione' : 'polvere';
   }
-  const tipoIdx = {soluzione:0, unguento:1, capsule:2, polvere:3, sospensione:4}[tipoTarget];
+  const tipoIdx = {soluzione:0, unguento:1, capsule:2, cartine:3, polvere:4, sospensione:5}[tipoTarget];
   const tipoBtns = document.querySelectorAll('#tariff-card-tipo .seg .seg-btn');
   if (tipoBtns[tipoIdx]) setTipo(tipoTarget, tipoBtns[tipoIdx]);
 
@@ -4408,7 +4561,9 @@ function aiImportaTutti(comps, tipo) {
   const inv = typeof invLoadMerged === 'function' ? invLoadMerged() : [];
   const compsForLibera = tipoTarget === 'capsule'
     ? comps.filter(c => !/\bcapsul/i.test(c.nome) && c.unit !== 'pz')
-    : comps;
+    : tipoTarget === 'cartine'
+      ? comps.filter(c => !/\bcartin|\bbustin/i.test(c.nome) && c.unit !== 'pz')
+      : comps;
   liberaRighe = compsForLibera.map((c, i) => {
     const qNorm = invNominalizza(c.nome);
     const chiaveAll = Object.keys(ALLEGATO_A).find(k => k.includes(qNorm) || qNorm.includes(k.split(' ')[0]));
@@ -4426,7 +4581,7 @@ function aiImportaTutti(comps, tipo) {
       fonte = 'inventario';
     }
     let unit = c.unit === 'ml' ? 'ml' : 'g';
-    if (tipoTarget === 'polvere' || tipoTarget === 'capsule') unit = 'g';
+    if (tipoTarget === 'polvere' || tipoTarget === 'capsule' || tipoTarget === 'cartine') unit = 'g';
     return {
       nome: nomeFinal,
       qty: String(c.qty),
@@ -4451,6 +4606,16 @@ function aiImportaTutti(comps, tipo) {
       if (nEl && !nEl.value && nVal > 0) {
         nEl.value = nVal;
         _prevCapsNCaps = nVal; // baseline per scaling: senza, il primo cambio non avrebbe riferimento
+      }
+    }
+  } else if (tipoTarget === 'cartine') {
+    const cartRiga = comps.find(c => /cartin|bustin/i.test(c.nome));
+    if (cartRiga) {
+      const nEl = document.getElementById('cart-ncart-lib');
+      const nVal = parseInt(cartRiga.qty) || 0;
+      if (nEl && !nEl.value && nVal > 0) {
+        nEl.value = nVal;
+        _prevCartNCart = nVal;
       }
     }
   }
@@ -4780,13 +4945,15 @@ function resetRicetta() {
   _suppManRighe = [];
   tipoScheda = 'soluzione';
   _prevCapsNCaps = null;
+  _prevCartNCart = null;
 
   const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
   const setHTML = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = v; };
 
   // ── input preparazione ──
   ['prep-pa-nome','qt','conc','mg-pa-cps','n-caps','eccip-nome',
-   'caps-ncaps-lib','caps-vuote-cerca','caps-vuote-nome','libera-conc','totale-prep','grado-alc','vol-soluzione'].forEach(id => setVal(id, ''));
+   'caps-ncaps-lib','caps-vuote-cerca','caps-vuote-nome','libera-conc','totale-prep','grado-alc','vol-soluzione',
+   'cart-ncart-lib'].forEach(id => setVal(id, ''));
   setVal('perc-et', '0');
   setVal('caps-vuote-prezzo', '0');
   setVal('tipo-diluente', 'acqua');
@@ -4802,6 +4969,7 @@ function resetRicetta() {
 
   // ── input tariffazione ──
   ['t-qt','t-conc','t-ncaps','t-mgpa','t-eccip','t-cpsvuote',
+   't-ncart',
    't-pa-nome','t-pa','t-fl','t-fl-cerca'].forEach(id => setVal(id, ''));
   ['t-comp','t-op','t-stupp','t-dop','t-notte'].forEach(id => setVal(id, '0'));
   document.querySelectorAll('#tt-extra-rows .t-extra-nome, #tt-extra-rows .t-extra-qty, #tt-extra-rows .t-extra-prezzo')
