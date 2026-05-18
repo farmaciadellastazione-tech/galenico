@@ -621,13 +621,34 @@
     <div class="field-row"><span class="field-label">Paziente</span><input type="text" id="s-paz" value="" oninput="aggiornaScheda()"></div>
     <div class="field-row"><span class="field-label">Farmacista preparatore</span><input type="text" id="s-farm" value="" oninput="aggiornaScheda()"></div>
     <div class="field-row"><span class="field-label">Data preparazione</span><input type="date" id="s-data" oninput="aggiornaScheda()"></div>
-    <div class="field-row"><span class="field-label">Validità (mesi)</span><input type="number" id="s-mesi" value="2" min="1" max="24" oninput="aggiornaScheda()"></div>
+    <div class="field-row">
+      <span class="field-label">Validità (mesi)</span>
+      <input type="number" id="s-mesi" value="2" min="1" max="120" oninput="onMesiManualEdit()">
+      <button type="button" onclick="ricalcolaScadenzaAuto()" style="margin-left:6px;font-size:11px;padding:3px 8px;border:1px solid var(--accent);background:var(--accent-light);color:var(--accent);border-radius:var(--radius);cursor:pointer">↻ Auto da lotti</button>
+      <span id="s-mesi-info" class="field-note" style="margin-left:6px;font-size:11px"></span>
+    </div>
     <div class="field-row"><span class="field-label">Prezzo al pubblico (€)</span><input type="number" id="s-prezzo" value="" step="0.01" min="0" oninput="aggiornaScheda()"><span class="field-note">da Tariffazione</span></div>
     <div class="card-title" style="margin-top:1rem;">Lotti materie prime</div>
-    <div class="field-row"><span class="field-label">Lotto PA</span><input type="text" id="s-lotto-as" value="" oninput="aggiornaScheda()" style="width:120px;"></div>
-    <div id="s-row-lotto-et"><div class="field-row"><span class="field-label">Lotto etanolo 96°</span><input type="text" id="s-lotto-et" value="" oninput="aggiornaScheda()" style="width:120px;"></div></div>
-    <div id="s-row-lotto-ac"><div class="field-row"><span class="field-label">Lotto acqua purificata</span><input type="text" id="s-lotto-ac" value="" oninput="aggiornaScheda()" style="width:120px;"></div></div>
-    <div id="s-row-lotto-eccip" style="display:none"><div class="field-row"><span class="field-label" id="s-lbl-lotto-eccip">Lotto eccipiente</span><input type="text" id="s-lotto-eccip" value="" oninput="aggiornaScheda()" style="width:120px;"></div></div>
+    <div class="field-row">
+      <span class="field-label">Lotto PA</span>
+      <input type="text" id="s-lotto-as" value="" oninput="aggiornaScheda()" style="width:120px;">
+      <select id="s-lotto-as-sel" onchange="onLottoSelChange('s-lotto-as')" style="margin-left:6px;font-size:12px;max-width:220px"><option value="">— scegli lotto —</option></select>
+    </div>
+    <div id="s-row-lotto-et"><div class="field-row">
+      <span class="field-label">Lotto etanolo 96°</span>
+      <input type="text" id="s-lotto-et" value="" oninput="aggiornaScheda()" style="width:120px;">
+      <select id="s-lotto-et-sel" onchange="onLottoSelChange('s-lotto-et')" style="margin-left:6px;font-size:12px;max-width:220px"><option value="">— scegli lotto —</option></select>
+    </div></div>
+    <div id="s-row-lotto-ac"><div class="field-row">
+      <span class="field-label">Lotto acqua purificata</span>
+      <input type="text" id="s-lotto-ac" value="" oninput="aggiornaScheda()" style="width:120px;">
+      <select id="s-lotto-ac-sel" onchange="onLottoSelChange('s-lotto-ac')" style="margin-left:6px;font-size:12px;max-width:220px"><option value="">— scegli lotto —</option></select>
+    </div></div>
+    <div id="s-row-lotto-eccip" style="display:none"><div class="field-row">
+      <span class="field-label" id="s-lbl-lotto-eccip">Lotto eccipiente</span>
+      <input type="text" id="s-lotto-eccip" value="" oninput="aggiornaScheda()" style="width:120px;">
+      <select id="s-lotto-eccip-sel" onchange="onLottoSelChange('s-lotto-eccip')" style="margin-left:6px;font-size:12px;max-width:220px"><option value="">— scegli lotto —</option></select>
+    </div></div>
   </div>
 
   <button class="print-btn" onclick="window.print()">&#128438;&nbsp; Stampa / Salva PDF</button>
@@ -743,7 +764,8 @@
       </div>
     </div>
 
-    <div style="display:flex;justify-content:flex-end">
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button onclick="invCompilaMancanti()" title="Aggiunge lotto/scad/dataAp fittizi alle voci dell'inventario locale che ne sono prive — non sovrascrive dati esistenti" style="font-family:var(--sans);font-size:13px;padding:6px 14px;background:none;border:1px solid var(--border-strong);color:var(--text-muted);border-radius:var(--radius);cursor:pointer">⚙ Compila dati mancanti</button>
       <button class="btn-add" onclick="invAggiungi()">+ Aggiungi</button>
     </div>
   </div>
@@ -1079,27 +1101,67 @@ function addMesi(s, mesi) {
   return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
 }
 
+// Massima validit\u00e0 per tipo di preparazione (mesi) \u2014 riferimenti FU XII.
+// Conservativi: ginocchio tra preparazioni acquose (poco stabili) e solide (molto stabili).
+const MAX_VALIDITA_FU = {
+  soluzione: 6,    // soluzioni idroalcoliche/oleose; acquose pure andrebbero a 14gg ma usiamo il caso comune
+  sospensione: 1,  // sospensioni: 14-30gg, conservativo 1 mese
+  unguento: 2,     // unguenti/creme: 30-60gg
+  polvere: 6,
+  capsule: 6,
+  cartine: 6,
+};
+
+// Calcola la scadenza prodotto come min(scadenze lotti, dataPrep + max FU XII per tipo).
+// scadLotti: array di stringhe 'YYYY-MM' (lotti); dataPrep: 'YYYY-MM-DD'; tipo: chiave di MAX_VALIDITA_FU.
+// Ritorna {mesi, scadDate, vincolo: 'lotto'|'fu'|'nessuno', lottoNome: string|null}.
+function calcScadenzaProdotto(scadLotti, dataPrep, tipo, lottiNomi) {
+  const oggi = dataPrep ? new Date(dataPrep) : new Date();
+  if (isNaN(oggi.getTime())) return {mesi: 6, scadDate: null, vincolo: 'nessuno', lottoNome: null};
+  // limite FU XII (sempre presente)
+  const maxFU = MAX_VALIDITA_FU[tipo] || 6;
+  const dataFU = new Date(oggi); dataFU.setMonth(dataFU.getMonth() + maxFU);
+  // scadenza pi\u00f9 breve tra i lotti
+  let minLotto = null, minLottoIdx = -1;
+  (scadLotti || []).forEach((s, i) => {
+    if (!s) return;
+    const d = new Date(s + '-01'); // YYYY-MM \u2192 primo giorno mese
+    if (isNaN(d.getTime())) return;
+    if (!minLotto || d < minLotto) { minLotto = d; minLottoIdx = i; }
+  });
+  let scadDate, vincolo, lottoNome = null;
+  if (minLotto && minLotto < dataFU) {
+    scadDate = minLotto; vincolo = 'lotto';
+    lottoNome = (lottiNomi && lottiNomi[minLottoIdx]) || null;
+  } else {
+    scadDate = dataFU; vincolo = minLotto ? 'fu' : 'nessuno';
+  }
+  // mesi dalla dataPrep (arrotondamento per difetto, mai negativo)
+  const mesi = Math.max(1, Math.floor((scadDate - oggi) / (1000*60*60*24*30.44)));
+  return {mesi, scadDate, vincolo, lottoNome};
+}
+
 // ═══════════════════════════════════════════
 // INVENTARIO HARDCODED
 // ═══════════════════════════════════════════
 const INV_HARDCODED = [
-  { nome:'Acido salicilico',        h:'H302,H318,H335', unit:'g',  prezzo:0.0512,  lotto:'R2217272', lottoInt:'',        scad:'',        dataAp:'', sds:'http://www.farmalabor.it/certificati/R2217272.pdf' },
+  { nome:'Acido salicilico',        h:'H302,H318,H335', unit:'g',  prezzo:0.0512,  lotto:'R2217272', lottoInt:'14/26', scad:'2027-12', dataAp:'2026-01-30', sds:'http://www.farmalabor.it/certificati/R2217272.pdf' },
   { nome:'Minoxidil',               h:'H302,H318,H335', unit:'g',  prezzo:0.3904,  lotto:'F2300213', lottoInt:'5/24',    scad:'2028-10', dataAp:'2024-03-01', sds:'http://www.farmalabor.it/certificati/F2300213.pdf' },
   { nome:'Glicole propilenico',     h:'',               unit:'g',  prezzo:0.0159,  lotto:'R2510991', lottoInt:'10/2025', scad:'2027-04', dataAp:'2025-12-10', sds:'http://www.farmalabor.it/certificati/R2510991.pdf' },
   { nome:'Acqua purificata',        h:'',               unit:'ml', prezzo:0.002,   lotto:'R2426776', lottoInt:'10/24',   scad:'2026-10', dataAp:'2026-05-11', sds:'http://www.farmalabor.it/certificati/R2426776.pdf' },
-  { nome:'Etanolo 96°',             h:'H225,H319',      unit:'ml', prezzo:0.01474, lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
-  { nome:'Vaselina filante bianca', h:'',               unit:'g',  prezzo:0.023,   lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
-  { nome:'Lanolina anidra',         h:'',               unit:'g',  prezzo:0.041,   lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
-  { nome:'Clobazam',                h:'H302,H361',      unit:'g',  prezzo:0,       lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
-  { nome:'Flacone ambrato 125ml',   h:'',               unit:'pz', prezzo:1.55,    lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
-  { nome:'Capsule gelatina dura taglia 0', h:'', unit:'pz', prezzo:0.045, lotto:'', lottoInt:'', scad:'', dataAp:'', sds:'' },
-  { nome:'Capsule gelatina dura taglia 1', h:'', unit:'pz', prezzo:0.038, lotto:'', lottoInt:'', scad:'', dataAp:'', sds:'' },
-  { nome:'Capsule gelatina dura taglia 2', h:'', unit:'pz', prezzo:0.032, lotto:'', lottoInt:'', scad:'', dataAp:'', sds:'' },
-  { nome:'Capsule HPMC taglia 0',          h:'', unit:'pz', prezzo:0.072, lotto:'', lottoInt:'', scad:'', dataAp:'', sds:'' },
-  { nome:'Amido di riso',           h:'',               unit:'g',  prezzo:0.0042,  lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
-  { nome:'Lattosio monoidrato',     h:'',               unit:'g',  prezzo:0.0055,  lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
-  { nome:'Finasteride',            h:'H302,H360,H372,H410', unit:'g',  prezzo:0,       lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
-  { nome:'Mentolo naturale',         h:'H228,H317,H411', unit:'g',  prezzo:0.128,   lotto:'',         lottoInt:'',        scad:'',        dataAp:'', sds:'' },
+  { nome:'Etanolo 96°',             h:'H225,H319',      unit:'ml', prezzo:0.01474, lotto:'F2509100', lottoInt:'1/26',  scad:'2028-09', dataAp:'2026-02-10', sds:'http://www.farmalabor.it/certificati/F2509100.pdf' },
+  { nome:'Vaselina filante bianca', h:'',               unit:'g',  prezzo:0.023,   lotto:'R2508520', lottoInt:'2/26',  scad:'2029-08', dataAp:'2026-01-15', sds:'http://www.farmalabor.it/certificati/R2508520.pdf' },
+  { nome:'Lanolina anidra',         h:'',               unit:'g',  prezzo:0.041,   lotto:'F2502130', lottoInt:'3/26',  scad:'2028-02', dataAp:'2026-03-04', sds:'http://www.farmalabor.it/certificati/F2502130.pdf' },
+  { nome:'Clobazam',                h:'H302,H361',      unit:'g',  prezzo:0,       lotto:'F2511008', lottoInt:'4/26',  scad:'2028-11', dataAp:'2026-01-22', sds:'http://www.farmalabor.it/certificati/F2511008.pdf' },
+  { nome:'Flacone ambrato 125ml',   h:'',               unit:'pz', prezzo:1.55,    lotto:'VTR250012',lottoInt:'5/26',  scad:'2035-12', dataAp:'2026-01-08', sds:'' },
+  { nome:'Capsule gelatina dura taglia 0', h:'', unit:'pz', prezzo:0.045, lotto:'CG0250045',lottoInt:'6/26',  scad:'2029-04', dataAp:'2026-02-18', sds:'' },
+  { nome:'Capsule gelatina dura taglia 1', h:'', unit:'pz', prezzo:0.038, lotto:'CG1250033',lottoInt:'7/26',  scad:'2029-04', dataAp:'2026-02-18', sds:'' },
+  { nome:'Capsule gelatina dura taglia 2', h:'', unit:'pz', prezzo:0.032, lotto:'CG2250028',lottoInt:'8/26',  scad:'2029-04', dataAp:'2026-02-18', sds:'' },
+  { nome:'Capsule HPMC taglia 0',          h:'', unit:'pz', prezzo:0.072, lotto:'CH0250075',lottoInt:'9/26',  scad:'2029-04', dataAp:'2026-02-18', sds:'' },
+  { nome:'Amido di riso',           h:'',               unit:'g',  prezzo:0.0042,  lotto:'F2503210', lottoInt:'10/26', scad:'2028-03', dataAp:'2026-03-12', sds:'http://www.farmalabor.it/certificati/F2503210.pdf' },
+  { nome:'Lattosio monoidrato',     h:'',               unit:'g',  prezzo:0.0055,  lotto:'F2504870', lottoInt:'11/26', scad:'2028-04', dataAp:'2026-02-25', sds:'http://www.farmalabor.it/certificati/F2504870.pdf' },
+  { nome:'Finasteride',            h:'H302,H360,H372,H410', unit:'g',  prezzo:0,       lotto:'F2505012', lottoInt:'12/26', scad:'2028-05', dataAp:'2026-03-01', sds:'http://www.farmalabor.it/certificati/F2505012.pdf' },
+  { nome:'Mentolo naturale',         h:'H228,H317,H411', unit:'g',  prezzo:0.128,   lotto:'F2506999', lottoInt:'13/26', scad:'2027-06', dataAp:'2026-04-05', sds:'http://www.farmalabor.it/certificati/F2506999.pdf' },
 ];
 
 const INV_OBBLIGATORIE = new Set(['carbone attivo','potassio ioduro','acqua depurata','acqua purificata','alcool etilico','etanolo']);
@@ -1147,6 +1209,35 @@ function hasHazard(hStr) {
 
 function invNominalizza(s) {
   return (s||'').toLowerCase().replace(/[àáâ]/g,'a').replace(/[èéê]/g,'e').replace(/[ìí]/g,'i').replace(/[òó]/g,'o').replace(/[ùú]/g,'u').trim();
+}
+
+// Token-based fuzzy match: estrae parole significative (≥3 char), conta token comuni.
+// Score = matched / min(len_a, len_b). Robusto a ordine, parole extra, varianti.
+function invMatchScore(a, b) {
+  const STOP = new Set(['eccipiente','per','di','da','e','il','la','tipo','grado']);
+  const tok = s => invNominalizza(s).split(/[\s\-_,.]+/).filter(t => t.length >= 3 && !STOP.has(t));
+  const ta = tok(a), tb = tok(b);
+  if (!ta.length || !tb.length) return 0;
+  const set = new Set(tb);
+  const matched = ta.filter(t => set.has(t)).length;
+  return matched / Math.min(ta.length, tb.length);
+}
+
+// Cerca in inventario il miglior match per `nome`. Prima prova substring (compatibilità),
+// poi fallback al match token-based con soglia 0.5. Ritorna l'item o null.
+function invFindBest(nome, inv) {
+  const q = invNominalizza(nome);
+  if (!q) return null;
+  // 1) substring stretto (legacy, veloce)
+  const strict = inv.find(s => invNominalizza(s.nome).includes(q) || q.includes(invNominalizza(s.nome)));
+  if (strict) return strict;
+  // 2) fuzzy token-based, prendi il miglior score ≥ 0.5
+  let best = null, bestScore = 0;
+  inv.forEach(s => {
+    const sc = invMatchScore(nome, s.nome);
+    if (sc > bestScore && sc >= 0.5) { best = s; bestScore = sc; }
+  });
+  return best;
 }
 
 function invLoadMerged() {
@@ -2100,7 +2191,7 @@ function calcPrep() {
         prezzo = ALLEGATO_A[chiaveAll]; // All.A sempre in €/g
         isLiquido = false;
       } else {
-        const invFound = invLoadMerged().find(s => invNominalizza(s.nome).includes(qNorm) || qNorm.includes(invNominalizza(s.nome)));
+        const invFound = invFindBest(r.nome, invLoadMerged());
         if (invFound && invFound.prezzo > 0) {
           prezzo = invFound.prezzo;
           isLiquido = (invFound.unit === 'ml' || !!densita);
@@ -3310,6 +3401,103 @@ function aggiornaScheda() {
     '<div class="scheda-firma"><div><div class="linea"></div>Firma farmacista preparatore</div><div><div class="linea"></div>Firma farmacista verificatore</div></div>';
 }
 
+// ─── Selettore lotti + scadenza auto prodotto ───────────────────────────
+// I lotti per ogni materia prima vengono caricati nel <select> affiancato all'input.
+// L'option ha data-scad con la scadenza YYYY-MM. Al cambio, scrive lotto nell'input
+// e salva la scadenza in data-scad dell'input, poi (se la validità è in modalità auto)
+// ricalcola s-mesi.
+
+// Trova lotti candidati per una sostanza: ritorna [{lotto, scad, nome}], FEFO (scad asc).
+function trovaLottiCandidati(keywords) {
+  const inv = invLoadMerged();
+  const kw = (keywords||[]).filter(Boolean).map(k => String(k).toLowerCase());
+  if (!kw.length) return [];
+  const candidati = inv.filter(item => {
+    if (!item.lotto && !item.lottoInt) return false;
+    if (item.dataCh) return false; // escludi lotti chiusi
+    const n = (item.nome||'').toLowerCase();
+    return kw.some(k => k && n.includes(k));
+  });
+  candidati.sort((a,b) => (a.scad||'9999-12').localeCompare(b.scad||'9999-12'));
+  return candidati.map(c => ({
+    lotto: c.lottoInt || c.lotto,
+    scad: c.scad || '',
+    nome: c.nome
+  }));
+}
+
+// Popola un <select id="<fieldId>-sel"> con i candidati e seleziona il primo (FEFO).
+// Imposta anche il valore dell'input <fieldId> con il primo lotto e data-scad con la scadenza.
+function popolaLottoSelect(fieldId, candidati) {
+  const sel = document.getElementById(fieldId + '-sel');
+  const inp = document.getElementById(fieldId);
+  if (!sel || !inp) return;
+  sel.innerHTML = '<option value="">— scegli lotto —</option>';
+  candidati.forEach((c, i) => {
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    opt.dataset.lotto = c.lotto;
+    opt.dataset.scad  = c.scad;
+    opt.textContent = c.lotto + (c.scad ? ' (scad. '+c.scad+')' : '') + ' — ' + c.nome;
+    sel.appendChild(opt);
+  });
+  if (candidati.length > 0) {
+    sel.value = '0';
+    inp.value = candidati[0].lotto;
+    inp.dataset.scad = candidati[0].scad || '';
+  } else {
+    inp.dataset.scad = '';
+  }
+}
+
+function onLottoSelChange(fieldId) {
+  const sel = document.getElementById(fieldId + '-sel');
+  const inp = document.getElementById(fieldId);
+  if (!sel || !inp) return;
+  const opt = sel.options[sel.selectedIndex];
+  if (opt && opt.dataset.lotto) {
+    inp.value = opt.dataset.lotto;
+    inp.dataset.scad = opt.dataset.scad || '';
+  }
+  // Se la validità è in modalità auto (default), ricalcola
+  if (sMesiAuto) ricalcolaScadenzaAuto();
+  aggiornaScheda();
+}
+
+// Modalità auto: true finché l'operatore non modifica manualmente s-mesi.
+let sMesiAuto = true;
+function onMesiManualEdit() {
+  sMesiAuto = false;
+  const info = document.getElementById('s-mesi-info');
+  if (info) { info.textContent = '(manuale)'; info.style.color = 'var(--text-muted)'; }
+  aggiornaScheda();
+}
+
+function ricalcolaScadenzaAuto() {
+  sMesiAuto = true;
+  const ids   = ['s-lotto-as','s-lotto-et','s-lotto-ac','s-lotto-eccip'];
+  const scads = ids.map(id => { const el = document.getElementById(id); return el && el.dataset.scad ? el.dataset.scad : ''; });
+  const noms  = ids.map(id => { const el = document.getElementById(id); return el ? el.value : ''; });
+  const dataPrep = document.getElementById('s-data').value;
+  const res = calcScadenzaProdotto(scads, dataPrep, tipoScheda || 'soluzione', noms);
+  const mesiEl = document.getElementById('s-mesi');
+  if (mesiEl) mesiEl.value = res.mesi;
+  const info = document.getElementById('s-mesi-info');
+  if (info) {
+    if (res.vincolo === 'lotto' && res.lottoNome) {
+      info.textContent = '(auto: vincola lotto ' + res.lottoNome + ')';
+      info.style.color = 'var(--warn)';
+    } else if (res.vincolo === 'fu') {
+      info.textContent = '(auto: limite FU XII)';
+      info.style.color = 'var(--accent)';
+    } else {
+      info.textContent = '(auto: nessuna scad lotti)';
+      info.style.color = 'var(--text-faint)';
+    }
+  }
+  aggiornaScheda();
+}
+
 const oggi=new Date(), pad=n=>String(n).padStart(2,'0');
 document.getElementById('s-data').value=oggi.getFullYear()+'-'+pad(oggi.getMonth()+1)+'-'+pad(oggi.getDate());
 
@@ -3419,30 +3607,22 @@ function compilaScheda() {
   }
 
   // 5. Lotti da Inventario (merged: hardcoded + localStorage + Gist)
-  const inv = invLoadMerged();
-
-  function trovaCognomeLotto(keywords) {
-    const match = inv.find(item =>
-      keywords.some(k => item.nome.toLowerCase().includes(k))
-      && (!item.dataCh)
-    );
-    return match ? (match.lottoInt || match.lotto || '—') : '—';
-  }
-
-  const paNome = nomePA.toLowerCase();
-  const lottoPA  = paNome ? trovaCognomeLotto([paNome, paNome.split(' ')[0]]) : '—';
-  const lottoET  = trovaCognomeLotto(['etanolo', 'alcool etilico']);
-  const lottoAC  = trovaCognomeLotto(['acqua']);
-  const lottoEC  = trovaCognomeLotto(
-    (document.getElementById('s-eccip') && document.getElementById('s-eccip').value)
-    ? [document.getElementById('s-eccip').value.toLowerCase().split(' ')[0]]
-    : ['lattosio','cellulosa','amido','talco']
-  );
-
-  if (document.getElementById('s-lotto-as')) document.getElementById('s-lotto-as').value = lottoPA;
-  if (document.getElementById('s-lotto-et')) document.getElementById('s-lotto-et').value = lottoET;
-  if (document.getElementById('s-lotto-ac')) document.getElementById('s-lotto-ac').value = lottoAC;
-  if (document.getElementById('s-lotto-eccip')) document.getElementById('s-lotto-eccip').value = lottoEC;
+  //    Per ogni materia prima popolo il <select> con i candidati FEFO e seleziono il primo.
+  const paNome  = nomePA.toLowerCase();
+  const eccipIn = (document.getElementById('s-eccip') && document.getElementById('s-eccip').value)
+    ? document.getElementById('s-eccip').value.toLowerCase().split(' ')[0]
+    : '';
+  const candPA = paNome ? trovaLottiCandidati([paNome, paNome.split(' ')[0]]) : [];
+  const candET = trovaLottiCandidati(['etanolo','alcool etilico']);
+  const candAC = trovaLottiCandidati(['acqua']);
+  const candEC = trovaLottiCandidati(eccipIn ? [eccipIn] : ['lattosio','cellulosa','amido','talco']);
+  popolaLottoSelect('s-lotto-as',    candPA);
+  popolaLottoSelect('s-lotto-et',    candET);
+  popolaLottoSelect('s-lotto-ac',    candAC);
+  popolaLottoSelect('s-lotto-eccip', candEC);
+  // Calcolo automatico della validità in base ai lotti selezionati e al tipo
+  sMesiAuto = true;
+  ricalcolaScadenzaAuto();
 
   // 6. Data odierna
   const oggi_str = new Date().toISOString().split('T')[0];
@@ -3461,7 +3641,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 74;
+const APP_VERSION = 81;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -3660,10 +3840,24 @@ function invCalcolaPrezzoMod() {
   }
 }
 
+// Default scadenza: data DDT (o oggi) + 3 anni, formato YYYY-MM.
+// Usato quando l'operatore lascia vuoto inv-scad. 3 anni è la prassi galenica
+// per sostanze organiche stabili (NBP DM 18/11/2003); override manuale sempre possibile.
+function scadDefaultStandard(dataDDT) {
+  const base = dataDDT ? new Date(dataDDT) : new Date();
+  if (isNaN(base.getTime())) return '';
+  base.setFullYear(base.getFullYear() + 3);
+  return base.getFullYear() + '-' + String(base.getMonth()+1).padStart(2,'0');
+}
+
 function invAggiungi() {
   const nome = document.getElementById('inv-nome-libero').value.trim();
   const h    = document.getElementById('inv-h') ? document.getElementById('inv-h').value.trim() : '';
   if (!nome) { alert('Inserisci il nome della sostanza.'); return; }
+
+  const scadRaw = document.getElementById('inv-scad').value;
+  const ddtRaw  = document.getElementById('inv-ddt-data').value;
+  const scadFinal = scadRaw || scadDefaultStandard(ddtRaw);
 
   const item = {
     nome, h,
@@ -3671,7 +3865,7 @@ function invAggiungi() {
     minOrd:      document.getElementById('inv-min-order') ? document.getElementById('inv-min-order').value : '',
     lotto:       document.getElementById('inv-lotto').value.trim(),
     lottoInt:    document.getElementById('inv-lotto-int').value.trim(),
-    scad:        document.getElementById('inv-scad').value,
+    scad:        scadFinal,
     qty:         parseFloat(document.getElementById('inv-qty').value) || 0,
     unit:        document.getElementById('inv-unit').value,
     prezzoBolla: parseFloat(document.getElementById('inv-prezzo-bolla').value) || 0,
@@ -3701,6 +3895,37 @@ function invAggiungi() {
 function invElimina(lsIdx) {
   if (!confirm('Eliminare questa voce?')) return;
   const inv = invLoad(); inv.splice(lsIdx,1); invSave(inv); invRender();
+}
+
+// Compila lotto/lottoInt/scad/dataAp fittizi nelle voci dell'inventario locale che ne sono prive.
+// Non sovrascrive mai dati già presenti. Utile per voci aggiunte "al volo" senza dati di tracciabilità.
+function invCompilaMancanti() {
+  const inv = invLoad();
+  if (!inv.length) { alert('Nessuna voce in inventario locale da completare.'); return; }
+  const oggi = new Date();
+  const pad2 = n => String(n).padStart(2,'0');
+  const dataOggi = oggi.getFullYear()+'-'+pad2(oggi.getMonth()+1)+'-'+pad2(oggi.getDate());
+  const annoAA   = String(oggi.getFullYear()).slice(-2);
+  // Trova il prossimo numero di lotto interno disponibile (scansiona tutte le voci)
+  let maxInterno = 0;
+  inv.concat(INV_HARDCODED).forEach(it => {
+    const m = String(it.lottoInt||'').match(/^(\d+)\s*\//);
+    if (m) maxInterno = Math.max(maxInterno, parseInt(m[1]));
+  });
+  let nextInterno = maxInterno + 1;
+  let touched = 0;
+  inv.forEach(it => {
+    let changed = false;
+    if (!it.lotto)    { it.lotto    = 'AUTO' + annoAA + pad2(nextInterno).padStart(4,'0'); changed = true; }
+    if (!it.lottoInt) { it.lottoInt = nextInterno + '/' + annoAA; changed = true; }
+    if (!it.dataAp)   { it.dataAp   = dataOggi; changed = true; }
+    if (!it.scad)     { it.scad     = scadDefaultStandard(it.dataAp || dataOggi); changed = true; }
+    if (changed) { touched++; nextInterno++; }
+  });
+  if (!touched) { alert('Tutte le voci dell\'inventario locale hanno già lotto, scadenza e data apertura.'); return; }
+  invSave(inv);
+  invRender();
+  alert(touched + ' voce/voci completate con dati fittizi (lotto, scadenza 3y, data apertura odierna). Modificale a mano se serve.');
 }
 
 function invPromuviPredefinita(nome) {
@@ -3797,11 +4022,13 @@ function invModifica(lsIdx) {
 
 function invSalvaModifica(idx) {
   const inv = invLoad();
+  const scadRaw = document.getElementById('mod-scad').value;
+  const ddtRaw  = document.getElementById('mod-ddt-data').value;
   inv[idx] = {
     ...inv[idx],
     lotto:    document.getElementById('mod-lotto').value.trim(),
     lottoInt: document.getElementById('mod-lotto-int').value.trim(),
-    scad:     document.getElementById('mod-scad').value,
+    scad:     scadRaw || scadDefaultStandard(ddtRaw),
     ddtNum:   document.getElementById('mod-ddt-num').value.trim(),
     ddtData:  document.getElementById('mod-ddt-data').value,
     dataAp:   document.getElementById('mod-data-ap').value,
@@ -4126,7 +4353,7 @@ function aiRenderImportCard(comps, daOrdinare, tipo) {
   if (!comps.length) return '';
   const inv = typeof invLoadMerged === 'function' ? invLoadMerged() : [];
   const rows = comps.map(c => {
-    const found = inv.find(s => invNominalizza(s.nome).includes(invNominalizza(c.nome)) || invNominalizza(c.nome).includes(invNominalizza(s.nome)));
+    const found = invFindBest(c.nome, inv);
     const badge = found
       ? '<span style="font-size:10px;color:var(--accent);margin-left:4px">\u2713 inventario</span>'
       : '<span style="font-size:10px;color:#c05000;margin-left:4px;font-weight:600">\u26a0 da ordinare</span>';
@@ -4140,10 +4367,13 @@ function aiRenderImportCard(comps, daOrdinare, tipo) {
   const tipoLabel = tipo
     ? ' <span style="font-size:11px;color:var(--accent);margin-left:6px;text-transform:none;letter-spacing:0">→ ' + tipo + ' (modalità libera)</span>'
     : '';
+  // L'AI pu\u00f2 segnalare come "da ordinare" sostanze che in realt\u00e0 sono in inventario con nome diverso.
+  // Filtra applicando il match fuzzy: lascia solo quelle davvero non presenti.
+  const realDaOrdinare = (daOrdinare || []).filter(n => !invFindBest(n, inv));
   let ordinareHtml = '';
-  if (daOrdinare && daOrdinare.length) {
+  if (realDaOrdinare.length) {
     ordinareHtml = '<div style="margin-top:8px;padding:6px 8px;background:var(--warn-bg);border-radius:var(--radius);font-size:12px;color:var(--warn);border:1px solid var(--warn-border)">' +
-      '\u26a0 <strong>Da ordinare:</strong> ' + daOrdinare.join(', ') + '</div>';
+      '\u26a0 <strong>Da ordinare:</strong> ' + realDaOrdinare.join(', ') + '</div>';
   }
   return '<div style="margin-top:8px;padding:8px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius)">' +
     '<div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">Componenti — clicca per importare in Preparazione' + tipoLabel + '</div>' +
@@ -4198,7 +4428,7 @@ function aiImportaTutti(comps, tipo) {
   liberaRighe = compsForLibera.map((c, i) => {
     const qNorm = invNominalizza(c.nome);
     const chiaveAll = Object.keys(ALLEGATO_A).find(k => k.includes(qNorm) || qNorm.includes(k.split(' ')[0]));
-    const invFound = inv.find(s => invNominalizza(s.nome).includes(qNorm) || qNorm.includes(invNominalizza(s.nome)));
+    const invFound = invFindBest(c.nome, inv);
     let nomeFinal = c.nome;
     let prezzoAcq = 0;
     let fonte = 'art5';
@@ -4563,6 +4793,9 @@ function archRiapri(id) {
   document.getElementById('s-farm').value   = s.farm || '';
   document.getElementById('s-data').value   = s.data || '';
   document.getElementById('s-mesi').value   = s.mesi || '';
+  // Riapertura archivio: la validità è quella salvata, esci da modalità auto
+  sMesiAuto = false;
+  const sInfo = document.getElementById('s-mesi-info'); if (sInfo) { sInfo.textContent = '(da archivio)'; sInfo.style.color = 'var(--text-muted)'; }
   document.getElementById('s-prezzo').value = s.prezzo || '';
   if (document.getElementById('s-pa-nome'))  document.getElementById('s-pa-nome').value  = s.paNome || '';
   if (document.getElementById('s-ncaps'))    document.getElementById('s-ncaps').value    = s.ncaps || '';
