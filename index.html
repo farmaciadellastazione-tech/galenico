@@ -339,56 +339,12 @@
   <input type="hidden" id="n-caps" value="">
   <input type="hidden" id="mg-pa-cps" value="">
 
-  <!-- PANNELLO CAPSULE EXTRA (visibile solo in libera+capsule) -->
-  <div id="prep-caps-extra" class="card" style="display:none">
-    <div class="card-title">Parametri capsula</div>
-    <div class="field-row">
-      <span class="field-label">Numero capsule</span>
-      <input type="number" id="caps-ncaps-lib" value="" min="1" max="1000" step="1" oninput="capsScaleOnNCapsChange()">
-      <span class="field-note">pz</span>
-    </div>
-    <div class="field-row">
-      <span class="field-label">Taglia capsula</span>
-      <select id="caps-taglia-lib" onchange="capsTagliaChanged(this.value)">
-        <option value="0">0 — 500 mg</option>
-        <option value="1">1 — 400 mg</option>
-        <option value="2">2 — 300 mg</option>
-        <option value="3">3 — 210 mg</option>
-        <option value="4">4 — 150 mg</option>
-      </select>
-      <span class="field-note">capacità indicativa</span>
-    </div>
-    <div class="field-row" style="align-items:flex-start">
-      <span class="field-label">Capsule vuote</span>
-      <div style="flex:1">
-        <input type="text" id="caps-vuote-cerca" placeholder=""
-          style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
-          oninput="capsVuoteCerca(this.value)">
-        <div id="caps-vuote-sug" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px"></div>
-        <div id="caps-vuote-sel" style="font-size:12px;color:var(--accent);margin-top:4px;font-family:var(--mono)"></div>
-      </div>
-    </div>
-    <input type="hidden" id="caps-vuote-prezzo" value="0">
-    <input type="hidden" id="caps-vuote-nome" value="">
-  </div>
-
-  <!-- PANNELLO CARTINE EXTRA (visibile solo in libera+cartine) -->
-  <div id="prep-cart-extra" class="card" style="display:none">
-    <div class="card-title">Parametri cartina</div>
-    <div class="field-row">
-      <span class="field-label">Numero cartine</span>
-      <input type="number" id="cart-ncart-lib" value="" min="1" max="1000" step="1" oninput="cartScaleOnNCartChange()">
-      <span class="field-note">pz</span>
-    </div>
-    <div style="font-size:11px;color:var(--text-faint);margin-top:4px">Il PA per cartina viene calcolato automaticamente da PA totale / N° cartine (vedi riepilogo formula).</div>
-  </div>
-
   <!-- MODALITÀ FORMULA LIBERA -->
   <div id="prep-modo-libera" class="card">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
-      <span>Ingredienti</span>
+      <span>Sostanze<span id="sost-per-cart-note" style="display:none;font-size:11px;color:var(--accent);font-weight:400;margin-left:8px;text-transform:none;letter-spacing:0"></span></span>
       <div style="display:flex;gap:6px">
-        <button class="btn-add" style="font-size:12px;padding:4px 12px" onclick="liberaAddRiga()">+ Ingrediente</button>
+        <button class="btn-add" style="font-size:12px;padding:4px 12px" onclick="liberaAddRiga()">+ Sostanza</button>
       </div>
     </div>
     <div class="field-row" id="row-totale-prep" style="display:none;margin-bottom:8px;flex-wrap:wrap">
@@ -427,8 +383,53 @@
       <span class="field-note" id="libera-conc-note">% — calcolata automaticamente</span>
     </div>
     <div id="libera-righe" style="margin-top:6px"></div>
-    <div style="font-size:11px;color:var(--text-faint);margin-top:6px">La concentrazione dichiarata va in scheda e tariffazione. L'acqua va inserita come ingrediente ma non modifica la concentrazione.</div>
+    <div style="font-size:11px;color:var(--text-faint);margin-top:6px">La concentrazione dichiarata va in scheda e tariffazione. L'acqua va inserita come sostanza ma non modifica la concentrazione.</div>
   </div>
+
+  <!-- PANNELLO CAPSULE EXTRA (visibile solo in capsule; dopo le sostanze) -->
+  <div id="prep-caps-extra" class="card" style="display:none">
+    <div class="card-title">Parametri capsula</div>
+    <div class="field-row">
+      <span class="field-label">Numero capsule</span>
+      <input type="number" id="caps-ncaps-lib" value="" min="1" max="1000" step="1" oninput="capsScaleOnNCapsChange()">
+      <span class="field-note">pz</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Taglia capsula</span>
+      <select id="caps-taglia-lib" onchange="capsTagliaChanged(this.value)">
+        <option value="0">0 — 500 mg</option>
+        <option value="1">1 — 400 mg</option>
+        <option value="2">2 — 300 mg</option>
+        <option value="3">3 — 210 mg</option>
+        <option value="4">4 — 150 mg</option>
+      </select>
+      <span class="field-note">capacità indicativa</span>
+    </div>
+    <div class="field-row" style="align-items:flex-start">
+      <span class="field-label">Capsule vuote</span>
+      <div style="flex:1">
+        <input type="text" id="caps-vuote-cerca" placeholder=""
+          style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
+          oninput="capsVuoteCerca(this.value)">
+        <div id="caps-vuote-sug" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px"></div>
+        <div id="caps-vuote-sel" style="font-size:12px;color:var(--accent);margin-top:4px;font-family:var(--mono)"></div>
+      </div>
+    </div>
+    <input type="hidden" id="caps-vuote-prezzo" value="0">
+    <input type="hidden" id="caps-vuote-nome" value="">
+  </div>
+
+  <!-- PANNELLO CARTINE EXTRA (visibile solo in cartine; dopo le sostanze) -->
+  <div id="prep-cart-extra" class="card" style="display:none">
+    <div class="card-title">Parametri cartina</div>
+    <div class="field-row">
+      <span class="field-label">Numero cartine</span>
+      <input type="number" id="cart-ncart-lib" value="" min="1" max="1000" step="1" oninput="cartScaleOnNCartChange()">
+      <span class="field-note">pz</span>
+    </div>
+    <div style="font-size:11px;color:var(--text-faint);margin-top:4px">Il PA per cartina viene calcolato automaticamente da PA totale / N° cartine (vedi riepilogo formula).</div>
+  </div>
+
   <div class="card">
     <div class="card-title">Formula calcolata</div>
     <div class="formula-grid" id="formula-grid"></div>
@@ -987,6 +988,13 @@ function setTipo(t, btn) {
   // Pannello cartine extra (visibile solo per Cartine — niente taglia, niente capsule vuote)
   const cartExtra = document.getElementById('prep-cart-extra');
   if (cartExtra) cartExtra.style.display = (t === 'cartine') ? '' : 'none';
+  // Nota "quantità per singola ..." sopra la lista sostanze
+  const sostNote = document.getElementById('sost-per-cart-note');
+  if (sostNote) {
+    if (t === 'cartine')      { sostNote.textContent = '— quantità per singola cartina'; sostNote.style.display = ''; }
+    else if (t === 'capsule') { sostNote.textContent = '— quantità per singola capsula'; sostNote.style.display = ''; }
+    else                      { sostNote.textContent = '';                                sostNote.style.display = 'none'; }
+  }
   // Concentrazione: non ha senso per capsule/cartine
   const rowConc = document.getElementById('row-libera-conc');
   if (rowConc) rowConc.style.display = (t === 'capsule' || t === 'cartine') ? 'none' : '';
@@ -1349,9 +1357,13 @@ function liberaRemoveRiga(i) {
 }
 
 function liberaRenderRighe() {
-  // Per polvere e capsule: forza unità g se era ml
-  if (tipoPrep === 'polvere' || tipoPrep === 'capsule') {
+  // Polvere/capsule/cartine: forza unità g se era ml (no ml per forme solide)
+  if (tipoPrep === 'polvere' || tipoPrep === 'capsule' || tipoPrep === 'cartine') {
     liberaRighe.forEach(r => { if (r.unit === 'ml') r.unit = 'g'; });
+  }
+  // Per capsule/cartine non ha senso % (input è per-singolo-pezzo, non frazione del totale)
+  if (tipoPrep === 'cartine' || tipoPrep === 'capsule') {
+    liberaRighe.forEach(r => { if (r.unit === '%') r.unit = 'g'; });
   }
   // Mostra "Totale preparazione" solo se almeno una riga usa %
   const anyPercent = liberaRighe.some(r => r.unit === '%');
@@ -1396,8 +1408,9 @@ function liberaRenderRighe() {
       <select onchange="liberaRighe[${i}].unit=this.value; liberaRenderRighe(); calcPrep()"
         style="font-family:var(--mono);font-size:13px;padding:3px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">
         <option value="g" ${r.unit==='g'?'selected':''}>g</option>
-        ${(tipoPrep!=='polvere'&&tipoPrep!=='capsule')?'<option value="ml" '+(r.unit==='ml'?'selected':'')+'>ml</option>':''}
-        <option value="%" ${r.unit==='%'?'selected':''}>%</option>
+        ${(tipoPrep==='cartine'||tipoPrep==='capsule')?'<option value="mg" '+(r.unit==='mg'?'selected':'')+'>mg</option>':''}
+        ${(tipoPrep!=='polvere'&&tipoPrep!=='capsule'&&tipoPrep!=='cartine')?'<option value="ml" '+(r.unit==='ml'?'selected':'')+'>ml</option>':''}
+        ${(tipoPrep!=='cartine'&&tipoPrep!=='capsule')?'<option value="%" '+(r.unit==='%'?'selected':'')+'>%</option>':''}
       </select>
       <span data-conv="${i}" style="font-size:11px;color:var(--accent)">${convNote}</span>
       <button onclick="liberaRemoveRiga(${i})" style="font-size:11px;padding:2px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">✕</button>
@@ -1692,6 +1705,8 @@ function liberaCalcTotale() {
     let grams;
     if (r.unit === '%') {
       grams = totalePrep > 0 ? (totalePrep * q / 100) : 0;
+    } else if (r.unit === 'mg') {
+      grams = q / 1000;
     } else if (r.unit === 'ml' && densita) {
       grams = q * densita;
     } else {
@@ -1813,75 +1828,110 @@ function calcPrep() {
       ];
 
     } else if (tipoPrep === 'capsule') {
-      // Capsule in modalità libera: taglia e n°capsule dal pannello caps-extra
-      // Le capsule vuote NON partecipano al peso (totG = solo PA + eccipienti)
-      // Capienze pratiche (densità polveri ~0.7 g/mL), non massimi teorici (densità 1.0)
+      // Capsule: l'utente inserisce le sostanze PER SINGOLA CAPSULA, poi N° capsule + taglia.
+      // Le quantità in liberaRighe sono per-capsula; totG e paG sono per-capsula.
+      // Le masse TOTALI da pesare = per-capsula × N° capsule.
       const capVolMap = {0:500, 1:400, 2:300, 3:210, 4:150};
       const taglia   = parseInt(document.getElementById('caps-taglia-lib')?.value||'0')||0;
       const nCaps    = parseInt(document.getElementById('caps-ncaps-lib')?.value||'0')||0;
       const capVol   = capVolMap[taglia] || 500;
-      const grTot    = totG; // solo ingredienti (PA + eccipienti), capsule escluse
-      const mgCps    = nCaps > 0 ? (grTot / nCaps * 1000) : 0;
-      const prezCps  = parseFloat(document.getElementById('caps-vuote-prezzo')?.value||'0')||0;
-      const nomeCps  = document.getElementById('caps-vuote-nome')?.value || 'Capsule vuote';
-      const costoCps = nCaps * prezCps;
-      // Propaga ai campi nascosti di stato condiviso (compilaScheda / sincronizzaTariffazione)
+      const mgCps      = totG * 1000;     // massa per capsula (mg)
+      const mgPACps    = paG  * 1000;     // PA per capsula (mg)
+      const grTotale   = totG * nCaps;    // massa totale da pesare (g)
+      const grPATot    = paG  * nCaps;    // PA totale (g)
+      const prezCps    = parseFloat(document.getElementById('caps-vuote-prezzo')?.value||'0')||0;
+      const nomeCps    = document.getElementById('caps-vuote-nome')?.value || 'Capsule vuote';
+      const costoCps   = nCaps * prezCps;
+      // Propaga ai campi nascosti / tariffazione
       if (nCaps) document.getElementById('n-caps').value = nCaps;
-      if (paG && nCaps) document.getElementById('mg-pa-cps').value = fmt(paG/nCaps*1000,2);
+      if (mgPACps > 0) document.getElementById('mg-pa-cps').value = fmt(mgPACps, 2);
       const tCps = document.getElementById('t-cpsvuote');
-      if (tCps && prezCps > 0) { tCps.value = prezCps.toFixed(4); }
+      if (tCps && prezCps > 0) tCps.value = prezCps.toFixed(4);
       const tNcaps = document.getElementById('t-ncaps');
-      if (tNcaps && nCaps > 0) { tNcaps.value = nCaps; }
-      // Formula display: ingredienti + capsule (con nota "non partecipa al peso")
+      if (tNcaps && nCaps > 0) tNcaps.value = nCaps;
+      // Helper: formato smart g/mg per masse in mg
+      const fmtMg = mg => mg >= 1000 ? {val: fmt(mg/1000, 2), unit: 'g'} : {val: fmt(mg, 1), unit: 'mg'};
+      // Formula display
       items.push({name:'Taglia capsula', val:String(taglia), unit:''});
       if (nCaps > 0) items.push({name:'Numero capsule', val:String(nCaps), unit:'pz'});
-      if (mgCps > 0) items.push({name:'Massa per capsula', val:fmt(mgCps,1), unit:'mg'});
+      if (mgCps > 0) { const f = fmtMg(mgCps); items.push({name:'Massa per capsula', val:f.val, unit:f.unit}); }
+      if (mgPACps > 0) { const f = fmtMg(mgPACps); items.push({name:'PA per capsula', val:f.val, unit:f.unit}); }
+      if (grTotale > 0 && nCaps > 0) items.push({name:'Massa totale da pesare', val:fmt(grTotale, 2), unit:'g'});
+      if (grPATot > 0 && nCaps > 0) items.push({name:'PA totale', val:fmt(grPATot, 2), unit:'g'});
       if (prezCps > 0) items.push({name:nomeCps+' (al costo, escluse dal peso)', val:'€'+fmt(costoCps,2), unit:''});
       if (mgCps > capVol * 1.05) items.push({name:'⚠ Supera capacità taglia '+taglia, val:fmt(capVol,0), unit:'mg max'});
-      // N.B. capsule aggiunte a liberaRigheExtra DOPO il loop ingredienti (vedi sotto)
+      // Procedura: pesate totali (× nCaps rispetto al per-capsula inserito)
+      const pesateCps = nCaps > 0
+        ? ingr.map(r => {
+            const q = parseFloat(r.qty)||0;
+            const qTot = q * nCaps;
+            let dispVal, dispUnit;
+            if (r.unit === 'mg') {
+              if (qTot >= 1000) { dispVal = fmt(qTot/1000, 2); dispUnit = 'g'; }
+              else              { dispVal = fmt(qTot, 1);      dispUnit = 'mg'; }
+            } else {
+              dispVal = fmt(qTot, 2); dispUnit = r.unit;
+            }
+            return 'Pesare <strong>'+dispVal+' '+dispUnit+'</strong> di '+r.nome+' (= '+r.qty+' '+r.unit+'/capsula × '+nCaps+').';
+          })
+        : pesate;
       proc = [
-        ...pesate,
+        ...pesateCps,
         ...(hasCrystalline ? ['Setacciare i componenti cristallini al setaccio n° 355 µm prima della miscelazione. <em>(Op. tecnologica aggiuntiva — Art. 6)</em>'] : []),
         'Miscelare PA ed eccipienti per almeno 5 minuti fino ad omogeneità cromatica.',
         'Eseguire la prova volumetrica nell\'opercolatrice da '+nCaps+' capsule taglia '+taglia+'.',
-        'Riempire le capsule. Controllare il peso di almeno 5 capsule (atteso: '+fmt(mgCps,1)+' mg/cps).',
+        'Riempire le capsule. Controllare il peso di almeno 5 capsule (atteso: '+(mgCps>=1000?fmt(mgCps/1000,2)+' g':fmt(mgCps,1)+' mg')+'/cps).',
         'Chiudere le capsule. Conservare in flacone ben chiuso. Etichettare.',
       ];
-      // Capsule: setacciatura (+1) sempre, polverizzazione (+1) se cristallino
       opTecnologicheExtra += 1; // setacciatura PA sempre
       if (hasCrystalline) {
-        opTecnologicheExtra += 1; // polverizzazione
+        opTecnologicheExtra += 1;
         opTecnologicheDesc = 'polverizzazione + setacciatura PA (Art. 6) — 2 op.';
       } else {
         opTecnologicheDesc = 'setacciatura PA (Art. 6)';
       }
     } else if (tipoPrep === 'cartine') {
-      // Cartine in modalità libera: numero cartine + dosaggio PA per cartina
-      // Nessuna taglia, nessuna capsula vuota — solo divisione di polvere in carte/bustine
+      // Cartine: l'utente inserisce le sostanze PER SINGOLA CARTINA, poi N° cartine.
+      // Le quantità in liberaRighe sono per-cartina; totG e paG (da liberaCalcTotale) sono per-cartina.
+      // Le masse TOTALI da pesare si ricavano moltiplicando per nCart.
       const nCart  = parseInt(document.getElementById('cart-ncart-lib')?.value||'0')||0;
-      const grTot  = totG; // PA + eccipienti
-      const mgCart = nCart > 0 ? (grTot / nCart * 1000) : 0;
-      const mgPACart = nCart > 0 ? (paG / nCart * 1000) : 0;
-      // Propaga il numero cartine alla tariffazione (il dosaggio è derivato e mostrato in formula)
+      const mgCart   = totG * 1000;  // massa per cartina (mg)
+      const mgPACart = paG  * 1000;  // PA per cartina (mg)
+      const grTotale = totG * nCart; // massa totale da pesare (g)
+      const grPATot  = paG  * nCart; // PA totale (g)
+      // Propaga il numero cartine alla tariffazione
       const tNcart = document.getElementById('t-ncart');
       if (tNcart && nCart > 0) tNcart.value = nCart;
+      // Helper: formato smart g/mg per masse in mg (g con 2 decimali, mg con 1)
+      const fmtMg = mg => mg >= 1000 ? {val: fmt(mg/1000, 2), unit: 'g'} : {val: fmt(mg, 1), unit: 'mg'};
       // Formula display
       if (nCart > 0) items.push({name:'Numero cartine', val:String(nCart), unit:'pz'});
-      if (mgCart > 0) {
-        const massaUnit = mgCart >= 1000 ? 'g' : 'mg';
-        const massaVal  = mgCart >= 1000 ? fmt(mgCart/1000, 3) : fmt(mgCart, 1);
-        items.push({name:'Massa per cartina', val:massaVal, unit:massaUnit});
-      }
-      if (mgPACart > 0) {
-        const paUnit = mgPACart >= 1000 ? 'g' : 'mg';
-        const paVal  = mgPACart >= 1000 ? fmt(mgPACart/1000, 3) : fmt(mgPACart, 2);
-        items.push({name:'PA per cartina', val:paVal, unit:paUnit});
-      }
+      if (mgCart > 0) { const f = fmtMg(mgCart); items.push({name:'Massa per cartina', val:f.val, unit:f.unit}); }
+      if (mgPACart > 0) { const f = fmtMg(mgPACart); items.push({name:'PA per cartina', val:f.val, unit:f.unit}); }
+      if (grTotale > 0 && nCart > 0) items.push({name:'Massa totale da pesare', val:fmt(grTotale, 2), unit:'g'});
+      if (grPATot > 0 && nCart > 0) items.push({name:'PA totale', val:fmt(grPATot, 2), unit:'g'});
+      // Procedura: pesate totali (× nCart rispetto al per-cartina inserito)
+      const pesateCart = nCart > 0
+        ? ingr.map(r => {
+            const q = parseFloat(r.qty)||0;
+            const qTot = q * nCart;
+            let dispVal, dispUnit;
+            if (r.unit === 'mg') {
+              if (qTot >= 1000) { dispVal = fmt(qTot/1000, 2); dispUnit = 'g'; }
+              else              { dispVal = fmt(qTot, 1);      dispUnit = 'mg'; }
+            } else {
+              dispVal = fmt(qTot, 2); dispUnit = r.unit;
+            }
+            return 'Pesare <strong>'+dispVal+' '+dispUnit+'</strong> di '+r.nome+' (= '+r.qty+' '+r.unit+'/cartina × '+nCart+').';
+          })
+        : pesate;
+      const massaCartFmt = mgCart >= 1000 ? fmt(mgCart/1000, 2)+' g' : fmt(mgCart, 1)+' mg';
+      const paCartFmt    = mgPACart >= 1000 ? fmt(mgPACart/1000, 2)+' g' : fmt(mgPACart, 1)+' mg';
       proc = [
-        ...pesate,
+        ...pesateCart,
         ...(hasCrystalline ? ['Setacciare i componenti cristallini al setaccio n° 355 µm prima della miscelazione. <em>(Op. tecnologica aggiuntiva — Art. 6)</em>'] : []),
         'Miscelare PA ed eccipienti per almeno 5 minuti fino ad omogeneità cromatica.',
-        'Ripartire la polvere in <strong>'+nCart+' cartine</strong> di carta velina (atteso: '+(mgCart>=1000?fmt(mgCart/1000,3)+' g':fmt(mgCart,1)+' mg')+'/cartina, di cui PA '+(mgPACart>=1000?fmt(mgPACart/1000,3)+' g':fmt(mgPACart,2)+' mg')+').',
+        'Ripartire la polvere in <strong>'+nCart+' cartine</strong> di carta velina (atteso: '+massaCartFmt+'/cartina, di cui PA '+paCartFmt+').',
         'Verificare il peso di almeno 3 cartine (tolleranza ±5%).',
         'Piegare e sigillare. Conservare in scatola/contenitore opaco. Etichettare.',
       ];
@@ -1909,9 +1959,9 @@ function calcPrep() {
     }
     // Se nessun ingrediente valido, sostituisci formula e procedura con placeholder
     if (ingr.length === 0) {
-      document.getElementById('formula-grid').innerHTML = '<div style="color:var(--text-faint);font-size:13px;padding:8px 0">Aggiungi almeno un ingrediente con quantità per vedere la formula.</div>';
+      document.getElementById('formula-grid').innerHTML = '<div style="color:var(--text-faint);font-size:13px;padding:8px 0">Aggiungi almeno una sostanza con quantità per vedere la formula.</div>';
       document.getElementById('alert-solub').innerHTML = '';
-      document.getElementById('procedura').innerHTML = '<li style="color:var(--text-faint);font-style:italic;list-style:none">La procedura comparirà quando aggiungerai gli ingredienti.</li>';
+      document.getElementById('procedura').innerHTML = '<li style="color:var(--text-faint);font-style:italic;list-style:none">La procedura comparirà quando aggiungerai le sostanze.</li>';
     } else {
       document.getElementById('formula-grid').innerHTML = items.map(i =>
         '<div class="formula-item"><div class="formula-item-name">'+i.name+'</div><div class="formula-item-val">'+i.val+'<span class="formula-item-unit">'+i.unit+'</span></div></div>'
@@ -1957,8 +2007,15 @@ function calcPrep() {
         }
       }
     }
-    if (document.getElementById('qt'))   document.getElementById('qt').value   = fmt(totG,1);
-    if (document.getElementById('conc')) document.getElementById('conc').value = fmt(conc,2);
+    // Cartine/Capsule: le righe rappresentano QUANTITÀ PER SINGOLO PEZZO.
+    // Per pricing/Allegato B serve la massa TOTALE: _perUnitFactor moltiplica per N° pezzi.
+    const _perUnitFactor =
+      tipoPrep === 'cartine' ? Math.max(1, parseInt(document.getElementById('cart-ncart-lib')?.value || '0') || 1) :
+      tipoPrep === 'capsule' ? Math.max(1, parseInt(document.getElementById('caps-ncaps-lib')?.value || '0') || 1) :
+      1;
+
+    if (document.getElementById('qt'))   document.getElementById('qt').value   = fmt(totG * _perUnitFactor, 2);
+    if (document.getElementById('conc')) document.getElementById('conc').value = fmt(conc, 2); // % invariata
 
     // Etanolo: calcola % v/v equivalente per il campo nascosto 'perc-et' (usato da Tariffazione/Scheda)
     const etRiga = ingr.find(r => {
@@ -1975,7 +2032,7 @@ function calcPrep() {
       if (document.getElementById('perc-et')) document.getElementById('perc-et').value = '0';
     }
 
-    liberaGrPA = paG;
+    liberaGrPA = paG * _perUnitFactor;
     liberaRigheExtra = [];
     liberaCostoExtra = 0;
 
@@ -1993,23 +2050,29 @@ function calcPrep() {
     ingr.forEach((r, _ri) => {
       const q = parseFloat(r.qty)||0;
       const densita = getDensita(r.nome);
-      // Risolvi quantità in g/ml a seconda dell'unità (g, ml, %)
+      // Risolvi quantità in g/ml a seconda dell'unità (g, mg, ml, %).
+      // Nota: in cartine `q` è per singola cartina; le moltiplichiamo poi per _perUnitFactor.
       let grams, mlQty;
       if (r.unit === '%') {
-        // % risolta contro "Totale preparazione" (unità totale presunta omogenea)
         grams = _totalePrep > 0 ? (_totalePrep * q / 100) : 0;
+        mlQty = densita ? grams/densita : grams;
+      } else if (r.unit === 'mg') {
+        grams = q / 1000;
         mlQty = densita ? grams/densita : grams;
       } else {
         grams = r.unit === 'ml' && densita ? q * densita : q;
         mlQty = r.unit === 'g' && densita ? q / densita : q;
       }
+      // Scala alle quantità totali se siamo in cartine (per-cartina × N°)
+      grams *= _perUnitFactor;
+      mlQty *= _perUnitFactor;
       const qNorm = invNominalizza(r.nome);
       const chiaveAll = Object.keys(ALLEGATO_A).find(k => k.includes(qNorm) || qNorm.includes(k.split(' ')[0]));
       let prezzo = 0;
       let isLiquido = (!!densita && r.unit === 'g') || r.unit === 'ml';
       if (chiaveAll) {
         prezzo = ALLEGATO_A[chiaveAll]; // All.A sempre in €/g
-        isLiquido = false; // usa grams
+        isLiquido = false;
       } else {
         const invFound = invLoadMerged().find(s => invNominalizza(s.nome).includes(qNorm) || qNorm.includes(invNominalizza(s.nome)));
         if (invFound && invFound.prezzo > 0) {
@@ -2020,15 +2083,18 @@ function calcPrep() {
           isLiquido = r.unit === 'ml';
         }
       }
-      // Costo: per % usa quantità risolte; per altre unità mantiene la logica originale
+      // Costo: usa quantità già scalate al totale
       let qtPerCosto;
       if (r.unit === '%') {
         qtPerCosto = isLiquido && !chiaveAll ? mlQty : grams;
+      } else if (r.unit === 'mg') {
+        qtPerCosto = grams; // prezzo €/g moltiplicato per g
       } else {
-        qtPerCosto = isLiquido && !chiaveAll ? (r.unit === 'ml' ? q : q/densita) : grams;
+        qtPerCosto = isLiquido && !chiaveAll ? (r.unit === 'ml' ? q * _perUnitFactor : (q * _perUnitFactor)/densita) : grams;
       }
       const costo = qtPerCosto * prezzo;
       if (prezzo > 0) liberaCostoExtra += costo;
+      // qty mostrata = per-cartina originale in cartine, altrimenti il valore totale
       liberaRigheExtra.push({nome: r.nome, qty: q, unit: r.unit, grams, mlQty, prezzo, costo, isLiquido: isLiquido && !chiaveAll, isPa: _ri === _paIdx});
     });
     // Capsule vuote: aggiunge DOPO il loop ingredienti (così non viene azzerata col reset)
@@ -2379,12 +2445,9 @@ function suppManTotale() {
   return _suppManRighe.reduce((s,r) => s + (parseFloat(r.importo)||0), 0);
 }
 
-// Tracking del numero capsule precedente per auto-scaling delle quantità in libera mode
-let _prevCapsNCaps = null;
-
-// Cambio numero capsule dalla pagina Tariffazione: in libera mode propaga a caps-ncaps-lib
-// e fa scattare lo scaling delle quantità in liberaRighe (sennò il tariff legge da caps-ncaps-lib
-// che resterebbe invariato e il prezzo non cambierebbe).
+// Cambio numero capsule dalla pagina Tariffazione: propaga a caps-ncaps-lib e ricalcola.
+// Nota v67: in modalità per-capsula i valori delle righe NON vanno scalati al cambio N°
+// (sono già per-singolo-pezzo); solo i totali derivati cambiano.
 function tariffNCapsChange() {
   if (tipoPrep === 'capsule') {
     const newN = parseInt(document.getElementById('t-ncaps').value) || 0;
@@ -2399,22 +2462,9 @@ function tariffNCapsChange() {
 }
 
 function capsScaleOnNCapsChange() {
-  const newN = parseInt(document.getElementById('caps-ncaps-lib').value) || 0;
-  if (tipoPrep === 'capsule'
-      && _prevCapsNCaps && _prevCapsNCaps > 0 && newN > 0 && _prevCapsNCaps !== newN
-      && Array.isArray(liberaRighe) && liberaRighe.length > 0) {
-    const ratio = newN / _prevCapsNCaps;
-    liberaRighe.forEach(r => {
-      const q = parseFloat(r.qty) || 0;
-      if (q > 0) r.qty = String(parseFloat((q * ratio).toFixed(4)));
-    });
-    if (typeof liberaRenderRighe === 'function') liberaRenderRighe();
-  }
-  _prevCapsNCaps = newN > 0 ? newN : _prevCapsNCaps;
+  // Righe per-capsula: nessuno scaling. Aggiorna solo i totali.
   calcPrep();
 }
-
-let _prevCartNCart = null;
 
 function tariffNCartChange() {
   if (tipoPrep === 'cartine') {
@@ -2430,18 +2480,7 @@ function tariffNCartChange() {
 }
 
 function cartScaleOnNCartChange() {
-  const newN = parseInt(document.getElementById('cart-ncart-lib').value) || 0;
-  if (tipoPrep === 'cartine'
-      && _prevCartNCart && _prevCartNCart > 0 && newN > 0 && _prevCartNCart !== newN
-      && Array.isArray(liberaRighe) && liberaRighe.length > 0) {
-    const ratio = newN / _prevCartNCart;
-    liberaRighe.forEach(r => {
-      const q = parseFloat(r.qty) || 0;
-      if (q > 0) r.qty = String(parseFloat((q * ratio).toFixed(4)));
-    });
-    if (typeof liberaRenderRighe === 'function') liberaRenderRighe();
-  }
-  _prevCartNCart = newN > 0 ? newN : _prevCartNCart;
+  // Righe per-cartina: nessuno scaling. Aggiorna solo i totali.
   calcPrep();
 }
 
@@ -2621,23 +2660,18 @@ function calcTariff() {
     const costoB  = baseB + addComp + addOp;
     const inc40   = costoB * 0.40;
 
-    // Modalità unica (libera): PA + eccipienti da liberaRigheExtra (niente capsule vuote)
-    const grPA = liberaGrPA;
-    const costoPA = grPA * pPA;
-    const nomePA = document.getElementById('prep-pa-nome')?.value || 'Principio attivo';
-    const _eccipienti = liberaRigheExtra.filter(r => !r.isCapsule && !r.isPa);
-    const _costoEccipienti = _eccipienti.reduce((s,r) => s+r.costo, 0);
-    const righeMaterie = [
-      {name: nomePA+' — '+fmt(grPA,3)+' g × '+fmtE(pPA)+'/g', val: costoPA,
-        badge: pPA===0?'⚠ inserire prezzo in inventario':'', badgeType:'warn'},
-      ..._eccipienti.map(r => {
+    // Modalità unica (libera): mostra tutte le materie prime da liberaRigheExtra
+    // (nome/grams/prezzo/costo già calibrati per il PA effettivo, qualunque sia il suo indice)
+    const righeMaterie = liberaRigheExtra
+      .filter(r => !r.isCapsule)
+      .map(r => {
         const dispQty = r.isLiquido ? fmt(r.unit==='ml'?r.qty:r.qty/(getDensita(r.nome)||1),1)+' ml' : fmt(r.grams,2)+' g';
         const dispUnit = r.isLiquido ? '/ml' : '/g';
         return {name: r.nome+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, val: r.costo,
           badge: r.prezzo===0?'⚠ inserire prezzo in inventario':'', badgeType:'warn'};
-      }),
-    ];
-    netto = costoPA + _costoEccipienti + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte + suppManTotale();
+      });
+    const _costoMaterie = righeMaterie.reduce((s,r) => s + r.val, 0);
+    netto = _costoMaterie + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte + suppManTotale();
 
     rows = [
       {group:'Materie prime'},
@@ -2675,41 +2709,33 @@ function calcTariff() {
     const costoB  = baseB + addComp + addOp;
     const inc40   = costoB * 0.40;
 
-    // Modalità unica libera: PA e eccipienti da liberaRigheExtra
-    const grPA    = liberaGrPA;
-    const costoPA = grPA * pPA;
-    const nomePA  = document.getElementById('prep-pa-nome')?.value || 'Principio attivo';
-
-    // Capsule vuote: leggi dal DOM come fonte primaria
+    // Modalità unica libera: materie prime da liberaRigheExtra (PA, eccipienti, capsule vuote)
+    // Iteriamo direttamente liberaRigheExtra per evitare duplicazioni quando il PA non è la prima riga.
+    const _capEntry = liberaRigheExtra.find(r => r.isCapsule);
     const _prezCpsDom  = parseFloat(document.getElementById('caps-vuote-prezzo')?.value||'0')||0;
     const _nomeCpsDom  = document.getElementById('caps-vuote-nome')?.value || '';
     const _nCapsLibera = parseInt(document.getElementById('caps-ncaps-lib')?.value||'0')||nCaps;
-    const _capEntry = liberaRigheExtra.find(r => r.isCapsule);
     const _prezCps  = _capEntry?.prezzo || _prezCpsDom;
     const _nomeCps  = _capEntry?.nome   || _nomeCpsDom || 'Capsule vuote';
     const _qtaCps   = _capEntry?.qty    || _nCapsLibera;
     const _costoCps = _qtaCps * _prezCps;
 
-    // Eccipienti: liberaRigheExtra meno PA e capsule
-    const _eccipienti = liberaRigheExtra.filter(r => !r.isCapsule && !r.isPa);
-    const _costoEccipienti = _eccipienti.reduce((s,r) => s+r.costo, 0);
-    const costoTotMaterie = costoPA + _costoEccipienti + _costoCps;
-
     const righeMaterie = [
-      {name: nomePA+' — '+fmt(grPA,3)+' g × '+fmtE(pPA)+'/g', val: costoPA,
-        badge: pPA===0?'⚠ inserire prezzo in inventario':'', badgeType:'warn'},
-      ..._eccipienti.map(r => {
-        const dispQty = r.isLiquido ? fmt(r.unit==='ml'?r.qty:r.qty/(getDensita(r.nome)||1),1)+' ml' : fmt(r.grams,2)+' g';
-        const dispUnit = r.isLiquido ? '/ml' : '/g';
-        return {name: r.nome+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, val: r.costo,
-          badge: r.prezzo===0?'⚠ inserire prezzo in inventario':'', badgeType:'warn'};
-      }),
+      ...liberaRigheExtra
+        .filter(r => !r.isCapsule)
+        .map(r => {
+          const dispQty = r.isLiquido ? fmt(r.unit==='ml'?r.qty:r.qty/(getDensita(r.nome)||1),1)+' ml' : fmt(r.grams,2)+' g';
+          const dispUnit = r.isLiquido ? '/ml' : '/g';
+          return {name: r.nome+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, val: r.costo,
+            badge: r.prezzo===0?'⚠ inserire prezzo in inventario':'', badgeType:'warn'};
+        }),
       _qtaCps > 0
         ? {name: _nomeCps+' — '+_qtaCps+' pz × '+fmtE(_prezCps)+'/pz', val: _costoCps,
             badge: _prezCps===0?'⚠ inserire prezzo in inventario':'al costo', badgeType: _prezCps===0?'warn':'ok'}
         : {name:'⚠ Capsule vuote — seleziona taglia per auto-compilare', val:0, badge:'mancante', badgeType:'warn'},
     ];
-    netto = costoTotMaterie + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte + suppManTotale();
+    const _costoMaterie = liberaRigheExtra.filter(r => !r.isCapsule).reduce((s,r) => s+r.costo, 0) + _costoCps;
+    netto = _costoMaterie + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte + suppManTotale();
 
     rows = [
       {group:'Materie prime'},
@@ -3087,7 +3113,7 @@ function aggiornaScheda() {
     const grEccip = (mgEccipcps * nCaps)/1000;
 
     formulaItems = [
-      {nome:nomePA+' (totale)', val:fmt(grPA,3), unit:'g'},
+      {nome:nomePA+' (totale)', val:fmt(grPA,2), unit:'g'},
       {nome:eccip+' (totale)', val:fmt(grEccip,2), unit:'g'},
       {nome:'Capsule taglia '+taglia, val:String(nCaps), unit:'pz'},
       {nome:'PA per capsula', val:fmt(mgPAcps,2), unit:'mg'},
@@ -3095,7 +3121,7 @@ function aggiornaScheda() {
       {nome:'Peso totale/capsula', val:fmt(capVol,0), unit:'mg'},
     ];
     proc = [
-      'Pesare <strong>'+fmt(grPA,3)+' g</strong> di '+nomePA+' su bilancia analitica.',
+      'Pesare <strong>'+fmt(grPA,2)+' g</strong> di '+nomePA+' su bilancia analitica.',
       'Eseguire prova volumetrica: inserire il PA nel cilindro dell\'opercolatrice da '+nCaps+' capsule taglia '+taglia+', aggiungere '+eccip+' fino a volume.',
       'Determinare il peso di '+eccip+' necessario (peso cilindro − tara − peso PA).',
       'Pesare l\'eccipiente calcolato (indicativamente <strong>'+fmt(grEccip,2)+' g</strong>).',
@@ -3327,7 +3353,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 64;
+const APP_VERSION = 68;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -4057,27 +4083,21 @@ function aiImportaTutti(comps, tipo) {
   });
   if (typeof liberaRenderRighe === 'function') liberaRenderRighe();
 
-  // 5) Per capsule: prova a leggere n° capsule dal contesto comps (es. se l'AI scrive "Capsule vuote: 30")
-  //    altrimenti l'utente le imposta manualmente.
+  // 5) Per capsule/cartine: prova a leggere il numero dal contesto comps
+  //    (es. se l'AI scrive "Capsule vuote: 30" o "Cartine: 20"); altrimenti l'utente le imposta manualmente.
   if (tipoTarget === 'capsule') {
     const capsRiga = comps.find(c => /capsul/i.test(c.nome));
     if (capsRiga) {
       const nEl = document.getElementById('caps-ncaps-lib');
       const nVal = parseInt(capsRiga.qty) || 0;
-      if (nEl && !nEl.value && nVal > 0) {
-        nEl.value = nVal;
-        _prevCapsNCaps = nVal; // baseline per scaling: senza, il primo cambio non avrebbe riferimento
-      }
+      if (nEl && !nEl.value && nVal > 0) nEl.value = nVal;
     }
   } else if (tipoTarget === 'cartine') {
     const cartRiga = comps.find(c => /cartin|bustin/i.test(c.nome));
     if (cartRiga) {
       const nEl = document.getElementById('cart-ncart-lib');
       const nVal = parseInt(cartRiga.qty) || 0;
-      if (nEl && !nEl.value && nVal > 0) {
-        nEl.value = nVal;
-        _prevCartNCart = nVal;
-      }
+      if (nEl && !nEl.value && nVal > 0) nEl.value = nVal;
     }
   }
 
@@ -4228,7 +4248,7 @@ function aiAvviaPreparazione() {
   const msg = 'Prepara la formula magistrale per: ' + nome +
     ', forma farmaceutica: ' + forma +
     ', quantita totale: ' + qt + ' ' + unit +
-    '. Indica ingredienti con quantita, procedura passo-passo, frasi H/P, scadenza raccomandata FU XII e avvertenze.';
+    '. Indica le sostanze con quantita, procedura passo-passo, frasi H/P, scadenza raccomandata FU XII e avvertenze.';
   aiChiama(msg);
 }
 
@@ -4403,8 +4423,6 @@ function resetRicetta() {
   tarPADaAllegatoA = true;
   _suppManRighe = [];
   tipoScheda = 'soluzione';
-  _prevCapsNCaps = null;
-  _prevCartNCart = null;
 
   const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
   const setHTML = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = v; };
