@@ -2813,7 +2813,7 @@ function calcTariff() {
       .map(r => {
         const dispQty = r.isLiquido ? fmt(r.unit==='ml'?r.qty:r.qty/(getDensita(r.nome)||1),1)+' ml' : fmt(r.grams,2)+' g';
         const dispUnit = r.isLiquido ? '/ml' : '/g';
-        return {name: r.nome+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, val: r.costo,
+        return {name: titleCase(r.nome)+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, val: r.costo,
           badge: r.prezzo===0?'⚠ inserire prezzo in inventario':'', badgeType:'warn'};
       });
     const _costoMaterie = righeMaterie.reduce((s,r) => s + r.val, 0);
@@ -2872,11 +2872,11 @@ function calcTariff() {
         .map(r => {
           const dispQty = r.isLiquido ? fmt(r.unit==='ml'?r.qty:r.qty/(getDensita(r.nome)||1),1)+' ml' : fmt(r.grams,2)+' g';
           const dispUnit = r.isLiquido ? '/ml' : '/g';
-          return {name: r.nome+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, val: r.costo,
+          return {name: titleCase(r.nome)+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, val: r.costo,
             badge: r.prezzo===0?'⚠ inserire prezzo in inventario':'', badgeType:'warn'};
         }),
       _qtaCps > 0
-        ? {name: _nomeCps+' — '+_qtaCps+' pz × '+fmtE(_prezCps)+'/pz', val: _costoCps,
+        ? {name: titleCase(_nomeCps)+' — '+_qtaCps+' pz × '+fmtE(_prezCps)+'/pz', val: _costoCps,
             badge: _prezCps===0?'⚠ inserire prezzo in inventario':'al costo', badgeType: _prezCps===0?'warn':'ok'}
         : {name:'⚠ Capsule vuote — seleziona taglia per auto-compilare', val:0, badge:'mancante', badgeType:'warn'},
     ];
@@ -3665,7 +3665,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 84;
+const APP_VERSION = 85;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
