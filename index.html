@@ -1082,6 +1082,21 @@ function setTipo(t, btn) {
 }
 
 function fmt(n, dec) { dec = dec === undefined ? 2 : dec; return n.toFixed(dec).replace('.', ','); }
+
+// Normalizza un nome sostanza in Title Case, preservando acronimi (CBD, HPMC, ...) e numeri romani (II, IV, ...).
+// Preposizioni italiane (di, da, del, ...) restano minuscole se non in prima posizione.
+const _TITLECASE_ACRONYMS = new Set(['CBD','HPMC','SDS','DDT','ASA','FU','PA','GHS','AIFA','NBP','IPA','EDTA','BHT','BHA','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII']);
+const _TITLECASE_LOWER = new Set(['di','da','del','della','dei','degli','delle','in','su','con','per','tra','fra','il','la','lo','i','gli','le','e','o','a','ai','al','allo','agli','alle']);
+function titleCase(s) {
+  if (!s) return '';
+  return s.toLowerCase().split(/(\s+|[-/])/).map((part, i) => {
+    if (!part || /^\s+$/.test(part) || /^[-/]$/.test(part)) return part;
+    const upper = part.toUpperCase();
+    if (_TITLECASE_ACRONYMS.has(upper)) return upper;
+    if (_TITLECASE_LOWER.has(part) && i > 0) return part;
+    return part.charAt(0).toUpperCase() + part.slice(1);
+  }).join('');
+}
 function fmtE(n) {
   // Usa più decimali per prezzi molto piccoli
   const dec = n > 0 && n < 0.01 ? 3 : 2;
@@ -2936,7 +2951,7 @@ function calcTariff() {
         const dispQty = r.isLiquido ? fmt(r.unit==='ml'?r.qty:r.qty/(getDensita(r.nome)||1),1)+' ml' : fmt(r.grams,2)+' g';
         const dispUnit = r.isLiquido ? '/ml' : '/g';
         const badge = r.prezzo===0 ? '⚠ prezzo mancante' : '';
-        return {name: r.nome+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, val: r.costo, badge, badgeType:'warn'};
+        return {name: titleCase(r.nome)+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, val: r.costo, badge, badgeType:'warn'};
       }),
       {group:'Costi di preparazione — All. B '+nomeVoce+' (D.M. 22/09/2017)'},
       {name:baseDesc, val:baseB},
@@ -3343,7 +3358,7 @@ function aggiornaScheda() {
   liberaRigheExtra.forEach(r => {
     const dispQty = r.isLiquido ? fmt(r.unit==='ml'?r.qty:r.qty/(getDensita(r.nome)||1),1)+' ml' : fmt(r.grams,2)+' g';
     const dispUnit = r.isLiquido ? '/ml' : '/g';
-    tariffRows.push({n: r.nome+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, v: r.costo});
+    tariffRows.push({n: titleCase(r.nome)+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, v: r.costo});
   });
   tariffRows.push(
     {n:'All. B — '+nomeVoceB, v:baseB},
@@ -3376,13 +3391,13 @@ function aggiornaScheda() {
     '<div class="scheda-section">' +
       '<div class="scheda-section-title">Formula</div>' +
       '<div class="scheda-formula" style="grid-template-columns:repeat('+Math.min(formulaItems.length,4)+',1fr)">' +
-        formulaItems.map(i=>'<div class="scheda-formula-item"><div class="nome">'+i.nome+'</div><div class="qty">'+i.val+'<span class="unit"> '+i.unit+'</span></div></div>').join('') +
+        formulaItems.map(i=>'<div class="scheda-formula-item"><div class="nome">'+titleCase(i.nome)+'</div><div class="qty">'+i.val+'<span class="unit"> '+i.unit+'</span></div></div>').join('') +
       '</div>' +
     '</div>' +
     '<div class="scheda-section">' +
       '<div class="scheda-section-title">Lotti materie prime</div>' +
       '<div style="display:grid;grid-template-columns:repeat('+Math.min(lottiItems.length,4)+',1fr);gap:8px;">' +
-        lottiItems.map(i=>'<div class="scheda-formula-item"><div class="nome">'+i.nome+'</div><div class="qty" style="font-size:13px;">Lotto '+i.lotto+'</div></div>').join('') +
+        lottiItems.map(i=>'<div class="scheda-formula-item"><div class="nome">'+titleCase(i.nome)+'</div><div class="qty" style="font-size:13px;">Lotto '+i.lotto+'</div></div>').join('') +
       '</div>' +
     '</div>' +
     '<div class="scheda-section">' +
@@ -3447,7 +3462,7 @@ function popolaLottoSelect(fieldId, candidati) {
     opt.value = String(i);
     opt.dataset.lotto = c.lotto;
     opt.dataset.scad  = c.scad;
-    opt.textContent = (c.demo ? '[DEMO] ' : '') + c.lotto + (c.scad ? ' (scad. '+c.scad+')' : '') + ' — ' + c.nome;
+    opt.textContent = (c.demo ? '[DEMO] ' : '') + c.lotto + (c.scad ? ' (scad. '+c.scad+')' : '') + ' — ' + titleCase(c.nome);
     sel.appendChild(opt);
   });
   if (candidati.length > 0) {
@@ -3650,7 +3665,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 83;
+const APP_VERSION = 84;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
