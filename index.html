@@ -325,66 +325,19 @@
       <button class="seg-btn" onclick="setTipo('polvere',this)">Polvere</button>
       <button class="seg-btn" onclick="setTipo('sospensione',this)">Sospensione</button>
     </div>
-    <!-- Selettore modalità rimosso in v46: modalità unica (libera con unità %) -->
   </div>
 
-  <!-- MODALITÀ % — DISMESSA: pannello nascosto, in fase 2 verrà rimosso col codice morto -->
-  <div id="prep-modo-perc" class="card" style="display:none">
-    <div class="card-title">Parametri</div>
-    <div class="field-row">
-      <span class="field-label">Principio attivo</span>
-      <input type="text" id="prep-pa-nome" placeholder="" style="width:220px;" list="pa-suggestions" oninput="sincronizzaPA()">
-      <datalist id="pa-suggestions"></datalist>
-    </div>
-    <div class="field-row">
-      <span class="field-label">Quantità totale</span>
-      <input type="number" id="qt" value="" min="1" max="2000" step="1" oninput="calcPrep()">
-      <span class="field-note">ml / g</span>
-    </div>
-    <div class="field-row">
-      <span class="field-label">Concentrazione PA</span>
-      <input type="number" id="conc" value="" min="0.01" max="100" step="0.1" oninput="calcPrep()">
-      <span class="field-note">% p/v</span>
-    </div>
-    <div class="field-row" id="row-et">
-      <span class="field-label">Etanolo (% v/v)</span>
-      <input type="number" id="perc-et" value="0" min="0" max="96" step="5" oninput="calcPrep()">
-      <span class="field-note">0 = soluzione acquosa</span>
-    </div>
-    <div class="field-row" id="row-taglia" style="display:none">
-      <span class="field-label">Taglia capsula</span>
-      <select id="taglia-caps" onchange="calcPrep()">
-        <option value="0">0 — 500 mg</option>
-        <option value="1">1 — 400 mg</option>
-        <option value="2">2 — 300 mg</option>
-        <option value="3">3 — 210 mg</option>
-        <option value="4">4 — 150 mg</option>
-      </select>
-      <span class="field-note">capacità indicativa</span>
-    </div>
-    <div class="field-row" id="row-mgpa" style="display:none">
-      <span class="field-label">Dosaggio PA per capsula</span>
-      <input type="number" id="mg-pa-cps" value="" min="0.1" step="0.1" oninput="calcPrep()" style="width:110px;">
-      <span class="field-note">mg/cps</span>
-    </div>
-    <div class="field-row" id="row-ncaps" style="display:none">
-      <span class="field-label">Numero capsule</span>
-      <input type="number" id="n-caps" value="" min="1" max="1000" step="1" oninput="calcPrep()">
-      <span class="field-note">pz</span>
-    </div>
-    <div class="field-row" id="row-eccip-nome" style="display:none">
-      <span class="field-label">Eccipiente principale</span>
-      <input type="text" id="eccip-nome" value="" placeholder="" style="width:220px;" oninput="calcPrep()">
-    </div>
-    <div class="field-row" id="row-diluente" style="display:none">
-      <span class="field-label">Diluente sospensione</span>
-      <select id="tipo-diluente" onchange="calcPrep()">
-        <option value="acqua">Acqua purificata</option>
-        <option value="glicole">Glicole propilenico</option>
-        <option value="olio">Olio di semi</option>
-      </select>
-    </div>
-  </div>
+  <!--
+    Stato condiviso (modalità unica libera, v46+): la modalità % è stata rimossa
+    in v64 ma alcuni campi servono ancora come ponte tra Preparazione, Tariffazione
+    e Scheda. calcPrep (libera) scrive qui i valori derivati; downstream legge.
+  -->
+  <input type="hidden" id="prep-pa-nome" value="">
+  <input type="hidden" id="qt" value="">
+  <input type="hidden" id="conc" value="">
+  <input type="hidden" id="perc-et" value="0">
+  <input type="hidden" id="n-caps" value="">
+  <input type="hidden" id="mg-pa-cps" value="">
 
   <!-- PANNELLO CAPSULE EXTRA (visibile solo in libera+capsule) -->
   <div id="prep-caps-extra" class="card" style="display:none">
@@ -1028,24 +981,13 @@ function setTipo(t, btn) {
   tipoPrep = t;
   document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  document.getElementById('row-et').style.display        = t === 'soluzione' ? '' : 'none';
-  document.getElementById('row-taglia').style.display    = t === 'capsule' ? '' : 'none';
-  document.getElementById('row-mgpa').style.display      = t === 'capsule' ? '' : 'none';
-  document.getElementById('row-ncaps').style.display     = t === 'capsule' ? '' : 'none';
-  document.getElementById('row-eccip-nome').style.display= t === 'capsule' ? '' : 'none';
-  document.getElementById('row-diluente').style.display  = t === 'sospensione' ? '' : 'none';
-  // Aggiorna label modalità in base al tipo
-  const percBtn = document.getElementById('modo-perc-btn');
-  const liberaBtn = document.getElementById('modo-libera-btn');
-  if (percBtn) percBtn.textContent  = t === 'capsule' ? 'Dati capsula' : '% concentrazione';
-  if (liberaBtn) liberaBtn.textContent = t === 'capsule' ? 'Per ingredienti (+ taglia/n°)' : 'Per ingredienti';
-  // Pannello capsule extra in modalità libera
+  // Pannello capsule extra (visibile solo per Capsule)
   const capExtra = document.getElementById('prep-caps-extra');
-  if (capExtra) capExtra.style.display = (t === 'capsule' && modoPrepara === 'libera') ? '' : 'none';
-  // Pannello cartine extra in modalità libera (no taglia, no capsule vuote)
+  if (capExtra) capExtra.style.display = (t === 'capsule') ? '' : 'none';
+  // Pannello cartine extra (visibile solo per Cartine — niente taglia, niente capsule vuote)
   const cartExtra = document.getElementById('prep-cart-extra');
-  if (cartExtra) cartExtra.style.display = (t === 'cartine' && modoPrepara === 'libera') ? '' : 'none';
-  // Concentrazione non ha senso per capsule/cartine (è per soluzioni)
+  if (cartExtra) cartExtra.style.display = (t === 'cartine') ? '' : 'none';
+  // Concentrazione: non ha senso per capsule/cartine
   const rowConc = document.getElementById('row-libera-conc');
   if (rowConc) rowConc.style.display = (t === 'capsule' || t === 'cartine') ? 'none' : '';
   // Alert uso: specifico per tipo
@@ -1138,7 +1080,7 @@ const INV_OBBLIGATORIE = new Set(['carbone attivo','potassio ioduro','acqua depu
 const CAPSULE_TAGLIE_ATTIVE = ['0'];
 
 function initCapsuleTaglie() {
-  ['taglia-caps','caps-taglia-lib','s-taglia'].forEach(id => {
+  ['caps-taglia-lib','s-taglia'].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
     Array.from(sel.options).forEach(opt => {
@@ -1200,41 +1142,6 @@ function invGetPrezzo(nomeSostanza) {
 }
 
 // ── Dropdown ricerca sostanza ──
-function invFiltraSostanze() {
-  const q  = invNominalizza(document.getElementById('inv-cerca').value);
-  const dd = document.getElementById('inv-dropdown');
-  const hcNomi  = INV_HARDCODED.map(s => ({ nome: s.nome, h: s.h || '', src: 'inv' }));
-  const allNomi = Object.keys(ALLEGATO_A)
-    .filter(k => !INV_HARDCODED.find(h => invNominalizza(h.nome) === invNominalizza(k)))
-    .map(k => ({ nome: k.charAt(0).toUpperCase() + k.slice(1), h: '', src: 'all' }));
-  const tutti = [...hcNomi, ...allNomi];
-  const obblig  = tutti.filter(s => INV_OBBLIGATORIE.has(invNominalizza(s.nome)));
-  const altri   = tutti.filter(s => !INV_OBBLIGATORIE.has(invNominalizza(s.nome)));
-  const ordinate = [...obblig, ...altri];
-  const filtrate = q ? ordinate.filter(s => invNominalizza(s.nome).includes(q)) : ordinate;
-  if (!filtrate.length) { dd.style.display = 'none'; return; }
-  dd.innerHTML = filtrate.slice(0, 40).map(s => {
-    const isObb = INV_OBBLIGATORIE.has(invNominalizza(s.nome));
-    const isInv = s.src === 'inv';
-    const b1 = isObb ? '<span style="background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-border);border-radius:3px;font-size:10px;padding:1px 5px;margin-left:6px">⚕ obbligatoria</span>' : '';
-    const b2 = isInv ? '<span style="background:var(--accent-light);color:var(--accent);border:1px solid #c4d9c0;border-radius:3px;font-size:10px;padding:1px 5px;margin-left:4px">inv</span>' : '';
-    return `<div onmousedown="invSelezionaSostanza('${s.nome.replace(/'/g,"\\'")}','${s.h}')"
-      style="padding:7px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center"
-      onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background=''">
-      <span style="flex:1">${s.nome}</span>${b1}${b2}</div>`;
-  }).join('');
-  dd.style.display = 'block';
-}
-
-function invSelezionaSostanza(nome, h) {
-  document.getElementById('inv-cerca').value    = nome;
-  document.getElementById('inv-nome-libero').value = nome;
-  if (document.getElementById('inv-h')) document.getElementById('inv-h').value = h || '';
-  document.getElementById('inv-dropdown').style.display = 'none';
-  const hc = INV_HARDCODED.find(s => invNominalizza(s.nome) === invNominalizza(nome));
-  if (hc && hc.unit) document.getElementById('inv-unit').value = hc.unit;
-}
-
 function invCercaNome(q) {
   const dd = document.getElementById('inv-nome-sug');
   if (!dd) return;
@@ -1252,21 +1159,6 @@ function invCercaNome(q) {
 }
 
 
-
-function popolaPASuggestions() {
-  const dl = document.getElementById('pa-suggestions');
-  if (!dl) return;
-  const invNomi = INV_HARDCODED.map(s => s.nome);
-  const allNomi = Object.keys(ALLEGATO_A).map(k => k.charAt(0).toUpperCase() + k.slice(1));
-  dl.innerHTML = [...new Set([...invNomi, ...allNomi])].map(k => '<option value="' + k + '">').join('');
-}
-
-function sincronizzaPA() {
-  const nome = document.getElementById('prep-pa-nome').value.trim();
-  const tNome = document.getElementById('t-pa-nome');
-  if (tNome && nome && nome.length >= 8) { tNome.value = nome; tarRicercaPA(); }
-  sincronizzaTariffazione();
-}
 
 // ── CODICE A BARRE ───────────────────────────────────────────────────────
 function invBarcodeInput(val) {
@@ -1354,10 +1246,8 @@ function ordinaEmail() {
 }
 
 
-let modoPrepara = 'libera'; // modalità unica — il selettore è stato dismesso
 let opTecnologicheDesc = ''; // descrizione op. aggiuntiva rilevata da calcPrep
 let liberaGrPA = 0;
-let liberaMlEt = 0;
 let liberaCostoExtra = 0;
 let liberaRigheExtra = []; // [{nome, grams, prezzo, costo}] per il dettaglio tariffazione
 let liberaRighe = []; // [{nome, qty, unit, isPa, densita}]
@@ -1377,42 +1267,6 @@ function getDensita(nome) {
     if (n.includes(k)) return v;
   }
   return null; // solidi: nessuna conversione
-}
-
-function setModoPrepara(modo, btn) {
-  modoPrepara = modo;
-  document.querySelectorAll('#page-preparazione .seg-btn[id^="modo-"]').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('prep-modo-perc').style.display   = modo === 'perc'   ? '' : 'none';
-  document.getElementById('prep-modo-libera').style.display = modo === 'libera' ? '' : 'none';
-  const capExtra = document.getElementById('prep-caps-extra');
-  if (capExtra) capExtra.style.display = (modo === 'libera' && tipoPrep === 'capsule') ? '' : 'none';
-  const cartExtra = document.getElementById('prep-cart-extra');
-  if (cartExtra) cartExtra.style.display = (modo === 'libera' && tipoPrep === 'cartine') ? '' : 'none';
-  // In libera mode: nascondi campo PA (ogni sostanza ha il suo prezzo)
-  const cardPaEl = document.getElementById('tariff-card-pa');
-  if (cardPaEl) cardPaEl.style.display = modo === 'libera' ? 'none' : '';
-  const rowConc2 = document.getElementById('row-libera-conc');
-  if (rowConc2) rowConc2.style.display = (tipoPrep === 'capsule' || tipoPrep === 'cartine') ? 'none' : '';
-  // In libera mode: nasconde componenti extra manuali tariffazione (vengono da liberaRigheExtra)
-  // Mantiene visibile flacone e PA
-  const ttExtraRows = document.getElementById('tt-extra-rows');
-  if (ttExtraRows) ttExtraRows.style.display = modo === 'libera' ? 'none' : '';
-  const ttExtraTitle = document.querySelector('#tariff-card-extra .tariff-group-title');
-  if (ttExtraTitle) ttExtraTitle.style.display = modo === 'libera' ? 'none' : '';
-  // Nascondi anche la card comp-extra in preparazione (inutile in libera: usa le righe)
-  const cardCompExtra = document.getElementById('card-comp-extra');
-  if (cardCompExtra) cardCompExtra.style.display = modo === 'libera' ? 'none' : '';
-  const ttLiquida = document.getElementById('tt-liquida');
-  if (ttLiquida) ttLiquida.style.display = (modo === 'libera' || tipoTariff === 'capsule') ? 'none' : '';
-  if (modo === 'libera') {
-    if (liberaRighe.length === 0) liberaAddRiga(true); // prima riga = PA
-    // Pulisce i campi extra manuali di tariffazione per evitare doppi conteggi
-    document.querySelectorAll('#tt-extra-rows .t-extra-nome').forEach(el => el.value = '');
-    document.querySelectorAll('#tt-extra-rows .t-extra-qty').forEach(el => el.value = '');
-    document.querySelectorAll('#tt-extra-rows .t-extra-prezzo').forEach(el => el.value = '');
-  }
-  calcPrep();
 }
 
 function liberaAddRiga(isPa) {
@@ -1861,80 +1715,13 @@ function liberaCalcTotale() {
 }
 
 
-let prepComps = [];
-
-function prepAddComp() {
-  if (prepComps.length >= 4) return;
-  prepComps.push({nome:'', qty:'', unit:'g', prezzoAcq:0});
-  prepRenderComps();
-}
-
-function prepRemoveComp(i) {
-  prepComps.splice(i, 1);
-  prepRenderComps();
-  calcPrep();
-}
-
-function prepRenderComps() {
-  const container = document.getElementById('prep-comp-extra');
-  if (!container) return;
-  if (prepComps.length === 0) { container.innerHTML = '<div style="font-size:12px;color:var(--text-faint);padding:4px 0">Nessun componente aggiuntivo.</div>'; return; }
-  container.innerHTML = prepComps.map((c, i) => `
-    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;padding:6px 8px;border:1px solid var(--border-strong);border-radius:var(--radius)">
-      <input type="text" value="${c.nome}" placeholder="Nome componente" autocomplete="off"
-        style="width:160px;font-family:var(--mono);font-size:13px;padding:3px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
-        oninput="prepComps[${i}].nome=this.value; prepCercaComp(${i},this.value); calcPrep()">
-      <input type="number" value="${c.qty}" placeholder="Qtà" min="0" step="0.1"
-        style="width:70px;font-family:var(--mono);font-size:13px;padding:3px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
-        oninput="prepComps[${i}].qty=this.value; calcPrep()">
-      <select onchange="prepComps[${i}].unit=this.value; calcPrep()"
-        style="font-family:var(--mono);font-size:13px;padding:3px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">
-        <option value="g" ${c.unit==='g'?'selected':''}>g</option>
-        <option value="ml" ${c.unit==='ml'?'selected':''}>ml</option>
-        <option value="pz" ${c.unit==='pz'?'selected':''}>pz</option>
-      </select>
-      <span style="font-size:11px;color:${c.prezzoAcq>0?'var(--accent)':'var(--text-faint)'}">${c.prezzoAcq>0?'€'+c.prezzoAcq.toFixed(4)+'/'+c.unit:'Art. 5'}</span>
-      <button onclick="prepRemoveComp(${i})" style="font-size:11px;padding:2px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">✕</button>
-      <div id="comp-sug-${i}" style="width:100%;display:flex;flex-wrap:wrap;gap:4px;margin-top:2px"></div>
-    </div>
-  `).join('');
-}
-
-function prepCercaComp(i, q) {
-  const dd = document.getElementById('comp-sug-'+i);
-  if (!dd || !q || q.length < 3) { if(dd) dd.innerHTML=''; return; }
-  const inv = typeof invLoadMerged === 'function' ? invLoadMerged() : [];
-  const matches = inv.filter(s => invNominalizza(s.nome).includes(invNominalizza(q))).slice(0, 6);
-  dd.innerHTML = matches.map(s =>
-    `<button onclick="prepSelComp(${i},'${s.nome.replace(/'/g,"\\'")}',${s.prezzo||0})"
-      style="font-size:11px;padding:2px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">
-      ${s.nome}${s.prezzo>0?' — €'+s.prezzo.toFixed(4):''}
-    </button>`
-  ).join('');
-}
-
-function prepSelComp(i, nome, prezzo) {
-  prepComps[i].nome = nome;
-  prepComps[i].prezzoAcq = prezzo;
-  prepRenderComps();
-  calcPrep();
-}
-
-function prepGetComps() { return prepComps.filter(c => c.nome && c.qty); }
-
 function calcPrep() {
-  // Modalità formula libera
-  if (modoPrepara === 'libera') {
-    liberaRenderRighe();
-    const {totG, paG, conc: concCalc, ingr} = liberaCalcTotale();
-    const concDich = parseFloat(document.getElementById('libera-conc')?.value)||0;
-    const conc = concDich > 0 ? concDich : concCalc;
+  liberaRenderRighe();
+  const {totG, paG, conc: concCalc, ingr} = liberaCalcTotale();
+  const concDich = parseFloat(document.getElementById('libera-conc')?.value)||0;
+  const conc = concDich > 0 ? concDich : concCalc;
 
-    // Nascondi pannello componenti aggiuntivi in modalità libera
-    const ccExtra = document.getElementById('card-comp-extra');
-    if (ccExtra) ccExtra.style.display = 'none';
-
-    const items = ingr.map(r => {
+  const items = ingr.map(r => {
       const q = parseFloat(r.qty)||0;
       const densita = getDensita(r.nome);
       const convNote = densita && r.unit === 'g' ? ' (≈'+fmt(q/densita,1)+' ml)' :
@@ -2038,10 +1825,9 @@ function calcPrep() {
       const prezCps  = parseFloat(document.getElementById('caps-vuote-prezzo')?.value||'0')||0;
       const nomeCps  = document.getElementById('caps-vuote-nome')?.value || 'Capsule vuote';
       const costoCps = nCaps * prezCps;
-      // Propaga a campi standard capsule per compilaScheda e tariffazione
-      if (document.getElementById('n-caps') && nCaps) document.getElementById('n-caps').value = nCaps;
-      if (document.getElementById('taglia-caps')) document.getElementById('taglia-caps').value = taglia;
-      if (document.getElementById('mg-pa-cps') && paG && nCaps) document.getElementById('mg-pa-cps').value = fmt(paG/nCaps*1000,2);
+      // Propaga ai campi nascosti di stato condiviso (compilaScheda / sincronizzaTariffazione)
+      if (nCaps) document.getElementById('n-caps').value = nCaps;
+      if (paG && nCaps) document.getElementById('mg-pa-cps').value = fmt(paG/nCaps*1000,2);
       const tCps = document.getElementById('t-cpsvuote');
       if (tCps && prezCps > 0) { tCps.value = prezCps.toFixed(4); }
       const tNcaps = document.getElementById('t-ncaps');
@@ -2174,7 +1960,7 @@ function calcPrep() {
     if (document.getElementById('qt'))   document.getElementById('qt').value   = fmt(totG,1);
     if (document.getElementById('conc')) document.getElementById('conc').value = fmt(conc,2);
 
-    // Etanolo: calcola % v/v equivalente per tariffazione (compAutoEt)
+    // Etanolo: calcola % v/v equivalente per il campo nascosto 'perc-et' (usato da Tariffazione/Scheda)
     const etRiga = ingr.find(r => {
       const n = invNominalizza(r.nome);
       return n.includes('etanolo') || n.includes('alcool') || n.includes('alcol');
@@ -2188,11 +1974,6 @@ function calcPrep() {
     } else {
       if (document.getElementById('perc-et')) document.getElementById('perc-et').value = '0';
     }
-
-    // NB: prepComps è la lista perc-mode dei componenti extra (popolata via prepAddComp).
-    // In libera mode NON va contaminata con ingredienti libera, altrimenti se l'utente switcha
-    // a perc la tariffazione legge prepComps.length come "componenti aggiuntivi" (era il bug del 2 d'ufficio).
-    // Il conteggio extra per la tariffazione in libera viene fatto in calcTariff via _liberaCompCount.
 
     liberaGrPA = paG;
     liberaRigheExtra = [];
@@ -2250,16 +2031,6 @@ function calcPrep() {
       if (prezzo > 0) liberaCostoExtra += costo;
       liberaRigheExtra.push({nome: r.nome, qty: q, unit: r.unit, grams, mlQty, prezzo, costo, isLiquido: isLiquido && !chiaveAll, isPa: _ri === _paIdx});
     });
-    const etRigaPerTariff = ingr.find(r => {
-      const n = invNominalizza(r.nome);
-      return n.includes('etanolo') || n.includes('alcool') || n.includes('alcol');
-    });
-    if (etRigaPerTariff) {
-      const qEt = parseFloat(etRigaPerTariff.qty)||0;
-      liberaMlEt = etRigaPerTariff.unit === 'ml' ? qEt : qEt / 0.807;
-    } else {
-      liberaMlEt = 0;
-    }
     // Capsule vuote: aggiunge DOPO il loop ingredienti (così non viene azzerata col reset)
     if (tipoPrep === 'capsule') {
       const _prezCpsPost  = parseFloat(document.getElementById('caps-vuote-prezzo')?.value||'0')||0;
@@ -2281,170 +2052,25 @@ function calcPrep() {
       if (_btnIdx !== undefined && _tarBtns[_btnIdx]) setTipoTariff(_tipoTariffAtteso, _tarBtns[_btnIdx]);
     }
     sincronizzaTariffazione();
-    return;
-  }
-
-  const ccExtra2 = document.getElementById('card-comp-extra');
-  if (ccExtra2) ccExtra2.style.display = '';
-
-
-  const qt   = parseFloat(document.getElementById('qt').value) || 100;
-  const conc = parseFloat(document.getElementById('conc').value) || 2;
-  const percEt = parseFloat(document.getElementById('perc-et').value) || 0;
-  const grPA = qt * conc / 100;
-  const mlET = tipoPrep === 'soluzione' ? qt * percEt / 100 : 0;
-  // ml di etanolo 96° necessari per ottenere percEt% in qt ml
-  const mlET96 = tipoPrep === 'soluzione' && percEt > 0 ? (qt * percEt / 96) : 0;
-  let items = [], proc = [], alertSolub = '';
-
-  if (tipoPrep === 'soluzione') {
-    const idroalcolica = percEt > 0;
-    items = idroalcolica ? [
-      {name:'Principio attivo', val:fmt(grPA,2), unit:'g'},
-      {name:'Etanolo 96°', val:fmt(mlET96,1), unit:'ml'},
-      {name:'Acqua purificata', val:'q.b. a '+qt, unit:'ml'},
-    ] : [
-      {name:'Principio attivo', val:fmt(grPA,2), unit:'g'},
-      {name:'Acqua purificata', val:'q.b. a '+qt, unit:'ml'},
-    ];
-    proc = idroalcolica ? [
-      'Pesare <strong>'+fmt(grPA,2)+' g</strong> di principio attivo su bilancia analitica.',
-      'Sciogliere in <strong>'+fmt(mlET96,1)+' ml</strong> di etanolo 96°.',
-      'Trasferire in matraccio tarato da <strong>'+qt+' ml</strong>.',
-      'Portare a volume con acqua purificata q.b. a '+qt+' ml, mescolando.',
-      'Verificare limpidezza. Filtrare su carta da filtro se necessario.',
-      'Trasferire in flacone ambrato. Chiudere ed etichettare.',
-    ] : [
-      'Pesare <strong>'+fmt(grPA,2)+' g</strong> di principio attivo su bilancia analitica.',
-      'Sciogliere in circa '+fmt(qt*0.8,0)+' ml di acqua purificata, agitando.',
-      'Trasferire in matraccio tarato da <strong>'+qt+' ml</strong>.',
-      'Portare a volume con acqua purificata q.b. a '+qt+' ml.',
-      'Verificare limpidezza. Filtrare se necessario.',
-      'Trasferire in flacone. Chiudere ed etichettare.',
-    ];
-    if (conc > 3 && idroalcolica) alertSolub = '<div class="alert alert-warn" style="margin-top:1rem"><span class="alert-icon">!</span><span>Concentrazione &gt;3% in soluzione idroalcolica: verificare solubilità del PA. Considerare riscaldamento blando o maggiore quota alcolica.</span></div>';
-
-  } else if (tipoPrep === 'unguento') {
-    const grVas = qt*0.49, grLan = qt*0.30;
-    items = [
-      {name:'Principio attivo', val:fmt(grPA,2), unit:'g'},
-      {name:'Vaselina filante bianca', val:fmt(grVas,2), unit:'g'},
-      {name:'Lanolina anidra', val:fmt(grLan,2), unit:'g'},
-      {name:'Totale', val:fmt(qt,0), unit:'g'},
-    ];
-    proc = [
-      'Pesare <strong>'+fmt(grPA,2)+' g</strong> di principio attivo finemente polverizzato.',
-      'Pesare vaselina ('+fmt(grVas,2)+' g) e lanolina ('+fmt(grLan,2)+' g).',
-      'Fondere a bagnomaria (~60\xb0C) la base vaselina/lanolina.',
-      'Allontanare dal calore. Incorporare il PA levigando fino a scomparsa dei granuli.',
-      'Mescolare durante il raffreddamento per evitare ricristallizzazione.',
-      'Invasare in barattolo opaco da '+qt+' g. Etichettare con "USO ESTERNO", data e scadenza.',
-    ];
-
-  } else if (tipoPrep === 'capsule') {
-    const nCaps   = parseInt(document.getElementById('n-caps').value) || 0;
-    const mgPAcps = parseFloat(document.getElementById('mg-pa-cps').value) || 0;
-    const taglia  = document.getElementById('taglia-caps').value;
-    const capVol  = {0:500, 1:400, 2:300, 3:210, 4:150}[taglia] || 500; // mg capacità pratica (densità ~0.7 g/mL)
-    const eccipNome = document.getElementById('eccip-nome').value.trim() || 'Eccipiente';
-
-    const mgEccipcps = Math.max(0, capVol - mgPAcps);
-    const grPA    = (mgPAcps * nCaps) / 1000;
-    const grEccip = (mgEccipcps * nCaps) / 1000;
-
-    items = [
-      {name:'Principio attivo (totale)', val:fmt(grPA,3), unit:'g'},
-      {name:eccipNome+' (totale)', val:fmt(grEccip,2), unit:'g'},
-      {name:'Capsule taglia '+taglia, val:String(nCaps), unit:'pz'},
-      {name:'PA per capsula', val:fmt(mgPAcps,2), unit:'mg'},
-      {name:'Eccipiente per capsula', val:fmt(mgEccipcps,1), unit:'mg'},
-      {name:'Peso totale per capsula', val:fmt(capVol,0), unit:'mg'},
-    ];
-    proc = [
-      'Pesare <strong>'+fmt(grPA,3)+' g</strong> di principio attivo su bilancia analitica.',
-      'Eseguire la prova volumetrica: inserire il PA nel cilindro dell\'opercolatrice da '+nCaps+' capsule taglia '+taglia+', aggiungere '+eccipNome+' fino a volume.',
-      'Determinare il peso di '+eccipNome+' necessario (peso cilindro − tara − peso PA).',
-      'Pesare l\'eccipiente calcolato (indicativamente <strong>'+fmt(grEccip,2)+' g</strong>).',
-      'Miscelare PA ed eccipiente per almeno 5 minuti fino ad omogeneità.',
-      'Riempire le capsule con l\'opercolatrice. Controllare peso di almeno 5 capsule.',
-      'Chiudere le capsule. Conservare in flacone ambrato ben chiuso.',
-      'Etichettare con nome PA, dosaggio per capsula ('+fmt(mgPAcps,2)+' mg), n° capsule ('+nCaps+'), data e scadenza.',
-    ];
-    if (mgPAcps > capVol) alertSolub = '<div class="alert alert-warn" style="margin-top:1rem"><span class="alert-icon">!</span><span>Il dosaggio PA ('+fmt(mgPAcps,1)+' mg) supera la capacità della taglia '+taglia+' ('+capVol+' mg). Considerare taglia più grande o dosaggio ridotto.</span></div>';
-    else if (mgPAcps > capVol * 0.9) alertSolub = '<div class="alert alert-warn" style="margin-top:1rem"><span class="alert-icon">!</span><span>Spazio eccipiente molto ridotto ('+fmt(mgEccipcps,1)+' mg/cps). Verificare scorrevolezza della polvere.</span></div>';
-
-  } else if (tipoPrep === 'polvere') {
-    items = [
-      {name:'Principio attivo', val:fmt(grPA,2), unit:'g'},
-      {name:'Eccipiente (se presente)', val:'q.b.', unit:''},
-      {name:'Totale polvere', val:fmt(qt,0), unit:'g'},
-    ];
-    proc = [
-      'Pesare <strong>'+fmt(grPA,2)+' g</strong> di principio attivo su bilancia analitica.',
-      'Se previsto eccipiente, pesarlo separatamente e mescolare per geometria (porzioni successive).',
-      'Passare al setaccio n\xb0 355 \xb5m se necessario per omogeneizzare la granulometria.',
-      'Miscelare accuratamente per almeno 5 minuti.',
-      'Trasferire in flacone/bustine. Etichettare con nome, concentrazione, data e scadenza.',
-    ];
-
-  } else if (tipoPrep === 'sospensione') {
-    const diluente = document.getElementById('tipo-diluente') ? document.getElementById('tipo-diluente').value : 'acqua';
-    const nomiDil = {acqua:'Acqua purificata', glicole:'Glicole propilenico', olio:'Olio di semi'};
-    const nomeDil = nomiDil[diluente] || 'Acqua purificata';
-    items = [
-      {name:'Principio attivo', val:fmt(grPA,2), unit:'g'},
-      {name:nomeDil, val:'q.b. a '+qt, unit:'ml'},
-      {name:'Agente sospendente', val:'q.b.', unit:''},
-    ];
-    proc = [
-      'Pesare <strong>'+fmt(grPA,2)+' g</strong> di principio attivo finemente polverizzato (setacciare se necessario).',
-      'Preparare il veicolo: sciogliere l\'agente sospendente (es. metilcellulosa 1%, carbossimetilcellulosa) in parte del '+nomeDil+'.',
-      'Aggiungere il PA al veicolo in piccole porzioni, agitando costantemente.',
-      'Portare a volume con '+nomeDil+' q.b. a '+qt+' ml.',
-      'Agitare energicamente. Verificare omogeneità e assenza di aggregati.',
-      'Trasferire in flacone ambrato. Etichettare con "AGITARE PRIMA DELL\'USO", data e scadenza.',
-    ];
-    alertSolub = '<div class="alert alert-warn" style="margin-top:1rem"><span class="alert-icon">!</span><span><strong>Agitare prima dell\'uso.</strong> Verificare stabilità fisica della sospensione a 24h e 48h dalla preparazione.</span></div>';
-  }
-
-  // Componenti aggiuntivi
-  const compsExtra = typeof prepGetComps === 'function' ? prepGetComps() : [];
-  compsExtra.forEach(c => items.push({name: c.nome, val: c.qty, unit: c.unit}));
-  if (compsExtra.length > 0) {
-    proc.push('Aggiungere: ' + compsExtra.map(c => '<strong>'+c.qty+' '+c.unit+'</strong> di '+c.nome).join(', ') + '.');
-  }
-
-  document.getElementById('formula-grid').innerHTML = items.map(i =>
-    '<div class="formula-item"><div class="formula-item-name">'+i.name+'</div><div class="formula-item-val">'+i.val+'<span class="formula-item-unit">'+i.unit+'</span></div></div>'
-  ).join('');
-  document.getElementById('alert-solub').innerHTML = alertSolub;
-  document.getElementById('procedura').innerHTML = proc.map(p => '<li>'+p+'</li>').join('');
-  sincronizzaTariffazione();
 }
 
 function sincronizzaTariffazione() {
-  const isLibera = modoPrepara === 'libera';
-  // In modalità libera nascondi tipo, PA e componenti extra manuali
-  // Il flacone resta sempre visibile
+  // Modalità unica libera (v46+): nascondi i selettori tipo/PA della Tariffazione e mostra la nota.
   ['tar-card-tipo','tariff-card-pa'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.style.display = isLibera ? 'none' : '';
+    if (el) el.style.display = 'none';
   });
-  // Nella card extra: nascondi solo le righe componenti, tieni flacone
   const cardExtra = document.getElementById('tariff-card-extra');
   if (cardExtra) {
     const extraRows = cardExtra.querySelector('#tt-extra-rows');
     const extraTitle = cardExtra.querySelector('.tariff-group-title');
     const extraNote = cardExtra.querySelector('[style*="Lascia vuoto"]');
-    if (extraRows) extraRows.style.display = isLibera ? 'none' : '';
-    if (extraTitle) extraTitle.style.display = isLibera ? 'none' : '';
-    if (extraNote) extraNote.style.display = isLibera ? 'none' : '';
-    // Etanolo manuale: nascosto in modalità libera (viene dalla formula)
-// tt-row-et rimosso
+    if (extraRows) extraRows.style.display = 'none';
+    if (extraTitle) extraTitle.style.display = 'none';
+    if (extraNote) extraNote.style.display = 'none';
   }
-  // Mostra/nascondi nota modalità libera
   let notaEl = document.getElementById('tariff-libera-nota');
-  if (isLibera && !notaEl) {
+  if (!notaEl) {
     notaEl = document.createElement('div');
     notaEl.id = 'tariff-libera-nota';
     notaEl.className = 'card';
@@ -2453,7 +2079,6 @@ function sincronizzaTariffazione() {
     const tarPage = document.getElementById('page-tariffazione');
     if (tarPage) tarPage.insertBefore(notaEl, tarPage.children[2]);
   }
-  if (notaEl) notaEl.style.display = isLibera ? '' : 'none';
 
   const nomePA = document.getElementById('prep-pa-nome') ? document.getElementById('prep-pa-nome').value.trim() : '';
   if (nomePA) {
@@ -2472,51 +2097,20 @@ function sincronizzaTariffazione() {
     const mapIdx  = {liquida:0, sospensione:1, semisolida:2, polvere:3, capsule:4, cartine:5};
     setTipoTariff(mapTipo[tipoPrep], tarBtns[mapIdx[mapTipo[tipoPrep]]]);
   }
+  // Ponte verso i campi della Tariffazione per i pannelli specifici (capsule, cartine)
   if (tipoPrep === 'cartine') {
     const _nCartLib = document.getElementById('cart-ncart-lib');
     if (document.getElementById('t-ncart') && _nCartLib) document.getElementById('t-ncart').value = _nCartLib.value || '';
-  } else if (tipoPrep !== 'capsule') {
-    if (document.getElementById('t-qt'))   document.getElementById('t-qt').value   = document.getElementById('qt').value;
-    if (document.getElementById('t-conc')) document.getElementById('t-conc').value = document.getElementById('conc').value;
-    // t-et-perc rimosso
-    // etanolo trattato come qualsiasi sostanza
-  } else {
+  } else if (tipoPrep === 'capsule') {
     const _nCapsEl = document.getElementById('n-caps');
     const _nCapsLib = document.getElementById('caps-ncaps-lib');
     const _nCapsVal = (_nCapsEl?.value) || (_nCapsLib?.value) || '';
     if (document.getElementById('t-ncaps')) document.getElementById('t-ncaps').value = _nCapsVal;
     if (document.getElementById('t-mgpa')  && document.getElementById('mg-pa-cps')) document.getElementById('t-mgpa').value  = document.getElementById('mg-pa-cps').value;
-    // Auto-lookup prezzo eccipiente capsule da inventario
-    if (modoPrepara !== 'libera') {
-      const eccNome = document.getElementById('eccip-nome')?.value?.trim() || '';
-      if (eccNome) {
-        const eccTrovato = invGetPrezzo(eccNome);
-        const tEccip = document.getElementById('t-eccip');
-        if (tEccip && eccTrovato && eccTrovato.prezzo > 0) tEccip.value = eccTrovato.prezzo.toFixed(4);
-      }
-    }
-  }
-  // Sincronizza componenti extra solo in modalità perc — in libera il calcolo viene
-  // da liberaRighe (vedi _liberaCompCount in calcTariff), prepComps è irrilevante.
-  if (modoPrepara !== 'libera') {
-    const nCompsPrep = typeof prepGetComps === 'function' ? prepGetComps().length : 0;
-    const tComp = document.getElementById('t-comp');
-    if (tComp) tComp.value = nCompsPrep;
-  }
-  // Auto-lookup eccipienti nella prima riga componenti extra per tipi non-capsule perc mode
-  if (modoPrepara !== 'libera' && tipoPrep !== 'capsule') {
-    const _eccNome = document.getElementById('eccip-nome')?.value?.trim() || '';
-    if (_eccNome) {
-      const _eccTr = invGetPrezzo(_eccNome);
-      const _extraRows = document.querySelectorAll('#tt-extra-rows .tt-extra-row');
-      if (_extraRows.length > 0 && _eccTr && _eccTr.prezzo > 0) {
-        const _r = _extraRows[0];
-        const _nomeEl = _r.querySelector('.t-extra-nome');
-        const _prezEl = _r.querySelector('.t-extra-prezzo');
-        if (_nomeEl && !_nomeEl.value) _nomeEl.value = _eccNome;
-        if (_prezEl && !_prezEl.value) _prezEl.value = _eccTr.prezzo.toFixed(4);
-      }
-    }
+  } else {
+    // soluzione / sospensione / unguento / polvere: ponte quantità + concentrazione per la Tariffazione
+    if (document.getElementById('t-qt'))   document.getElementById('t-qt').value   = document.getElementById('qt').value;
+    if (document.getElementById('t-conc')) document.getElementById('t-conc').value = document.getElementById('conc').value;
   }
   calcTariff();
 }
@@ -2716,8 +2310,8 @@ function setTipoTariff(t, btn) {
   tipoTariff = t;
   document.querySelectorAll('#page-tariffazione .seg-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  const isLiquida = t === 'liquida' || t === 'sospensione' || t === 'semisolida' || t === 'polvere';
-  document.getElementById('tt-liquida').style.display  = (isLiquida && modoPrepara !== 'libera') ? '' : 'none';
+  // Modalità unica libera: i campi quantità/concentrazione per le forme non-capsule arrivano dalla Preparazione (tt-liquida resta nascosto)
+  document.getElementById('tt-liquida').style.display  = 'none';
   document.getElementById('tt-capsule').style.display  = t === 'capsule' ? '' : 'none';
   const ttCartine = document.getElementById('tt-cartine');
   if (ttCartine) ttCartine.style.display = t === 'cartine' ? '' : 'none';
@@ -2792,12 +2386,12 @@ let _prevCapsNCaps = null;
 // e fa scattare lo scaling delle quantità in liberaRighe (sennò il tariff legge da caps-ncaps-lib
 // che resterebbe invariato e il prezzo non cambierebbe).
 function tariffNCapsChange() {
-  if (tipoPrep === 'capsule' && modoPrepara === 'libera') {
+  if (tipoPrep === 'capsule') {
     const newN = parseInt(document.getElementById('t-ncaps').value) || 0;
     const capsEl = document.getElementById('caps-ncaps-lib');
     if (capsEl) {
       capsEl.value = newN > 0 ? newN : '';
-      capsScaleOnNCapsChange(); // scala liberaRighe e chiama calcPrep (che ricalcola anche il tariff)
+      capsScaleOnNCapsChange();
       return;
     }
   }
@@ -2806,8 +2400,7 @@ function tariffNCapsChange() {
 
 function capsScaleOnNCapsChange() {
   const newN = parseInt(document.getElementById('caps-ncaps-lib').value) || 0;
-  // Scaling attivo solo in libera + capsule, con valore precedente noto e diverso da quello attuale
-  if (tipoPrep === 'capsule' && modoPrepara === 'libera'
+  if (tipoPrep === 'capsule'
       && _prevCapsNCaps && _prevCapsNCaps > 0 && newN > 0 && _prevCapsNCaps !== newN
       && Array.isArray(liberaRighe) && liberaRighe.length > 0) {
     const ratio = newN / _prevCapsNCaps;
@@ -2824,7 +2417,7 @@ function capsScaleOnNCapsChange() {
 let _prevCartNCart = null;
 
 function tariffNCartChange() {
-  if (tipoPrep === 'cartine' && modoPrepara === 'libera') {
+  if (tipoPrep === 'cartine') {
     const newN = parseInt(document.getElementById('t-ncart').value) || 0;
     const cartEl = document.getElementById('cart-ncart-lib');
     if (cartEl) {
@@ -2838,7 +2431,7 @@ function tariffNCartChange() {
 
 function cartScaleOnNCartChange() {
   const newN = parseInt(document.getElementById('cart-ncart-lib').value) || 0;
-  if (tipoPrep === 'cartine' && modoPrepara === 'libera'
+  if (tipoPrep === 'cartine'
       && _prevCartNCart && _prevCartNCart > 0 && newN > 0 && _prevCartNCart !== newN
       && Array.isArray(liberaRighe) && liberaRighe.length > 0) {
     const ratio = newN / _prevCartNCart;
@@ -2989,39 +2582,22 @@ function tarForzaManuale() {
 function calcTariff() {
   const pPA   = parseFloat(document.getElementById('t-pa').value)||0;
   const pFL   = parseFloat(document.getElementById('t-fl').value)||0;
-  const compManuale = parseInt(document.getElementById('t-comp').value)||0;
-  const percEtTariff = parseFloat(document.getElementById('t-et-perc')?.value)||0;
-  const compAutoEt = 0; // etanolo: costo materia prima al prezzo acquisto, non conta come comp. aggiuntivo Art.5
-  // In modalità libera: conta tutte le sostanze, base 2 incluse nel prezzo base
-  // Comp in libera: esclude PA (indice 0), acqua ed etanolo (solventi standard non extra)
-  // Vale anche per capsule (PA + eccipiente già nella base voce Allegato B)
-  const _liberaCompCount = modoPrepara === 'libera'
-    ? liberaGetIngr().filter((r, i) => {
-        if (i === 0) return false; // PA
-        const n = invNominalizza(r.nome);
-        if (n.includes('acqua')) return false;
-        if (n.includes('etanolo') || n.includes('alcool') || n.includes('alcol')) return false;
-        return true;
-      }).length
-    : null;
-  const comp = _liberaCompCount !== null ? Math.max(0, _liberaCompCount - 2) : compManuale + compAutoEt; // DM: base include 2 sostanze
+  // Modalità unica libera: conta le sostanze extra (escludi PA, acqua, etanolo).
+  // Art. 5: la base Allegato B include già 2 sostanze, quindi comp = max(0, count-2).
+  const _liberaCompCount = liberaGetIngr().filter((r, i) => {
+    if (i === 0) return false; // PA
+    const n = invNominalizza(r.nome);
+    if (n.includes('acqua')) return false;
+    if (n.includes('etanolo') || n.includes('alcool') || n.includes('alcol')) return false;
+    return true;
+  }).length;
+  const comp = Math.max(0, _liberaCompCount - 2);
   const op    = parseInt(document.getElementById('t-op').value)||0;
   const stupp = parseInt(document.getElementById('t-stupp').value)||0;
   const dop   = parseInt(document.getElementById('t-dop').value)||0;
   const notte = parseFloat(document.getElementById('t-notte').value)||0;
-  // suppH auto: €2,50 se almeno un ingrediente ha codici H di pericolo per la salute (Art. 8a)
-  let _hRilevato = false;
-  if (modoPrepara === 'libera') {
-    _hRilevato = liberaRighe.some(r => r.nome && hasHazard(r.h || getHDaInventario(r.nome)));
-  } else {
-    const _paNome = document.getElementById('prep-pa-nome')?.value || document.getElementById('t-pa-nome')?.value || '';
-    _hRilevato = hasHazard(getHDaInventario(_paNome));
-    // Etanolo H225 → rileva se presente in preparazione (soluzione idroalcolica)
-    if (!_hRilevato && (tipoTariff === 'liquida' || tipoTariff === 'sospensione')) {
-      const _percEtPrep = parseFloat(document.getElementById('perc-et')?.value||'0')||0;
-      if (_percEtPrep > 0) _hRilevato = true;
-    }
-  }
+  // suppH auto (Art. 8a): €2,50 se almeno un ingrediente ha un codice H di pericolo per la salute
+  const _hRilevato = liberaRighe.some(r => r.nome && hasHazard(r.h || getHDaInventario(r.nome)));
   const suppH = _hRilevato ? 2.50 : 0;
   const suppSt = stupp*2.50, suppDop = dop*2.50;
 
@@ -3099,65 +2675,41 @@ function calcTariff() {
     const costoB  = baseB + addComp + addOp;
     const inc40   = costoB * 0.40;
 
-    let grPA, costoPA, righeMaterie;
+    // Modalità unica libera: PA e eccipienti da liberaRigheExtra
+    const grPA    = liberaGrPA;
+    const costoPA = grPA * pPA;
+    const nomePA  = document.getElementById('prep-pa-nome')?.value || 'Principio attivo';
 
-    if (modoPrepara === 'libera') {
-      // Libera: PA e eccipienti da liberaRigheExtra
-      grPA    = liberaGrPA;
-      costoPA = grPA * pPA;
-      const nomePA = document.getElementById('prep-pa-nome')?.value || 'Principio attivo';
+    // Capsule vuote: leggi dal DOM come fonte primaria
+    const _prezCpsDom  = parseFloat(document.getElementById('caps-vuote-prezzo')?.value||'0')||0;
+    const _nomeCpsDom  = document.getElementById('caps-vuote-nome')?.value || '';
+    const _nCapsLibera = parseInt(document.getElementById('caps-ncaps-lib')?.value||'0')||nCaps;
+    const _capEntry = liberaRigheExtra.find(r => r.isCapsule);
+    const _prezCps  = _capEntry?.prezzo || _prezCpsDom;
+    const _nomeCps  = _capEntry?.nome   || _nomeCpsDom || 'Capsule vuote';
+    const _qtaCps   = _capEntry?.qty    || _nCapsLibera;
+    const _costoCps = _qtaCps * _prezCps;
 
-      // Capsule vuote: leggi direttamente dal DOM come fonte primaria affidabile
-      const _prezCpsDom  = parseFloat(document.getElementById('caps-vuote-prezzo')?.value||'0')||0;
-      const _nomeCpsDom  = document.getElementById('caps-vuote-nome')?.value || '';
-      const _nCapsLibera = parseInt(document.getElementById('caps-ncaps-lib')?.value||'0')||nCaps;
-      // Usa liberaRigheExtra per capsule se presente, altrimenti costruisce dal DOM
-      const _capEntry = liberaRigheExtra.find(r => r.isCapsule);
-      const _prezCps  = _capEntry?.prezzo || _prezCpsDom;
-      const _nomeCps  = _capEntry?.nome  || _nomeCpsDom || 'Capsule vuote';
-      const _qtaCps   = _capEntry?.qty   || _nCapsLibera;
-      const _costoCps = _qtaCps * _prezCps;
+    // Eccipienti: liberaRigheExtra meno PA e capsule
+    const _eccipienti = liberaRigheExtra.filter(r => !r.isCapsule && !r.isPa);
+    const _costoEccipienti = _eccipienti.reduce((s,r) => s+r.costo, 0);
+    const costoTotMaterie = costoPA + _costoEccipienti + _costoCps;
 
-      // Eccipienti: da liberaRigheExtra (escludi PA, già contato come costoPA, e capsule)
-      const _eccipienti = liberaRigheExtra.filter(r => !r.isCapsule && !r.isPa);
-      const _costoEccipienti = _eccipienti.reduce((s,r) => s+r.costo, 0);
-
-      const costoTotMaterie = costoPA + _costoEccipienti + _costoCps;
-
-      righeMaterie = [
-        {name: nomePA+' — '+fmt(grPA,3)+' g × '+fmtE(pPA)+'/g', val: costoPA,
-          badge: pPA===0?'⚠ inserire prezzo in inventario':'', badgeType:'warn'},
-        ..._eccipienti.map(r => {
-            const dispQty = r.isLiquido ? fmt(r.unit==='ml'?r.qty:r.qty/(getDensita(r.nome)||1),1)+' ml' : fmt(r.grams,2)+' g';
-            const dispUnit = r.isLiquido ? '/ml' : '/g';
-            return {name: r.nome+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, val: r.costo,
-              badge: r.prezzo===0?'⚠ inserire prezzo in inventario':'', badgeType:'warn'};
-          }),
-        _qtaCps > 0
-          ? {name: _nomeCps+' — '+_qtaCps+' pz × '+fmtE(_prezCps)+'/pz', val: _costoCps,
-              badge: _prezCps===0?'⚠ inserire prezzo in inventario':'al costo', badgeType: _prezCps===0?'warn':'ok'}
-          : {name:'⚠ Capsule vuote — seleziona taglia per auto-compilare', val:0, badge:'mancante', badgeType:'warn'},
-      ];
-      netto = costoTotMaterie + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte + suppManTotale();
-    } else {
-      // Modalità perc: usa campi manuali tariffazione
-      const pEccip  = parseFloat(document.getElementById('t-eccip').value)||0;
-      // grEccip: stima da taglia capsula − mgPA (capacità − dose PA)
-      const _tagliaCps = parseInt(document.getElementById('taglia-caps')?.value||'0')||0;
-      const _capVolMap = {0:500,1:400,2:300,3:210,4:150};
-      const _capVolMg  = _capVolMap[_tagliaCps] || 500;
-      const grEccip = Math.max(0, (_capVolMg - mgPAcps) * nCaps / 1000);
-      grPA     = (mgPAcps * nCaps) / 1000;
-      costoPA  = grPA * pPA;
-      const costoEccip = grEccip * pEccip;
-      const costoCps   = nCaps * pCpsVuote;
-      righeMaterie = [
-        {name:'Principio attivo — '+fmt(grPA,3)+' g × '+fmtE(pPA)+'/g', val:costoPA},
-        ...(costoEccip>0?[{name:'Eccipiente — '+fmt(grEccip,2)+' g × '+fmtE(pEccip)+'/g', val:costoEccip}]:[]),
-        {name:'Capsule vuote — '+nCaps+' × '+fmtE(pCpsVuote), val:costoCps, badge:'al costo', badgeType:'ok'},
-      ];
-      netto = costoPA + costoEccip + costoCps + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte + suppManTotale();
-    }
+    const righeMaterie = [
+      {name: nomePA+' — '+fmt(grPA,3)+' g × '+fmtE(pPA)+'/g', val: costoPA,
+        badge: pPA===0?'⚠ inserire prezzo in inventario':'', badgeType:'warn'},
+      ..._eccipienti.map(r => {
+        const dispQty = r.isLiquido ? fmt(r.unit==='ml'?r.qty:r.qty/(getDensita(r.nome)||1),1)+' ml' : fmt(r.grams,2)+' g';
+        const dispUnit = r.isLiquido ? '/ml' : '/g';
+        return {name: r.nome+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, val: r.costo,
+          badge: r.prezzo===0?'⚠ inserire prezzo in inventario':'', badgeType:'warn'};
+      }),
+      _qtaCps > 0
+        ? {name: _nomeCps+' — '+_qtaCps+' pz × '+fmtE(_prezCps)+'/pz', val: _costoCps,
+            badge: _prezCps===0?'⚠ inserire prezzo in inventario':'al costo', badgeType: _prezCps===0?'warn':'ok'}
+        : {name:'⚠ Capsule vuote — seleziona taglia per auto-compilare', val:0, badge:'mancante', badgeType:'warn'},
+    ];
+    netto = costoTotMaterie + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte + suppManTotale();
 
     rows = [
       {group:'Materie prime'},
@@ -3178,19 +2730,10 @@ function calcTariff() {
 
   } else {
     // ── LIQUIDA / SEMISOLIDA / POLVERE ── All. B DM 2017
+    // Modalità unica libera: PA, etanolo ed eccipienti sono in liberaRigheExtra (costoPA/costoET = 0)
     const qt     = parseFloat(document.getElementById('t-qt').value)||0;
-    const conc   = parseFloat(document.getElementById('t-conc').value)||0;
-    // Etanolo: % v/v da Preparazione, prezzo da inventario (auto)
-    const percEt = parseFloat(document.getElementById('perc-et')?.value||'0')||0;
-    const _etInv = invLoadMerged().find(s => invNominalizza(s.nome).includes('etanolo') || invNominalizza(s.nome).includes('alcool'));
-    const pET    = _etInv ? (_etInv.prezzo||0) : 0;
-    const grPA   = modoPrepara === 'libera' ? liberaGrPA : qt*conc/100;
-    const mlET96s = (percEt > 0 && qt > 0 && (tipoTariff === 'liquida' || tipoTariff === 'sospensione')) ? qt * percEt / 96 : 0;
     const nFlac  = 1;
-    const costoPA  = modoPrepara === 'libera' ? 0 : grPA*pPA; // libera: costo PA in liberaRigheExtra
-    const costoET  = modoPrepara === 'libera' ? 0 : mlET96s * pET; // libera: etanolo in liberaRigheExtra
     const costoFL  = nFlac*pFL;
-    const costoExtra = modoPrepara === 'libera' ? liberaCostoExtra : 0;
 
     // All. B: base e scaglioni per tipo
     // All. B GU 30-1-2018 valori ufficiali
@@ -3217,21 +2760,7 @@ function calcTariff() {
     const costoB  = baseB + addComp + addOp;
     const inc40   = costoB * 0.40;
 
-    const _costoExtraTPeek = modoPrepara !== 'libera' ? Array.from(document.querySelectorAll('#tt-extra-rows .tt-extra-row')).reduce((s,row)=>{const n=row.querySelector('.t-extra-nome').value.trim(),q=parseFloat(row.querySelector('.t-extra-qty').value)||0,p=parseFloat(row.querySelector('.t-extra-prezzo').value)||0;return s+(n&&q>0&&p>0?q*p:0);},0) : 0;
-    netto = (modoPrepara === 'libera' ? liberaCostoExtra : costoPA + costoET + _costoExtraTPeek) + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte + suppManTotale();
-
-    // ── componenti extra (Art. 5) ──
-    const extraRowsT = document.querySelectorAll('#tt-extra-rows .tt-extra-row');
-    let extraRowsArr = [];
-    extraRowsT.forEach(row => {
-      const nome  = row.querySelector('.t-extra-nome').value.trim();
-      const qty   = parseFloat(row.querySelector('.t-extra-qty').value)||0;
-      const unit  = row.querySelector('.t-extra-unit').value;
-      const prez  = parseFloat(row.querySelector('.t-extra-prezzo').value)||0;
-      if (nome && qty>0 && prez>0) extraRowsArr.push({nome,qty,unit,prez,costo:qty*prez});
-    });
-    const costoExtraT = extraRowsArr.reduce((s,e)=>s+e.costo,0);
-    // netto già calcolato sopra con _costoExtraTPeek (stesso valore)
+    netto = liberaCostoExtra + costoB + inc40 + suppH + suppSt + suppDop + costoFL + notte + suppManTotale();
 
     const nomeVoce = {
       liquida:    'Soluzioni (voce 1)',
@@ -3246,19 +2775,12 @@ function calcTariff() {
 
     rows = [
       {group:'Materie prime'},
-      ...(modoPrepara === 'libera'
-        ? liberaRigheExtra.map(r => {
-            const dispQty = r.isLiquido ? fmt(r.unit==='ml'?r.qty:r.qty/(getDensita(r.nome)||1),1)+' ml' : fmt(r.grams,2)+' g';
-            const dispUnit = r.isLiquido ? '/ml' : '/g';
-            const badge = r.prezzo===0 ? '⚠ prezzo mancante' : '';
-            return {name: r.nome+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, val: r.costo, badge, badgeType:'warn'};
-          })
-        : [
-            {name:(document.getElementById('prep-pa-nome')?.value||'Principio attivo')+' — '+fmt(grPA,2)+' g × '+fmtE(pPA)+'/g', val:costoPA},
-            ...(mlET96s>0?[{name:'Etanolo 96° — '+fmt(mlET96s,1)+' ml × '+fmtE(pET)+'/ml', val:costoET}]:[]),
-            ...extraRowsArr.map(e=>({name:e.nome+' — '+fmt(e.qty,3)+' '+e.unit+' × '+fmtE(e.prez)+'/'+e.unit+' (Art. 5)', val:e.costo})),
-          ]
-      ),
+      ...liberaRigheExtra.map(r => {
+        const dispQty = r.isLiquido ? fmt(r.unit==='ml'?r.qty:r.qty/(getDensita(r.nome)||1),1)+' ml' : fmt(r.grams,2)+' g';
+        const dispUnit = r.isLiquido ? '/ml' : '/g';
+        const badge = r.prezzo===0 ? '⚠ prezzo mancante' : '';
+        return {name: r.nome+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, val: r.costo, badge, badgeType:'warn'};
+      }),
       {group:'Costi di preparazione — All. B '+nomeVoce+' (D.M. 22/09/2017)'},
       {name:baseDesc, val:baseB},
       ...(comp>0?[{name:'Componenti aggiuntivi: '+comp+' × €'+fmt(c.compExtra,2), val:addComp}]:[]),
@@ -3335,11 +2857,9 @@ function setTipoScheda(t, btn) {
     const mapIdx  = {liquida:0, sospensione:1, semisolida:2, polvere:3, capsule:4};
     const idx = mapIdx[tipoTariff];
     if (tarBtns[idx]) tarBtns[idx].classList.add('active');
-    // aggiorna visibilità campi tariff
-    const isLiquida = tipoTariff === 'liquida' || tipoTariff === 'sospensione' || tipoTariff === 'semisolida' || tipoTariff === 'polvere';
-    document.getElementById('tt-liquida').style.display  = (isLiquida && modoPrepara !== 'libera') ? '' : 'none';
+    // Modalità unica libera: tt-liquida sempre nascosto, tt-capsule solo se capsule
+    document.getElementById('tt-liquida').style.display  = 'none';
     document.getElementById('tt-capsule').style.display  = tipoTariff === 'capsule' ? '' : 'none';
-    // tt-row-et rimosso
   }
 
   aggiornaScheda();
@@ -3387,7 +2907,7 @@ function aggiornaScheda() {
   if (tipoScheda === 'soluzione') {
     // In modalità libera leggi direttamente da liberaRighe
     let qt, conc, percEt, grPA, mlET96s;
-    if (modoPrepara === 'libera' && liberaRighe.length > 0) {
+    if (liberaRighe.length > 0) {
       const {totG, paG, conc: concCalcA, ingr} = liberaCalcTotale();
       qt = totG; conc = concCalcA; grPA = paG; // conc sempre auto-calcolata
       const etRiga = ingr.find(r => { const n=invNominalizza(r.nome); return n.includes('etanolo')||n.includes('alcool')||n.includes('alcol'); });
@@ -3404,7 +2924,7 @@ function aggiornaScheda() {
     const _etInvS = invLoadMerged().find(s => invNominalizza(s.nome).includes('etanolo') || invNominalizza(s.nome).includes('alcool'));
     const pET    = _etInvS ? (_etInvS.prezzo||0) : 0;
 
-    if (modoPrepara === 'libera' && liberaRighe.length > 0) {
+    if (liberaRighe.length > 0) {
       const {ingr: ingrL} = liberaCalcTotale();
       formulaItems = ingrL.map(r => {
         const q = parseFloat(r.qty)||0;
@@ -3510,7 +3030,7 @@ function aggiornaScheda() {
   // ═══════════ POLVERE ═══════════
   } else if (tipoScheda === 'polvere') {
     let qt, grPA, eccip, grEccip;
-    if (modoPrepara === 'libera' && liberaRighe.length > 0) {
+    if (liberaRighe.length > 0) {
       const {totG, paG, ingr: ingrL} = liberaCalcTotale();
       qt = totG; grPA = paG; grEccip = Math.max(0, totG - paG);
       eccip = ingrL.length > 1 ? ingrL.slice(1).map(r => r.nome).join(' + ') : 'Eccipiente';
@@ -3596,38 +3116,21 @@ function aggiornaScheda() {
   }
 
   // ═══════ calcolo tariff ═══════
-  let _hS = false;
-  if (modoPrepara === 'libera') {
-    _hS = liberaRighe.some(r => r.nome && hasHazard(r.h || getHDaInventario(r.nome)));
-  } else {
-    _hS = hasHazard(getHDaInventario(nomePA));
-    // Etanolo → H per soluzioni e sospensioni idroalcoliche
-    if (!_hS && (tipoScheda === 'soluzione' || tipoScheda === 'sospensione')) {
-      const _percEtS = parseFloat(document.getElementById('perc-et')?.value||'0')||0;
-      if (_percEtS > 0) _hS = true;
-    }
-  }
+  // Modalità unica libera: PA, etanolo ed extra sono in liberaRigheExtra/liberaCostoExtra
+  const _hS = liberaRighe.some(r => r.nome && hasHazard(r.h || getHDaInventario(r.nome)));
   const suppH  = _hS ? 2.50 : 0;
   const inc40  = baseB * 0.40;
-  // In libera mode il PA è già incluso in liberaCostoExtra / liberaRigheExtra: non sommarlo né mostrarlo due volte
-  const _costoPA_eff = modoPrepara === 'libera' ? 0 : costoPA;
-  const nettoMaterie = modoPrepara === 'libera' ? liberaCostoExtra : (costoPA + costoET + costoExtra);
+  const nettoMaterie = liberaCostoExtra;
   const netto  = nettoMaterie + baseB + inc40 + suppH + costoFL_s;
   const iva    = netto * 0.10;
   const totale = prezzo > 0 ? prezzo : netto + iva;
 
   let tariffRows = [];
-  if (modoPrepara === 'libera') {
-    liberaRigheExtra.forEach(r => {
-      const dispQty = r.isLiquido ? fmt(r.unit==='ml'?r.qty:r.qty/(getDensita(r.nome)||1),1)+' ml' : fmt(r.grams,2)+' g';
-      const dispUnit = r.isLiquido ? '/ml' : '/g';
-      tariffRows.push({n: r.nome+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, v: r.costo});
-    });
-  } else {
-    tariffRows.push({n: nomePA + ' — ' + fmt(_costoPA_eff/Math.max(pPA,0.0001),3) + ' g × ' + fmtE(pPA) + '/g', v: _costoPA_eff});
-// etanolo in liberaRigheExtra
-    extra.forEach(e => tariffRows.push({n:e.nome+' '+fmt(e.qty,3)+' '+e.unit+' × '+fmtE(e.prez)+'/'+e.unit, v:e.costo}));
-  }
+  liberaRigheExtra.forEach(r => {
+    const dispQty = r.isLiquido ? fmt(r.unit==='ml'?r.qty:r.qty/(getDensita(r.nome)||1),1)+' ml' : fmt(r.grams,2)+' g';
+    const dispUnit = r.isLiquido ? '/ml' : '/g';
+    tariffRows.push({n: r.nome+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, v: r.costo});
+  });
   tariffRows.push(
     {n:'All. B — '+nomeVoceB, v:baseB},
     {n:'Incremento 40% (Art. 7)', v:inc40},
@@ -3748,49 +3251,29 @@ function compilaScheda() {
   if (document.getElementById('s-pa-nome')) document.getElementById('s-pa-nome').value = nomePA;
 
   if (tipoPrep === 'capsule') {
-    const nCaps   = document.getElementById('n-caps') ? document.getElementById('n-caps').value : '';
-    const mgPAcps = document.getElementById('mg-pa-cps') ? document.getElementById('mg-pa-cps').value : '';
-    const taglia  = document.getElementById('taglia-caps') ? document.getElementById('taglia-caps').value : '0';
-    const eccip   = document.getElementById('eccip-nome') ? document.getElementById('eccip-nome').value : '';
+    const nCaps   = document.getElementById('n-caps')?.value || '';
+    const mgPAcps = document.getElementById('mg-pa-cps')?.value || '';
+    const taglia  = document.getElementById('caps-taglia-lib')?.value || '0';
     if (document.getElementById('s-ncaps')) document.getElementById('s-ncaps').value = nCaps;
     if (document.getElementById('s-mgpa'))  document.getElementById('s-mgpa').value  = mgPAcps;
     if (document.getElementById('s-taglia'))document.getElementById('s-taglia').value = taglia;
-    if (document.getElementById('s-eccip')) document.getElementById('s-eccip').value  = eccip;
     const prepNome = nomePA ? nomePA+' '+mgPAcps+' mg/cps capsule' : 'Capsule';
     document.getElementById('s-prep').value = prepNome;
   } else {
-    if (modoPrepara === 'libera') {
-      // Modalità formula libera: leggi da liberaRighe
-      const {totG, paG, conc: concCalcS, ingr} = liberaCalcTotale();
-      const concL = concCalcS; // conc sempre auto-calcolata
-      const concStr = concL > 0 ? fmt(concL,1) + '% ' : '';
-      const tipoStr = tipoPrep === 'soluzione' ? 'Soluzione' : tipoPrep === 'unguento' ? 'Unguento' : tipoPrep === 'polvere' ? 'Polvere' : 'Sospensione';
-      const prepNome = nomePA ? nomePA + ' ' + concStr + tipoStr : tipoStr;
-      document.getElementById('s-prep').value = prepNome;
-      document.getElementById('s-qt').value   = fmt(totG,1);
-      document.getElementById('s-conc').value = fmt(concL,2);
-      const etRiga = ingr.find(r => {
-        const n = invNominalizza(r.nome);
-        return n.includes('etanolo') || n.includes('alcool') || n.includes('alcol');
-      });
-      if (document.getElementById('s-et')) document.getElementById('s-et').value = etRiga ? etRiga.qty : '0';
-    } else {
-      const prepNome = nomePAraw ?
-        (nomePAraw + ' ' + document.getElementById('conc').value + '%') :
-        (document.getElementById('conc').value + '% ' +
-         (tipoPrep === 'soluzione' ? 'Soluzione idroalcolica' :
-          tipoPrep === 'unguento' ? 'Unguento' :
-          tipoPrep === 'polvere' ? 'Polvere' : 'Sospensione'));
-      document.getElementById('s-prep').value  = prepNome;
-      const qt   = document.getElementById('qt').value;
-      const conc = document.getElementById('conc').value;
-      const et   = document.getElementById('perc-et') ? document.getElementById('perc-et').value : '0';
-      document.getElementById('s-qt').value    = qt;
-      document.getElementById('s-conc').value  = conc;
-      if (document.getElementById('s-et')) document.getElementById('s-et').value = et;
-      const eccip = document.getElementById('eccip-nome') ? document.getElementById('eccip-nome').value : '';
-      if (document.getElementById('s-eccip')) document.getElementById('s-eccip').value = eccip;
-    }
+    // Modalità unica libera: leggi da liberaRighe
+    const {totG, paG, conc: concCalcS, ingr} = liberaCalcTotale();
+    const concL = concCalcS;
+    const concStr = concL > 0 ? fmt(concL,1) + '% ' : '';
+    const tipoStr = tipoPrep === 'soluzione' ? 'Soluzione' : tipoPrep === 'unguento' ? 'Unguento' : tipoPrep === 'polvere' ? 'Polvere' : 'Sospensione';
+    const prepNome = nomePA ? nomePA + ' ' + concStr + tipoStr : tipoStr;
+    document.getElementById('s-prep').value = prepNome;
+    document.getElementById('s-qt').value   = fmt(totG,1);
+    document.getElementById('s-conc').value = fmt(concL,2);
+    const etRiga = ingr.find(r => {
+      const n = invNominalizza(r.nome);
+      return n.includes('etanolo') || n.includes('alcool') || n.includes('alcol');
+    });
+    if (document.getElementById('s-et')) document.getElementById('s-et').value = etRiga ? etRiga.qty : '0';
   }
 
   // 4. Prezzo da Tariffazione — legge l'ultimo elemento .totale-num (prezzo al pubblico)
@@ -3844,7 +3327,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 63;
+const APP_VERSION = 64;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -4490,12 +3973,9 @@ function aiRenderImportCard(comps, daOrdinare, tipo) {
     const badge = found
       ? '<span style="font-size:10px;color:var(--accent);margin-left:4px">\u2713 inventario</span>'
       : '<span style="font-size:10px;color:#c05000;margin-left:4px;font-weight:600">\u26a0 da ordinare</span>';
-    const nomeEnc = c.nome.replace(/\'/g,"\\\'");
     return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">' +
       '<span style="flex:1;font-size:12px;font-family:var(--mono)">' + c.nome + badge + '</span>' +
       '<span style="font-size:12px;font-family:var(--mono);color:var(--text-muted)">' + c.qty + ' ' + c.unit + '</span>' +
-      '<button onclick="aiImportaComp(\'' + nomeEnc + '\',\'' + c.qty + '\',\'' + c.unit + '\')" ' +
-        'style="font-size:11px;padding:2px 10px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);cursor:pointer">+ Aggiungi</button>' +
       '</div>';
   }).join('');
   const compsJson = JSON.stringify(comps).replace(/"/g,'&quot;');
@@ -4517,18 +3997,6 @@ function aiRenderImportCard(comps, daOrdinare, tipo) {
     '</div>';
 }
 
-function aiImportaComp(nome, qty, unit) {
-  if (typeof prepComps === 'undefined') { alert('Vai prima nella sezione Preparazione.'); return; }
-  if (prepComps.length >= 4) { alert('Massimo 4 componenti aggiuntivi raggiunti.'); return; }
-  const inv = typeof invLoadMerged === 'function' ? invLoadMerged() : [];
-  const found = inv.find(s => invNominalizza(s.nome).includes(invNominalizza(nome)) || invNominalizza(nome).includes(invNominalizza(s.nome)));
-  prepComps.push({nome: found ? found.nome : nome, qty, unit, prezzoAcq: found ? (found.prezzo||0) : 0});
-  if (typeof prepRenderComps === 'function') prepRenderComps();
-  if (typeof calcPrep === 'function') calcPrep();
-  const prepBtn = document.querySelector('.nav-btn[onclick*=\"preparazione\"]');
-  if (prepBtn) showPage('preparazione', prepBtn);
-}
-
 function aiImportaTutti(comps, tipo) {
   if (!comps || !comps.length) return;
   // 1) Vai in Preparazione
@@ -4547,17 +4015,10 @@ function aiImportaTutti(comps, tipo) {
   const tipoBtns = document.querySelectorAll('#tariff-card-tipo .seg .seg-btn');
   if (tipoBtns[tipoIdx]) setTipo(tipoTarget, tipoBtns[tipoIdx]);
 
-  // 3) Forza modalità libera (setTipo la attiva di default solo per polvere/unguento)
-  const liberaBtn = document.getElementById('modo-libera-btn');
-  if (liberaBtn && modoPrepara !== 'libera') setModoPrepara('libera', liberaBtn);
+  // 3) (Modalità unica libera dal v46+ — niente switch da fare)
 
   // 4) Popola liberaRighe da zero con i comps, facendo lookup Allegato A + inventario.
   //    Per capsule: escludi la riga "Capsule ..." (non è un ingrediente in peso, va in caps-ncaps-lib).
-  //    Pulisce prepComps (lista perc-mode): in libera non serve, e se l'utente ha cliccato
-  //    "+ Aggiungi" sui singoli ingredienti dalla card AI prima di "Porta in Preparazione",
-  //    prepComps.length inquinerebbe t-comp nella tariffazione.
-  prepComps = [];
-  if (typeof prepRenderComps === 'function') prepRenderComps();
   const inv = typeof invLoadMerged === 'function' ? invLoadMerged() : [];
   const compsForLibera = tipoTarget === 'capsule'
     ? comps.filter(c => !/\bcapsul/i.test(c.nome) && c.unit !== 'pz')
@@ -4934,11 +4395,9 @@ function resetRicetta() {
 
   // ── state moduli ──
   tipoPrep = 'soluzione';
-  modoPrepara = 'libera'; // modalità unica
   liberaRighe = [];
   liberaRigheExtra = [];
-  liberaGrPA = 0; liberaMlEt = 0; liberaCostoExtra = 0;
-  prepComps = [];
+  liberaGrPA = 0; liberaCostoExtra = 0;
   opTecnologicheDesc = '';
   tipoTariff = 'liquida';
   tarPADaAllegatoA = true;
@@ -4951,18 +4410,15 @@ function resetRicetta() {
   const setHTML = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = v; };
 
   // ── input preparazione ──
-  ['prep-pa-nome','qt','conc','mg-pa-cps','n-caps','eccip-nome',
+  ['prep-pa-nome','qt','conc','mg-pa-cps','n-caps',
    'caps-ncaps-lib','caps-vuote-cerca','caps-vuote-nome','libera-conc','totale-prep','grado-alc','vol-soluzione',
    'cart-ncart-lib'].forEach(id => setVal(id, ''));
   setVal('perc-et', '0');
   setVal('caps-vuote-prezzo', '0');
-  setVal('tipo-diluente', 'acqua');
-  setVal('taglia-caps', '0');
   setVal('caps-taglia-lib', '0');
   const cvSel = document.getElementById('caps-vuote-sel'); if (cvSel) cvSel.textContent = '';
   setHTML('caps-vuote-sug', '');
   setHTML('libera-righe', '');
-  setHTML('prep-comp-extra', '');
   setHTML('formula-grid', '');
   setHTML('procedura', '');
   setHTML('alert-solub', '');
@@ -4999,7 +4455,6 @@ function resetRicetta() {
   const prepTipoBtn = document.querySelector('#page-preparazione .seg-btn');
   const tarTipoBtn  = document.querySelector('#page-tariffazione .seg-btn');
   const schTipoBtn  = document.querySelector('#scheda-inputs .seg-btn');
-  const modoPercBtn = document.getElementById('modo-perc-btn');
   if (prepTipoBtn) setTipo('soluzione', prepTipoBtn);
   if (liberaRighe.length === 0) liberaAddRiga();
   liberaRenderRighe();
@@ -5023,7 +4478,6 @@ ghCaricaToken();
 invSyncFromGist().then(() => invRender()).catch(() => invRender());
 etiqAggiorna();
 aiCaricaKey();
-popolaPASuggestions();
 initCapsuleTaglie();
 if (liberaRighe.length === 0) liberaAddRiga();
 liberaRenderRighe();
