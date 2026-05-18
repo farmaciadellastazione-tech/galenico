@@ -3407,7 +3407,15 @@ function aggiornaScheda() {
 // e salva la scadenza in data-scad dell'input, poi (se la validità è in modalità auto)
 // ricalcola s-mesi.
 
-// Trova lotti candidati per una sostanza: ritorna [{lotto, scad, nome}], FEFO (scad asc).
+// True se il lotto è fittizio (placeholder INV_HARDCODED senza override locale, o generato da "Compila dati mancanti").
+function isLottoDemo(item) {
+  if (!item) return false;
+  if (item._hardcoded === true) return true;
+  if (/^AUTO\d/.test(String(item.lotto||''))) return true;
+  return false;
+}
+
+// Trova lotti candidati per una sostanza: ritorna [{lotto, scad, nome, demo}], FEFO (scad asc).
 function trovaLottiCandidati(keywords) {
   const inv = invLoadMerged();
   const kw = (keywords||[]).filter(Boolean).map(k => String(k).toLowerCase());
@@ -3422,7 +3430,8 @@ function trovaLottiCandidati(keywords) {
   return candidati.map(c => ({
     lotto: c.lottoInt || c.lotto,
     scad: c.scad || '',
-    nome: c.nome
+    nome: c.nome,
+    demo: isLottoDemo(c)
   }));
 }
 
@@ -3438,7 +3447,7 @@ function popolaLottoSelect(fieldId, candidati) {
     opt.value = String(i);
     opt.dataset.lotto = c.lotto;
     opt.dataset.scad  = c.scad;
-    opt.textContent = c.lotto + (c.scad ? ' (scad. '+c.scad+')' : '') + ' — ' + c.nome;
+    opt.textContent = (c.demo ? '[DEMO] ' : '') + c.lotto + (c.scad ? ' (scad. '+c.scad+')' : '') + ' — ' + c.nome;
     sel.appendChild(opt);
   });
   if (candidati.length > 0) {
@@ -3641,7 +3650,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 81;
+const APP_VERSION = 82;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -4070,8 +4079,9 @@ function invRender() {
     const hTags = item.h ? item.h.split(',').map(s=>s.trim()).filter(Boolean).map(s=>`<span class="tag-h">${s}</span>`).join('') : '';
     const chiusa = item.dataCh ? `<span class="tag-ok">chiusa ${fmtGiorno(item.dataCh)}</span>` : '';
     const obbTag = isObb ? `<span style="background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-border);border-radius:3px;font-size:10px;padding:1px 4px;margin-left:4px">⚕ obbligatoria</span>` : '';
+    const demoTag = isLottoDemo(item) ? `<span style="background:#fff3cd;color:#856404;border:1px solid #ffc107;border-radius:3px;font-size:9px;padding:1px 4px;margin-left:4px;font-weight:600;letter-spacing:0.04em">DEMO</span>` : '';
     rows += `<tr class="${cls}">
-      <td><div class="inv-nome">${item.nome}${obbTag}</div><div>${hTags}${chiusa}</div></td>
+      <td><div class="inv-nome">${item.nome}${obbTag}${demoTag}</div><div>${hTags}${chiusa}</div></td>
       <td><div class="inv-lotto">${item.lotto||'—'}</div>${item.lottoInt?`<div class="inv-sub">int: ${item.lottoInt}</div>`:''}</td>
       <td>${item.ddtNum?`<div class="inv-lotto">${item.ddtNum}</div>`:'<div class="inv-sub">—</div>'}${item.ddtData?`<div class="inv-sub">${fmtGiorno(item.ddtData)}</div>`:''}</td>
       <td>${item.dataAp?`<div class="inv-sub">ap. ${fmtGiorno(item.dataAp)}</div>`:'<div class="inv-sub">—</div>'}</td>
@@ -4094,8 +4104,9 @@ function invRender() {
       const hTags = item.h ? item.h.split(',').map(s=>s.trim()).filter(Boolean).map(s=>`<span class="tag-h">${s}</span>`).join('') : '';
       const obbTag = isObb ? `<span style="background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-border);border-radius:3px;font-size:10px;padding:1px 4px;margin-left:4px">⚕ obbligatoria</span>` : '';
       const nomeEnc = item.nome.replace(/'/g,"\\'");
+      const demoTag = `<span style="background:#fff3cd;color:#856404;border:1px solid #ffc107;border-radius:3px;font-size:9px;padding:1px 4px;margin-left:4px;font-weight:600;letter-spacing:0.04em">DEMO</span>`;
       rows += `<tr class="${cls}" style="opacity:0.75">
-        <td><div class="inv-nome">${item.nome}${obbTag}</div><div>${hTags}</div></td>
+        <td><div class="inv-nome">${item.nome}${obbTag}${demoTag}</div><div>${hTags}</div></td>
         <td><div class="inv-sub">${item.lotto||'—'}</div>${item.lottoInt?`<div class="inv-sub">int: ${item.lottoInt}</div>`:''}</td>
         <td><div class="inv-sub">—</div></td>
         <td><div class="inv-sub">${item.dataAp?fmtGiorno(item.dataAp):'—'}</div></td>
