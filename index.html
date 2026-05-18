@@ -881,32 +881,6 @@
   <p class="subtitle">Assistente galenico — Groq gpt-oss-120b · solo farmacopea e preparazioni magistrali</p>
 
   <div class="card">
-    <div class="card-title">Chiave API Groq</div>
-    <div class="ai-key-row">
-      <input type="text" id="ai-groq-key" placeholder="gsk_..." autocomplete="off" spellcheck="false">
-      <button onclick="aiSalvaKey()">✓ Salva</button>
-      <button onclick="aiMostraKey()" style="background:var(--text-muted)">👁</button>
-    </div>
-    <div id="ai-key-status" style="font-size:11px;font-family:var(--mono);color:var(--text-faint);margin-top:4px"></div>
-    <div style="font-size:11px;color:var(--text-faint);font-family:var(--mono)">
-      Chiave gratuita su <a href="https://console.groq.com" target="_blank" style="color:var(--accent)">console.groq.com</a> — salvata in localStorage, mai inviata altrove
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">Token GitHub (sincronizzazione inventario)</div>
-    <div class="ai-key-row">
-      <input type="text" id="gh-token-input" placeholder="ghp_..." autocomplete="off" spellcheck="false">
-      <button onclick="ghSalvaToken()">✓ Salva</button>
-      <button onclick="ghMostraToken()" style="background:var(--text-muted)">👁</button>
-    </div>
-    <div id="gh-token-status" style="font-size:11px;font-family:var(--mono);color:var(--text-faint);margin-top:4px"></div>
-    <div style="font-size:11px;color:var(--text-faint);font-family:var(--mono)">
-      Token GitHub con scope <strong>gist</strong> — lo stesso di LinguaeQuiz. Salvato in localStorage.
-    </div>
-  </div>
-
-  <div class="card">
     <div class="card-title">Nuova preparazione</div>
     <div class="field-row" style="margin-bottom:0.75rem">
       <span class="field-label">Nome preparazione</span>
@@ -915,7 +889,9 @@
     <div class="field-row" style="margin-bottom:0.75rem">
       <span class="field-label">Forma farmaceutica</span>
       <select id="ai-prep-forma">
+        <option>Soluzione acquosa</option>
         <option>Soluzione idroalcolica</option>
+        <option>Soluzione oleosa</option>
         <option>Unguento</option>
         <option>Crema</option>
         <option>Gel</option>
@@ -962,6 +938,32 @@
     <div class="ai-actions">
       <button class="btn-add" style="font-size:12px;padding:5px 14px" onclick="aiEsportaScheda()">→ Usa in Scheda</button>
       <button style="font-family:var(--sans);font-size:12px;padding:5px 12px;background:none;border:1px solid var(--border-strong);color:var(--text-muted);border-radius:var(--radius);cursor:pointer" onclick="aiReset()">↺ Nuova conversazione</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Chiave API Groq</div>
+    <div class="ai-key-row">
+      <input type="text" id="ai-groq-key" placeholder="gsk_..." autocomplete="off" spellcheck="false">
+      <button onclick="aiSalvaKey()">✓ Salva</button>
+      <button onclick="aiMostraKey()" style="background:var(--text-muted)">👁</button>
+    </div>
+    <div id="ai-key-status" style="font-size:11px;font-family:var(--mono);color:var(--text-faint);margin-top:4px"></div>
+    <div style="font-size:11px;color:var(--text-faint);font-family:var(--mono)">
+      Chiave gratuita su <a href="https://console.groq.com" target="_blank" style="color:var(--accent)">console.groq.com</a> — salvata in localStorage, mai inviata altrove
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Token GitHub (sincronizzazione inventario)</div>
+    <div class="ai-key-row">
+      <input type="text" id="gh-token-input" placeholder="ghp_..." autocomplete="off" spellcheck="false">
+      <button onclick="ghSalvaToken()">✓ Salva</button>
+      <button onclick="ghMostraToken()" style="background:var(--text-muted)">👁</button>
+    </div>
+    <div id="gh-token-status" style="font-size:11px;font-family:var(--mono);color:var(--text-faint);margin-top:4px"></div>
+    <div style="font-size:11px;color:var(--text-faint);font-family:var(--mono)">
+      Token GitHub con scope <strong>gist</strong> — lo stesso di LinguaeQuiz. Salvato in localStorage.
     </div>
   </div>
 </div>
@@ -3689,7 +3691,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 59;
+const APP_VERSION = 60;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -4515,7 +4517,7 @@ function aiAddSys(text) {
 async function aiChiama(userMsg) {
   const key = aiGetKey();
   if (!key || key.indexOf('gsk_') !== 0) {
-    aiAddSys('Inserisci una chiave Groq valida (gsk_...) nel campo in alto.');
+    aiAddSys('Inserisci una chiave Groq valida (gsk_...) nel campo in fondo pagina.');
     return;
   }
   aiHistory.push({ role: 'user', content: userMsg });
