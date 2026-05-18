@@ -485,7 +485,7 @@
   <h1>Tariffazione magistrale</h1>
   <p class="subtitle">D.M. 22 settembre 2017 (mod. D.M. 13 dicembre 2017) — IVA 10%</p>
 
-  <div class="card" id="tariff-card-tipo">
+  <div class="card" id="tar-card-tipo">
     <div class="card-title">Tipo di preparazione</div>
     <div class="seg">
       <button class="seg-btn active" onclick="setTipoTariff('liquida',this)">Soluzione</button>
@@ -2362,7 +2362,7 @@ function sincronizzaTariffazione() {
   const isLibera = modoPrepara === 'libera';
   // In modalità libera nascondi tipo, PA e componenti extra manuali
   // Il flacone resta sempre visibile
-  ['tariff-card-tipo','tariff-card-pa'].forEach(id => {
+  ['tar-card-tipo','tariff-card-pa'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = isLibera ? 'none' : '';
   });
@@ -3689,7 +3689,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 58;
+const APP_VERSION = 59;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
