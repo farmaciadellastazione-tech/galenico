@@ -427,7 +427,12 @@
       <input type="number" id="cart-ncart-lib" value="" min="1" max="1000" step="1" oninput="cartScaleOnNCartChange()">
       <span class="field-note">pz</span>
     </div>
-    <div style="font-size:11px;color:var(--text-faint);margin-top:4px">Il PA per cartina viene calcolato automaticamente da PA totale / N° cartine (vedi riepilogo formula).</div>
+    <div class="field-row">
+      <span class="field-label">Dose PA per cartina</span>
+      <input type="number" id="cart-dose-lib" value="" min="0" step="0.1" oninput="cartDoseChange()">
+      <span class="field-note">mg/cartina</span>
+    </div>
+    <div style="font-size:11px;color:var(--text-faint);margin-top:4px">La dose qui sopra è sincronizzata con la prima riga sostanze (PA). Modificarla aggiorna la quantità del PA.</div>
   </div>
 
   <div class="card">
@@ -584,6 +589,7 @@
       <button class="seg-btn active" onclick="setTipoScheda('soluzione',this)">Soluzione</button>
       <button class="seg-btn" onclick="setTipoScheda('unguento',this)">Unguento / crema</button>
       <button class="seg-btn" onclick="setTipoScheda('capsule',this)">Capsule</button>
+      <button class="seg-btn" onclick="setTipoScheda('cartine',this)">Cartine</button>
       <button class="seg-btn" onclick="setTipoScheda('polvere',this)">Polvere</button>
       <button class="seg-btn" onclick="setTipoScheda('sospensione',this)">Sospensione</button>
     </div>
@@ -597,6 +603,10 @@
     <!-- campi capsule -->
     <div id="s-row-ncaps" style="display:none"><div class="field-row"><span class="field-label">Numero capsule</span><input type="number" id="s-ncaps" value="" min="1" step="1" oninput="aggiornaScheda()"></div></div>
     <div id="s-row-mgpa" style="display:none"><div class="field-row"><span class="field-label">Dosaggio PA (mg/cps)</span><input type="number" id="s-mgpa" value="" step="0.1" min="0" oninput="aggiornaScheda()"></div></div>
+    <!-- campi cartine -->
+    <div id="s-row-ncart" style="display:none"><div class="field-row"><span class="field-label">Numero cartine</span><input type="number" id="s-ncart" value="" min="1" step="1" oninput="aggiornaScheda()"></div></div>
+    <div id="s-row-mgpacart" style="display:none"><div class="field-row"><span class="field-label">Dosaggio PA (mg/cartina)</span><input type="number" id="s-mgpacart" value="" step="0.1" min="0" oninput="aggiornaScheda()"></div></div>
+    <div id="s-row-mgcart" style="display:none"><div class="field-row"><span class="field-label">Massa totale per cartina (mg)</span><input type="number" id="s-mgcart" value="" step="1" min="0" oninput="aggiornaScheda()"><span class="field-note">PA + eccipiente</span></div></div>
     <div id="s-row-taglia" style="display:none"><div class="field-row"><span class="field-label">Taglia capsula</span>
       <select id="s-taglia" onchange="aggiornaScheda()">
         <option value="0">0 — 500 mg</option>
@@ -869,6 +879,7 @@
         <option>Crema</option>
         <option>Gel</option>
         <option>Capsule</option>
+        <option>Cartine</option>
         <option>Polvere</option>
         <option>Sospensione</option>
         <option>Collirio</option>
@@ -882,6 +893,16 @@
         <option>g</option>
         <option>pz</option>
       </select>
+    </div>
+    <div class="field-row" style="margin-bottom:0.75rem">
+      <span class="field-label">Dose per pezzo</span>
+      <input type="number" id="ai-prep-dose" value="" min="0" step="0.1" style="width:90px" placeholder="opz.">
+      <select id="ai-prep-dose-unit" style="width:70px;margin-left:4px">
+        <option>mg</option>
+        <option>g</option>
+        <option>%</option>
+      </select>
+      <span class="field-note" style="margin-left:8px">per cartine/capsule (dose PA per singolo pezzo)</span>
     </div>
     <button class="btn-add" onclick="aiAvviaPreparazione()">🤖 Chiedi all'AI la formula</button>
   </div>
@@ -1902,6 +1923,11 @@ function calcPrep() {
       // Propaga il numero cartine alla tariffazione
       const tNcart = document.getElementById('t-ncart');
       if (tNcart && nCart > 0) tNcart.value = nCart;
+      // Propaga la dose PA per cartina al pannello (non sovrascrivere se l'utente sta digitando lì)
+      const cartDoseEl = document.getElementById('cart-dose-lib');
+      if (cartDoseEl && document.activeElement !== cartDoseEl) {
+        cartDoseEl.value = mgPACart > 0 ? fmt(mgPACart, 2) : '';
+      }
       // Helper: formato smart g/mg per masse in mg (g con 2 decimali, mg con 1)
       const fmtMg = mg => mg >= 1000 ? {val: fmt(mg/1000, 2), unit: 'g'} : {val: fmt(mg, 1), unit: 'mg'};
       // Formula display
@@ -2484,6 +2510,20 @@ function cartScaleOnNCartChange() {
   calcPrep();
 }
 
+// Cambio dose PA per cartina dal pannello cartine: propaga alla prima riga PA in liberaRighe.
+function cartDoseChange() {
+  if (tipoPrep !== 'cartine') return;
+  const doseMg = parseFloat(document.getElementById('cart-dose-lib').value) || 0;
+  if (!liberaRighe.length) return;
+  let idx = liberaRighe.findIndex(r => r.isPa);
+  if (idx < 0) idx = 0;
+  // Forza unit=mg e usa valore numerico con punto (parseFloat-compatible)
+  liberaRighe[idx].unit = 'mg';
+  liberaRighe[idx].qty  = String(doseMg);
+  liberaRenderRighe();
+  calcPrep();
+}
+
 function capsTagliaChanged(taglia) {
   // Auto-cerca capsule vuote in inventario per la taglia selezionata
   const inv = invLoadMerged();
@@ -2851,11 +2891,23 @@ function setTipoScheda(t, btn) {
   const isSol  = t === 'soluzione' || t === 'sospensione';
   const isSemi = t === 'unguento';
   const isCaps = t === 'capsule';
+  const isCart = t === 'cartine';
   const isPol  = t === 'polvere';
+  const hasEccip = isCaps || isCart || isPol || isSemi;
 
   // quantità + concentrazione sempre visibili; label cambia
-  document.getElementById('s-lbl-qt').textContent = isCaps ? 'Quantità (pz capsule)' : (isSol ? 'Quantità (ml)' : 'Quantità (g)');
-  document.getElementById('s-lbl-conc').textContent = isCaps ? 'Dosaggio PA (mg/cps)' : 'Concentrazione PA (%)';
+  document.getElementById('s-lbl-qt').textContent =
+    isCaps ? 'Quantità (pz capsule)' :
+    isCart ? 'Quantità (pz cartine)' :
+    (isSol ? 'Quantità (ml)' : 'Quantità (g)');
+  document.getElementById('s-lbl-conc').textContent =
+    isCaps ? 'Dosaggio PA (mg/cps)' :
+    isCart ? 'Dosaggio PA (mg/cartina)' :
+    'Concentrazione PA (%)';
+
+  // concentrazione % non ha senso per capsule/cartine (la dose è per-pezzo nei rispettivi campi)
+  document.getElementById('s-row-conc').style.display = (isCaps || isCart) ? 'none' : '';
+  document.getElementById('s-row-qt-ml').style.display = (isCaps || isCart) ? 'none' : '';
 
   // etanolo solo soluzione
   document.getElementById('s-row-et').style.display = isSol ? '' : 'none';
@@ -2864,28 +2916,34 @@ function setTipoScheda(t, btn) {
   document.getElementById('s-row-ncaps').style.display  = isCaps ? '' : 'none';
   document.getElementById('s-row-mgpa').style.display   = isCaps ? '' : 'none';
   document.getElementById('s-row-taglia').style.display = isCaps ? '' : 'none';
-  document.getElementById('s-row-eccip').style.display  = (isCaps || isPol || isSemi) ? '' : 'none';
+  // campi specifici cartine
+  document.getElementById('s-row-ncart').style.display     = isCart ? '' : 'none';
+  document.getElementById('s-row-mgpacart').style.display  = isCart ? '' : 'none';
+  document.getElementById('s-row-mgcart').style.display    = isCart ? '' : 'none';
+  document.getElementById('s-row-eccip').style.display     = hasEccip ? '' : 'none';
 
   // lotti
   document.getElementById('s-row-lotto-et').style.display = isSol ? '' : 'none';
   document.getElementById('s-row-lotto-ac').style.display = (isSol || t === 'sospensione') ? '' : 'none';
-  document.getElementById('s-row-lotto-eccip').style.display = (isCaps || isPol || isSemi) ? '' : 'none';
-  const lblEccip = {capsule:'Lotto eccipiente', polvere:'Lotto eccipiente', unguento:'Lotto base (vaselina/cera)'};
+  document.getElementById('s-row-lotto-eccip').style.display = hasEccip ? '' : 'none';
+  const lblEccip = {capsule:'Lotto eccipiente', cartine:'Lotto eccipiente', polvere:'Lotto eccipiente', unguento:'Lotto base (vaselina/cera)'};
   if (lblEccip[t]) document.getElementById('s-lbl-lotto-eccip').textContent = lblEccip[t];
 
   // sincronizza tipoTariff
-  const mapT = {soluzione:'liquida', sospensione:'sospensione', unguento:'semisolida', polvere:'polvere', capsule:'capsule'};
+  const mapT = {soluzione:'liquida', sospensione:'sospensione', unguento:'semisolida', polvere:'polvere', capsule:'capsule', cartine:'cartine'};
   if (mapT[t]) {
     tipoTariff = mapT[t];
     // aggiorna bottone attivo in tariffazione
     document.querySelectorAll('#page-tariffazione .seg-btn').forEach(b => b.classList.remove('active'));
     const tarBtns = document.querySelectorAll('#page-tariffazione .seg-btn');
-    const mapIdx  = {liquida:0, sospensione:1, semisolida:2, polvere:3, capsule:4};
+    const mapIdx  = {liquida:0, sospensione:1, semisolida:2, polvere:3, capsule:4, cartine:5};
     const idx = mapIdx[tipoTariff];
     if (tarBtns[idx]) tarBtns[idx].classList.add('active');
-    // Modalità unica libera: tt-liquida sempre nascosto, tt-capsule solo se capsule
+    // Modalità unica libera: tt-liquida sempre nascosto, pannelli specifici solo per il tipo corrispondente
     document.getElementById('tt-liquida').style.display  = 'none';
     document.getElementById('tt-capsule').style.display  = tipoTariff === 'capsule' ? '' : 'none';
+    const ttCart = document.getElementById('tt-cartine');
+    if (ttCart) ttCart.style.display = tipoTariff === 'cartine' ? '' : 'none';
   }
 
   aggiornaScheda();
@@ -3139,6 +3197,45 @@ function aggiornaScheda() {
     const diff10 = Math.ceil(Math.abs(nCaps-120)/10);
     baseB = 22.00 + (nCaps>120?diff10*2:nCaps<120?-diff10*1:0);
     baseB = Math.max(0,baseB); nomeVoceB = 'Capsule/bustine (voce 7)';
+
+  // ═══════════ CARTINE ═══════════
+  } else if (tipoScheda === 'cartine') {
+    const nCart    = parseInt(document.getElementById('s-ncart').value)||0;
+    const mgPAcart = parseFloat(document.getElementById('s-mgpacart').value)||0;
+    const eccip    = document.getElementById('s-eccip').value.trim()||'Eccipiente';
+    // Massa per cartina: nessun limite fisso (le cartine non sono contenute). L'operatore inserisce il valore;
+    // se vuoto, di default = solo PA (niente eccipiente).
+    const mgCartInput = parseFloat(document.getElementById('s-mgcart').value);
+    const mgCart      = isNaN(mgCartInput) || mgCartInput <= 0 ? mgPAcart : Math.max(mgPAcart, mgCartInput);
+    const mgEccipcart = Math.max(0, mgCart - mgPAcart);
+    const grPA        = (mgPAcart * nCart)/1000;
+    const grEccip     = (mgEccipcart * nCart)/1000;
+
+    formulaItems = [
+      {nome:nomePA+' (totale)', val:fmt(grPA,3), unit:'g'},
+      {nome:eccip+' (totale)', val:fmt(grEccip,2), unit:'g'},
+      {nome:'Cartine', val:String(nCart), unit:'pz'},
+      {nome:'PA per cartina', val:fmt(mgPAcart,2), unit:'mg'},
+      {nome:'Eccipiente per cartina', val:fmt(mgEccipcart,1), unit:'mg'},
+      {nome:'Peso per cartina', val:fmt(mgCart,0), unit:'mg'},
+    ];
+    proc = [
+      'Pesare <strong>'+fmt(grPA,3)+' g</strong> di '+nomePA+' su bilancia analitica.',
+      'Pesare <strong>'+fmt(grEccip,2)+' g</strong> di '+eccip+'.',
+      'Miscelare PA ed eccipiente per almeno 5 minuti fino ad omogeneità (triturare in mortaio se necessario).',
+      'Ripartire la polvere in <strong>'+nCart+' cartine</strong> di carta velina (atteso: '+fmt(mgCart,0)+' mg/cartina, di cui PA '+fmt(mgPAcart,2)+' mg).',
+      'Verificare il peso di almeno 3 cartine (tolleranza ±5%).',
+      'Piegare le cartine e conservare in busta o scatola chiusa. Etichettare.',
+      'Etichettare: '+nomePA+' '+fmt(mgPAcart,2)+' mg/cartina — N° '+nCart+' cartine — data e scadenza.',
+    ];
+    lottiItems = [
+      {nome:nomePA, lotto:lottoAS},
+      {nome:eccip, lotto:document.getElementById('s-lotto-eccip').value||'—'},
+    ];
+    costoPA = grPA*pPA; costoFL_s = pFL;
+    const diff10c = Math.ceil(Math.abs(nCart-120)/10);
+    baseB = 22.00 + (nCart>120?diff10c*2:nCart<120?-diff10c*1:0);
+    baseB = Math.max(0,baseB); nomeVoceB = 'Cartine/bustine (voce 7)';
   }
 
   // ═══════ calcolo tariff ═══════
@@ -3166,6 +3263,7 @@ function aggiornaScheda() {
 
   // ═══════ HTML scheda ═══════
   const qtLabel = tipoScheda==='capsule' ? (document.getElementById('s-ncaps').value||'—')+' pz'
+                : tipoScheda==='cartine' ? (document.getElementById('s-ncart').value||'—')+' pz'
                 : tipoScheda==='soluzione'||tipoScheda==='sospensione' ? (document.getElementById('s-qt').value||'—')+' ml'
                 : (document.getElementById('s-qt').value||'—')+' g';
 
@@ -3173,7 +3271,7 @@ function aggiornaScheda() {
     '<div class="scheda-header">' +
       '<div class="scheda-farmacia"><strong>Farmacia della Stazione</strong>Via Fiume 75 \u2014 La Spezia<br>Farmacista: '+farm+'</div>' +
       '<div class="scheda-title"><h2>Scheda n. '+num+'</h2><p>Preparato magistrale \xb7 '+
-        {soluzione:'Soluzione idroalcolica',sospensione:'Sospensione',unguento:'Unguento/crema',polvere:'Polvere',capsule:'Capsule'}[tipoScheda]+
+        {soluzione:'Soluzione idroalcolica',sospensione:'Sospensione',unguento:'Unguento/crema',polvere:'Polvere',capsule:'Capsule',cartine:'Cartine'}[tipoScheda]+
       '</p></div>' +
     '</div>' +
     '<div class="scheda-meta">' +
@@ -3181,7 +3279,7 @@ function aggiornaScheda() {
       '<div class="scheda-meta-item"><div class="lbl">Paziente</div><div class="val">'+paz+'</div></div>' +
       '<div class="scheda-meta-item"><div class="lbl">Data</div><div class="val">'+fmtData(dataVal)+'</div></div>' +
       '<div class="scheda-meta-item"><div class="lbl">Quantità</div><div class="val">'+qtLabel+'</div></div>' +
-      (tipoScheda!=='capsule' ? '<div class="scheda-meta-item"><div class="lbl">Concentrazione</div><div class="val">'+fmt(parseFloat(document.getElementById('s-conc').value)||0,1)+'% p/v</div></div>' : '') +
+      (tipoScheda!=='capsule' && tipoScheda!=='cartine' ? '<div class="scheda-meta-item"><div class="lbl">Concentrazione</div><div class="val">'+fmt(parseFloat(document.getElementById('s-conc').value)||0,1)+'% p/v</div></div>' : '') +
       '<div class="scheda-meta-item"><div class="lbl">Scadenza</div><div class="val">'+scadenza+'</div></div>' +
     '</div>' +
     '<div class="scheda-section">' +
@@ -3257,13 +3355,12 @@ function compilaScheda() {
   document.getElementById('s-num').value = numScheda;
 
   // 2. Sincronizza tipo da Preparazione → Scheda
-  // Cartine: mappa a polvere (la scheda non ha template dedicato; la formula calcolata già riporta n° cartine)
-  const mapTipoPrep = {soluzione:'soluzione', unguento:'unguento', capsule:'capsule', cartine:'polvere', polvere:'polvere', sospensione:'sospensione'};
+  const mapTipoPrep = {soluzione:'soluzione', unguento:'unguento', capsule:'capsule', cartine:'cartine', polvere:'polvere', sospensione:'sospensione'};
   if (mapTipoPrep[tipoPrep]) {
     tipoScheda = mapTipoPrep[tipoPrep];
     // clicca il bottone corrispondente nella Scheda
     const sBtn = document.querySelectorAll('#scheda-inputs .seg-btn');
-    const mapIdx = {soluzione:0,unguento:1,capsule:2,polvere:3,sospensione:4};
+    const mapIdx = {soluzione:0,unguento:1,capsule:2,cartine:3,polvere:4,sospensione:5};
     setTipoScheda(tipoScheda, sBtn[mapIdx[tipoScheda]]);
   }
 
@@ -3284,6 +3381,17 @@ function compilaScheda() {
     if (document.getElementById('s-mgpa'))  document.getElementById('s-mgpa').value  = mgPAcps;
     if (document.getElementById('s-taglia'))document.getElementById('s-taglia').value = taglia;
     const prepNome = nomePA ? nomePA+' '+mgPAcps+' mg/cps capsule' : 'Capsule';
+    document.getElementById('s-prep').value = prepNome;
+  } else if (tipoPrep === 'cartine') {
+    const nCart   = document.getElementById('cart-ncart-lib')?.value || '';
+    const {totG: totGcart, paG: paGcart} = liberaCalcTotale();
+    const n = parseInt(nCart) || 0;
+    const mgPAcart = (n > 0 && paGcart > 0) ? fmt((paGcart * 1000) / n, 2) : '';
+    const mgCart   = (n > 0 && totGcart > 0) ? fmt((totGcart * 1000) / n, 0) : '';
+    if (document.getElementById('s-ncart'))    document.getElementById('s-ncart').value    = nCart;
+    if (document.getElementById('s-mgpacart')) document.getElementById('s-mgpacart').value = mgPAcart;
+    if (document.getElementById('s-mgcart'))   document.getElementById('s-mgcart').value   = mgCart;
+    const prepNome = nomePA ? nomePA+' '+mgPAcart+' mg/cartina' : 'Cartine';
     document.getElementById('s-prep').value = prepNome;
   } else {
     // Modalità unica libera: leggi da liberaRighe
@@ -3353,7 +3461,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 68;
+const APP_VERSION = 73;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -3821,7 +3929,9 @@ function etiqAggiorna() {
 function etiqDaScheda() {
   // Importa i dati dalla scheda già compilata
   const prep    = document.getElementById('s-prep').value;
-  const qt      = document.getElementById('s-qt').value;
+  const qt      = tipoScheda === 'capsule' ? document.getElementById('s-ncaps').value
+                : tipoScheda === 'cartine' ? document.getElementById('s-ncart').value
+                : document.getElementById('s-qt').value;
   const paz     = document.getElementById('s-paz').value;
   const dataVal = document.getElementById('s-data').value;
   const mesi    = document.getElementById('s-mesi').value;
@@ -3829,7 +3939,8 @@ function etiqDaScheda() {
 
   // unità in base al tipo
   const unitaQt = (tipoScheda === 'soluzione' || tipoScheda === 'sospensione') ? ' ml' :
-                  tipoScheda === 'capsule' ? ' cps' : ' g';
+                  tipoScheda === 'capsule' ? ' cps' :
+                  tipoScheda === 'cartine' ? ' cartine' : ' g';
 
   if (prep)    document.getElementById('e-nome').value = prep;
   if (qt)      document.getElementById('e-qty').value  = qt + unitaQt;
@@ -3844,7 +3955,7 @@ function etiqDaScheda() {
   // uso esterno/interno in base al tipo scheda
   const usoEl = document.getElementById('e-uso');
   if (usoEl) {
-    if (tipoScheda === 'capsule' || tipoScheda === 'polvere') usoEl.value = 'USO ORALE';
+    if (tipoScheda === 'capsule' || tipoScheda === 'cartine' || tipoScheda === 'polvere') usoEl.value = 'USO ORALE';
     else usoEl.value = 'USO ESTERNO';
   }
 
@@ -3909,9 +4020,9 @@ function aiGetSystemPrompt() {
     'IMPORTANTE: rispondi SEMPRE con la formula completa anche se alcune sostanze non sono in inventario. ' +
     'Alla fine aggiungi: DA ORDINARE: [sostanze mancanti dall\'inventario] ' +
     'Quando proponi una formula usa SEMPRE questo formato:\n' +
-    'TIPO: [soluzione|sospensione|unguento|polvere|capsule]\n' +
+    'TIPO: [soluzione|sospensione|unguento|polvere|capsule|cartine]\n' +
     'FORMULA:\n- [sostanza]: [quantit\u00e0] [unit\u00e0]\nPROCEDURA:\n1. [passo]\nNOTE: [avvertenze]\n' +
-    'TIPO \u00e8 obbligatorio e deve essere uno dei 5 valori esatti sopra (minuscolo). Per liquidi usa ml, per solidi usa g. Elenca ogni componente su riga separata con trattino.\n' +
+    'TIPO \u00e8 obbligatorio e deve essere uno dei 6 valori esatti sopra (minuscolo). Per liquidi usa ml, per solidi usa g. Elenca ogni componente su riga separata con trattino.\n' +
     'CAPSULE \u2014 REGOLE DI CALCOLO (RIGIDE, NON DEROGABILI):\n' +
     '  1. In questa farmacia \u00e8 disponibile SOLO la taglia 0 (cifra zero, MAI lettera O). Usa sempre "Capsule gelatina dura taglia 0" o "Capsule HPMC taglia 0".\n' +
     '  2. Se l\'utente non specifica il numero di capsule, CHIEDI prima di rispondere. Non assumere un numero a caso.\n' +
@@ -3924,6 +4035,21 @@ function aiGetSystemPrompt() {
     '     - Finasteride: 0,060 g  (= 60 cps \u00d7 1 mg \u00f7 1000)\n' +
     '     - Eccipiente tipo II Vivaldi: 29,94 g  (= 60 \u00d7 0,5 \u2212 0,060)\n' +
     '     - Capsule gelatina dura taglia 0: 60 pz\n' +
+    'CARTINE \u2014 REGOLE DI CALCOLO:\n' +
+    '  1. Le cartine sono dosi di polvere ripartite in carta velina (uso orale, anche pediatrico, o per posologie particolari). Non hanno un contenitore rigido: NON applicare il limite delle capsule.\n' +
+    '  2. NON esiste un limite massimo fisso di peso per cartina. Range pratico: da pochi mg fino a ~5 g per cartina (oltre, valutare divisione in pi\u00f9 cartine per facilit\u00e0 di assunzione, ma \u00e8 una raccomandazione, non un divieto).\n' +
+    '  3. Se l\'utente non specifica il numero di cartine, CHIEDI prima di rispondere. Non assumere un numero a caso.\n' +
+    '  4. Massa PA (g) = numero_cartine \u00d7 dose_per_cartina (convertita in g).\n' +
+    '  5. L\'eccipiente \u00e8 OPZIONALE: per dosi piccole (< ~100 mg/cartina) aggiungerlo come diluente per facilitare la pesata e la ripartizione; per dosi grandi (\u2265 ~500 mg/cartina) spesso non serve.\n' +
+    '  6. Eccipiente preferito quando serve: lattosio monoidrato (gusto neutro, sicuro per uso pediatrico). NON usare "Eccipiente tipo II Vivaldi" (ottimizzato per opercolatrici, non per cartine).\n' +
+    '  7. Le unit\u00e0 nella FORMULA per polveri devono essere SEMPRE in grammi (g). Includi una riga finale "Cartine: N pz" con il numero totale di cartine (serve all\'app per popolare automaticamente il campo).\n' +
+    '  8. Esempio A \u2014 20 cartine pediatriche paracetamolo 125 mg (dose piccola, con diluente):\n' +
+    '     - Paracetamolo: 2,500 g  (= 20 \u00d7 125 mg)\n' +
+    '     - Lattosio monoidrato: 7,50 g  (diluente per facilitare la ripartizione)\n' +
+    '     - Cartine: 20 pz\n' +
+    '  9. Esempio B \u2014 10 cartine di acido salicilico 5 g (dose grande, niente eccipiente):\n' +
+    '     - Acido salicilico: 50,00 g  (= 10 \u00d7 5 g)\n' +
+    '     - Cartine: 10 pz\n' +
     'DOSAGGI STANDARD (preparazione magistrale italiana):\n' +
     '  - finasteride orale: 1 mg/cps (alopecia androgenetica). Max 5 mg/cps.\n' +
     '  - dutasteride orale: 0,5 mg/cps. Max 2,5 mg/cps.\n' +
@@ -3944,7 +4070,7 @@ function aiParseFormula(text) {
   const comps = [];
   let inFormula = false;
   let tipo = null;
-  const tipoMatch = cleanText.match(/^TIPO\s*:\s*(soluzione|sospensione|unguento|polvere|capsule)\b/im);
+  const tipoMatch = cleanText.match(/^TIPO\s*:\s*(soluzione|sospensione|unguento|polvere|capsule|cartine)\b/im);
   if (tipoMatch) tipo = tipoMatch[1].toLowerCase();
   for (const rawLine of lines) {
     const line = rawLine.trim();
@@ -3983,10 +4109,15 @@ function aiParseFormula(text) {
       if (t) daOrdinare.push(t);
     });
   }
-  // Fallback TIPO se assente: euristica da unità
+  // Fallback TIPO se assente: euristica da contenuto
   if (!tipo && comps.length) {
-    const hasML = comps.some(c => c.unit === 'ml');
-    tipo = hasML ? 'soluzione' : 'polvere';
+    const hasCart = comps.some(c => /\bcartin|\bbustin/i.test(c.nome));
+    const hasCaps = comps.some(c => /\bcapsul/i.test(c.nome));
+    const hasML   = comps.some(c => c.unit === 'ml');
+    tipo = hasCart ? 'cartine'
+         : hasCaps ? 'capsule'
+         : hasML   ? 'soluzione'
+         : 'polvere';
   }
   return {comps, daOrdinare, tipo};
 }
@@ -4051,6 +4182,19 @@ function aiImportaTutti(comps, tipo) {
     : tipoTarget === 'cartine'
       ? comps.filter(c => !/\bcartin|\bbustin/i.test(c.nome) && c.unit !== 'pz')
       : comps;
+
+  // Per capsule/cartine l'AI scrive quantità TOTALI (es. 300 g per 60 cartine).
+  // liberaRighe però è per-singolo-pezzo: leggi il numero pezzi PRIMA e usa come divisore.
+  let nPezzi = 0;
+  if (tipoTarget === 'capsule') {
+    const capsRiga = comps.find(c => /capsul/i.test(c.nome));
+    if (capsRiga) nPezzi = parseInt(capsRiga.qty) || 0;
+  } else if (tipoTarget === 'cartine') {
+    const cartRiga = comps.find(c => /cartin|bustin/i.test(c.nome));
+    if (cartRiga) nPezzi = parseInt(cartRiga.qty) || 0;
+  }
+  const scaling = (tipoTarget === 'capsule' || tipoTarget === 'cartine') && nPezzi > 0 ? nPezzi : 1;
+
   liberaRighe = compsForLibera.map((c, i) => {
     const qNorm = invNominalizza(c.nome);
     const chiaveAll = Object.keys(ALLEGATO_A).find(k => k.includes(qNorm) || qNorm.includes(k.split(' ')[0]));
@@ -4069,9 +4213,11 @@ function aiImportaTutti(comps, tipo) {
     }
     let unit = c.unit === 'ml' ? 'ml' : 'g';
     if (tipoTarget === 'polvere' || tipoTarget === 'capsule' || tipoTarget === 'cartine') unit = 'g';
+    // Scala a per-singolo-pezzo: divide la qty totale per nPezzi (solo per capsule/cartine)
+    const qtyNum = (parseFloat(String(c.qty).replace(',','.')) || 0) / scaling;
     return {
       nome: nomeFinal,
-      qty: String(c.qty),
+      qty: String(qtyNum),
       unit,
       isPa: i === 0,
       densita: null,
@@ -4083,22 +4229,13 @@ function aiImportaTutti(comps, tipo) {
   });
   if (typeof liberaRenderRighe === 'function') liberaRenderRighe();
 
-  // 5) Per capsule/cartine: prova a leggere il numero dal contesto comps
-  //    (es. se l'AI scrive "Capsule vuote: 30" o "Cartine: 20"); altrimenti l'utente le imposta manualmente.
-  if (tipoTarget === 'capsule') {
-    const capsRiga = comps.find(c => /capsul/i.test(c.nome));
-    if (capsRiga) {
-      const nEl = document.getElementById('caps-ncaps-lib');
-      const nVal = parseInt(capsRiga.qty) || 0;
-      if (nEl && !nEl.value && nVal > 0) nEl.value = nVal;
-    }
-  } else if (tipoTarget === 'cartine') {
-    const cartRiga = comps.find(c => /cartin|bustin/i.test(c.nome));
-    if (cartRiga) {
-      const nEl = document.getElementById('cart-ncart-lib');
-      const nVal = parseInt(cartRiga.qty) || 0;
-      if (nEl && !nEl.value && nVal > 0) nEl.value = nVal;
-    }
+  // 5) Popola il campo numero pezzi (calcolato sopra)
+  if (tipoTarget === 'capsule' && nPezzi > 0) {
+    const nEl = document.getElementById('caps-ncaps-lib');
+    if (nEl && !nEl.value) nEl.value = nPezzi;
+  } else if (tipoTarget === 'cartine' && nPezzi > 0) {
+    const nEl = document.getElementById('cart-ncart-lib');
+    if (nEl && !nEl.value) nEl.value = nPezzi;
   }
 
   // 6) Ricalcola tutto (calcPrep in libera mode propaga a tariffazione)
@@ -4242,13 +4379,35 @@ function aiAvviaPreparazione() {
   const forma = document.getElementById('ai-prep-forma').value;
   const qt = document.getElementById('ai-prep-qt').value;
   const unit = document.getElementById('ai-prep-unit').value;
+  const doseRaw  = document.getElementById('ai-prep-dose')?.value || '';
+  const doseUnit = document.getElementById('ai-prep-dose-unit')?.value || 'mg';
   if (!nome) { aiAddSys('Inserisci il nome della preparazione prima di procedere.'); return; }
   const navBtns = document.querySelectorAll('.nav-btn');
   showPage('formulario', navBtns[navBtns.length - 1]);
+  // Mappa forma del dropdown → TIPO esatto da usare nella risposta
+  const formaToTipo = {
+    'Soluzione acquosa':'soluzione', 'Soluzione idroalcolica':'soluzione', 'Soluzione oleosa':'soluzione',
+    'Unguento':'unguento', 'Crema':'unguento', 'Gel':'unguento',
+    'Capsule':'capsule', 'Cartine':'cartine', 'Polvere':'polvere',
+    'Sospensione':'sospensione', 'Collirio':'soluzione'
+  };
+  const tipoHint = formaToTipo[forma] || '';
+  const tipoLine = tipoHint ? ' Usa OBBLIGATORIAMENTE "TIPO: ' + tipoHint + '" (minuscolo) nella prima riga della risposta.' : '';
+  // Dose per pezzo (opz.) — utile per cartine/capsule per evitare che l'AI chieda
+  const doseVal = parseFloat(doseRaw) || 0;
+  let doseLine = '';
+  if (doseVal > 0) {
+    const perPezzo = (tipoHint === 'capsule') ? 'per capsula'
+                   : (tipoHint === 'cartine') ? 'per cartina'
+                   : 'per pezzo';
+    doseLine = ' Dose principio attivo ' + perPezzo + ': ' + doseVal + ' ' + doseUnit + '.';
+  }
   const msg = 'Prepara la formula magistrale per: ' + nome +
     ', forma farmaceutica: ' + forma +
     ', quantita totale: ' + qt + ' ' + unit +
-    '. Indica le sostanze con quantita, procedura passo-passo, frasi H/P, scadenza raccomandata FU XII e avvertenze.';
+    '.' + doseLine +
+    ' Indica le sostanze con quantita, procedura passo-passo, frasi H/P, scadenza raccomandata FU XII e avvertenze.' +
+    tipoLine;
   aiChiama(msg);
 }
 
@@ -4300,6 +4459,9 @@ function salvaInArchivio() {
     ncaps:  document.getElementById('s-ncaps') ? document.getElementById('s-ncaps').value : '',
     mgpa:   document.getElementById('s-mgpa') ? document.getElementById('s-mgpa').value : '',
     taglia: document.getElementById('s-taglia') ? document.getElementById('s-taglia').value : '',
+    ncart:    document.getElementById('s-ncart')    ? document.getElementById('s-ncart').value    : '',
+    mgpacart: document.getElementById('s-mgpacart') ? document.getElementById('s-mgpacart').value : '',
+    mgcart:   document.getElementById('s-mgcart')   ? document.getElementById('s-mgcart').value   : '',
     eccip:  document.getElementById('s-eccip') ? document.getElementById('s-eccip').value : '',
     paNome: document.getElementById('s-pa-nome') ? document.getElementById('s-pa-nome').value : '',
     lottoAS: document.getElementById('s-lotto-as') ? document.getElementById('s-lotto-as').value : '',
@@ -4381,7 +4543,7 @@ function archRiapri(id) {
   // ripristina tipo
   if (s.tipo) {
     const sBtn = document.querySelectorAll('#scheda-inputs .seg-btn');
-    const mapIdx = {soluzione:0,unguento:1,capsule:2,polvere:3,sospensione:4};
+    const mapIdx = {soluzione:0,unguento:1,capsule:2,cartine:3,polvere:4,sospensione:5};
     setTipoScheda(s.tipo, sBtn[mapIdx[s.tipo]||0]);
   }
 
@@ -4398,6 +4560,9 @@ function archRiapri(id) {
   if (document.getElementById('s-ncaps'))    document.getElementById('s-ncaps').value    = s.ncaps || '';
   if (document.getElementById('s-mgpa'))     document.getElementById('s-mgpa').value     = s.mgpa || '';
   if (document.getElementById('s-taglia'))   document.getElementById('s-taglia').value   = s.taglia || '0';
+  if (document.getElementById('s-ncart'))    document.getElementById('s-ncart').value    = s.ncart || '';
+  if (document.getElementById('s-mgpacart')) document.getElementById('s-mgpacart').value = s.mgpacart || '';
+  if (document.getElementById('s-mgcart'))   document.getElementById('s-mgcart').value   = s.mgcart || '';
   if (document.getElementById('s-eccip'))    document.getElementById('s-eccip').value    = s.eccip || '';
   if (document.getElementById('s-lotto-as')) document.getElementById('s-lotto-as').value = s.lottoAS || '';
   if (document.getElementById('s-lotto-et')) document.getElementById('s-lotto-et').value = s.lottoET || '';
@@ -4430,7 +4595,7 @@ function resetRicetta() {
   // ── input preparazione ──
   ['prep-pa-nome','qt','conc','mg-pa-cps','n-caps',
    'caps-ncaps-lib','caps-vuote-cerca','caps-vuote-nome','libera-conc','totale-prep','grado-alc','vol-soluzione',
-   'cart-ncart-lib'].forEach(id => setVal(id, ''));
+   'cart-ncart-lib','cart-dose-lib'].forEach(id => setVal(id, ''));
   setVal('perc-et', '0');
   setVal('caps-vuote-prezzo', '0');
   setVal('caps-taglia-lib', '0');
@@ -4462,7 +4627,7 @@ function resetRicetta() {
   if (tpaInput) { tpaInput.readOnly = false; tpaInput.style.background = ''; }
 
   // ── input scheda ──
-  ['s-num','s-prep','s-qt','s-conc','s-et','s-ncaps','s-mgpa','s-eccip',
+  ['s-num','s-prep','s-qt','s-conc','s-et','s-ncaps','s-mgpa','s-ncart','s-mgpacart','s-mgcart','s-eccip',
    's-pa-nome','s-paz','s-farm','s-data','s-prezzo',
    's-lotto-as','s-lotto-et','s-lotto-ac','s-lotto-eccip'].forEach(id => setVal(id, ''));
   setVal('s-mesi', '2');
