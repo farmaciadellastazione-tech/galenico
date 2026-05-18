@@ -3650,7 +3650,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 82;
+const APP_VERSION = 83;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -4302,8 +4302,11 @@ function aiNormCapsule(nome) {
 }
 
 function aiParseFormula(text) {
-  // Pre-pulizia: rimuovi marker markdown ** (l'AI spesso usa **FORMULA:**)
-  const cleanText = text.replace(/\*\*/g, '');
+  // Pre-pulizia: rimuovi marker markdown ** (l'AI spesso usa **FORMULA:**), # heading, e tag <strong>
+  const cleanText = text
+    .replace(/\*\*/g, '')
+    .replace(/^#+\s*/gm, '')
+    .replace(/<\/?strong>/gi, '');
   const lines = cleanText.split('\n');
   const comps = [];
   let inFormula = false;
@@ -4316,7 +4319,8 @@ function aiParseFormula(text) {
     if (/^TIPO\s*:/i.test(line) || /^PROCEDURA\s*:/i.test(line) || /^NOTE\s*:/i.test(line) || /^DA ORDINARE/i.test(line)) inFormula = false;
     if (inFormula) {
       // Bullet accettati: - \u00b7 \u2022 *
-      const m = line.match(/^[-\u2022\u00b7*]\s*(.+?):\s*([\d.,]+)\s*([a-zA-Z%\u00b0\u00b5]+)?/);
+      // Bullet o numerato accettati: -, \u2022, \u00b7, *, 1., 1), o anche senza prefisso se la riga ha "nome: qty unit"
+      const m = line.match(/^(?:[-\u2022\u00b7*]|\d+[.)])?\s*(.+?):\s*([\d.,]+)\s*([a-zA-Z%\u00b0\u00b5]+)?/);
       if (m) {
         const nome = aiNormCapsule(m[1].trim());
         const qty  = m[2].replace(',','.');
@@ -4653,10 +4657,36 @@ function aiAvviaPreparazione() {
 }
 
 function aiEsportaScheda() {
-  const nome = document.getElementById('ai-prep-nome').value;
-  if (nome) document.getElementById('s-prep').value = nome;
+  const nome  = document.getElementById('ai-prep-nome').value;
+  const forma = document.getElementById('ai-prep-forma').value;
+  const qt    = document.getElementById('ai-prep-qt').value;
+  const dose  = parseFloat(document.getElementById('ai-prep-dose')?.value || '') || 0;
+  const doseUnit = document.getElementById('ai-prep-dose-unit')?.value || 'mg';
+  // Mappa forma → tipoScheda (stesso ordine dei bottoni in pagina Scheda: 0=sol 1=ung 2=caps 3=cart 4=pol 5=sosp)
+  const formaToTipo = {
+    'Soluzione acquosa':'soluzione','Soluzione idroalcolica':'soluzione','Soluzione oleosa':'soluzione','Collirio':'soluzione',
+    'Unguento':'unguento','Crema':'unguento','Gel':'unguento',
+    'Capsule':'capsule','Cartine':'cartine','Polvere':'polvere','Sospensione':'sospensione'
+  };
+  const tipoTarget = formaToTipo[forma] || 'soluzione';
   const navBtns = document.querySelectorAll('.nav-btn');
   showPage('scheda', navBtns[2]);
+  // Attiva il bottone tipo corretto nella Scheda
+  const tipoIdx = {soluzione:0, unguento:1, capsule:2, cartine:3, polvere:4, sospensione:5}[tipoTarget];
+  const sBtns = document.querySelectorAll('#scheda-inputs .seg-btn');
+  if (sBtns[tipoIdx]) setTipoScheda(tipoTarget, sBtns[tipoIdx]);
+  // Popola i campi specifici per pezzo (capsule/cartine) usando dose + qt
+  if (nome) document.getElementById('s-prep').value = nome;
+  if (tipoTarget === 'capsule') {
+    if (qt)   document.getElementById('s-ncaps').value = qt;
+    if (dose) document.getElementById('s-mgpa').value  = doseUnit === 'g' ? dose * 1000 : dose;
+  } else if (tipoTarget === 'cartine') {
+    if (qt)   document.getElementById('s-ncart').value    = qt;
+    if (dose) document.getElementById('s-mgpacart').value = doseUnit === 'g' ? dose * 1000 : dose;
+  } else {
+    if (qt)   document.getElementById('s-qt').value = qt;
+    if (dose && doseUnit === '%') document.getElementById('s-conc').value = dose;
+  }
   aggiornaScheda();
 }
 
