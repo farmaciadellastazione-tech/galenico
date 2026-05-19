@@ -910,7 +910,7 @@
     <div class="field-row" style="margin-bottom:0.75rem">
       <span class="field-label">Principio attivo</span>
       <input type="text" id="ai-prep-pa" placeholder="es. Acido borico (opz.)" style="flex:1">
-      <input type="number" id="ai-prep-pa-conc" min="0" step="0.1" placeholder="conc." style="width:70px;margin-left:4px">
+      <input type="text" id="ai-prep-pa-conc" placeholder="conc. o ss" title="numero (con unità a destra) oppure: ss, sat, saturo, saturazione, a saturazione" style="width:80px;margin-left:4px">
       <select id="ai-prep-pa-conc-unit" style="width:70px;margin-left:4px">
         <option>%</option>
         <option>mg/ml</option>
@@ -3682,7 +3682,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 88;
+const APP_VERSION = 89;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -4788,11 +4788,18 @@ function aiAvviaPreparazione() {
   if (_aiFormaIsAlcolica(forma) && gradoVal > 0) {
     gradoLine = ' Grado alcolico finale: ' + gradoVal + '% v/v (calcola etanolo 96 e acqua di conseguenza per ottenere il grado richiesto sul volume totale).';
   }
-  // Principio attivo: nome + concentrazione opzionale
+  // Principio attivo: nome + concentrazione opzionale (numero o codice saturazione)
   let paLine = '';
   if (paNome) {
-    const concVal = parseFloat(paConc) || 0;
-    paLine = ' Principio attivo: ' + paNome + (concVal > 0 ? ' alla concentrazione ' + concVal + ' ' + paConcUnit : '') + '.';
+    const concRaw = (paConc || '').trim().toLowerCase();
+    const concNum = parseFloat(concRaw.replace(',', '.'));
+    let concPart = '';
+    if (!isNaN(concNum) && concNum > 0) {
+      concPart = ' alla concentrazione ' + concNum + ' ' + paConcUnit;
+    } else if (/^(ss|sat|saturo|satura|saturazione|a\s+saturazione)$/.test(concRaw)) {
+      concPart = ' a concentrazione di saturazione (soluzione satura: calcola la quantita di PA necessaria per saturare il solvente a temperatura ambiente, basandoti sui dati di solubilita FU XII/letteratura)';
+    }
+    paLine = ' Principio attivo: ' + paNome + concPart + '.';
   }
   const msg = 'Prepara la formula magistrale per: ' + nome +
     ', forma farmaceutica: ' + forma +
