@@ -3665,7 +3665,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 85;
+const APP_VERSION = 86;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -4457,7 +4457,12 @@ function aiImportaTutti(comps, tipo) {
 
   liberaRighe = compsForLibera.map((c, i) => {
     const qNorm = invNominalizza(c.nome);
-    const chiaveAll = Object.keys(ALLEGATO_A).find(k => k.includes(qNorm) || qNorm.includes(k.split(' ')[0]));
+    // Match esatto/substring sulla chiave intera (NON sul primo token: "acido borico" matchava
+    // "acido acetilsalicilico" perché entrambi iniziano per "acido").
+    const chiaveAll = Object.keys(ALLEGATO_A).find(k => {
+      const kn = invNominalizza(k);
+      return kn === qNorm || kn.includes(qNorm) || qNorm.includes(kn);
+    });
     const invFound = invFindBest(c.nome, inv);
     let nomeFinal = c.nome;
     let prezzoAcq = 0;
