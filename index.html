@@ -1262,10 +1262,11 @@ function getHDaInventario(nome) {
   return found ? (found.h || '') : '';
 }
 
-// Considera anche il flag manuale hPreventivo (solo se modPreventivo è attivo).
+// Il flag manuale hPreventivo sopravvive al toggle della modalità (così disattivando
+// preventivo dopo un preventivo approvato i calcoli Art. 8a restano corretti).
 function rigaHazardous(r) {
   if (!r || !r.nome) return false;
-  if (modPreventivo && r.hPreventivo === true) return true;
+  if (r.hPreventivo === true) return true;
   return hasHazard(r.h || getHDaInventario(r.nome));
 }
 
@@ -3789,7 +3790,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 100;
+const APP_VERSION = 101;
 
 // ── Modalità preventivo ──────────────────────────────────────────────
 // Quando attiva: in libera mode i prezzi/H mancanti diventano editabili,
@@ -5279,6 +5280,7 @@ function archivioRender(filtro) {
       '<div class="arch-data">' + (s.farm||'') + '</div>' +
       '<div class="arch-prezzo">' + prezzoFmt + '</div>' +
       '<div class="arch-btns">' +
+        (s.preventivo ? '<button onclick="archApprova(' + s.id + ')" title="Approva preventivo → scheda definitiva" style="font-size:12px;padding:3px 8px;border:1px solid #c46d2c;border-radius:4px;background:#fde8d8;cursor:pointer;color:#7d3c0c;font-weight:600">✓ Approva</button>' : '') +
         '<button onclick="archRiapri(' + s.id + ')" title="Riapri scheda" style="font-size:12px;padding:3px 8px;border:1px solid var(--border-strong);border-radius:4px;background:none;cursor:pointer;color:var(--accent)">↩</button>' +
         '<button onclick="archElimina(' + s.id + ')" title="Elimina" style="font-size:12px;padding:3px 8px;border:1px solid #e0a0a0;border-radius:4px;background:none;cursor:pointer;color:var(--red,#8b1a1a)">✕</button>' +
       '</div>' +
@@ -5296,10 +5298,49 @@ function archElimina(id) {
   archivioRender(document.getElementById('archivio-search').value);
 }
 
+// Approva un preventivo: riapre i dati, esce dalla modalità preventivo, propone il
+// prossimo numero ufficiale. L'utente rivede e poi clicca "Salva in archivio" per
+// creare la scheda definitiva (il preventivo originale resta come audit trail).
+function archApprova(id) {
+  const arch = archLoad();
+  const s = arch.find(s => s.id === id);
+  if (!s) return;
+  if (!s.preventivo) { alert('Questa scheda non è un preventivo.'); return; }
+  if (!confirm('Approvare il preventivo ' + s.num + ' e convertirlo in scheda definitiva?\n\n• I dati vengono ricaricati nel form\n• Viene assegnato il prossimo numero ufficiale\n• Il preventivo originale resta in archivio (audit)\n• Clicca poi "Salva in archivio" per archiviare la scheda definitiva')) return;
+
+  // 1. Carica i dati (sincronizza anche modPreventivo → on perché s.preventivo=true)
+  archRiapri(id);
+  // 2. Forza off la modalità preventivo (dopo il riapri, così s-num verrà rigenerato corretto)
+  if (modPreventivo) {
+    modPreventivo = false;
+    localStorage.setItem('gal_mod_preventivo', '0');
+    document.body.classList.remove('preventivo-on');
+  }
+  // 3. Calcola il prossimo numero ufficiale (peek, senza incrementare — verrà
+  //    incrementato veramente solo a salvataggio confermato).
+  const anno = new Date().getFullYear();
+  const key = 'gal_scheda_counter_' + anno;
+  const nextN = (parseInt(localStorage.getItem(key) || '0')||0) + 1;
+  const nuovoNum = anno + '/' + String(nextN).padStart(3, '0');
+  document.getElementById('s-num').value = nuovoNum;
+  // 4. Refresh visuale
+  if (typeof aggiornaScheda === 'function') aggiornaScheda();
+  alert('Preventivo ' + s.num + ' riaperto come bozza scheda definitiva ' + nuovoNum + '.\nVerifica i dati, poi clicca "Salva in archivio".');
+}
+
 function archRiapri(id) {
   const arch = archLoad();
   const s = arch.find(s => s.id === id);
   if (!s) return;
+
+  // Sincronizza modalità preventivo con il tipo di scheda caricata
+  // (così banner/numerazione/watermark sono coerenti con quanto si sta vedendo).
+  const wantPreventivo = !!s.preventivo;
+  if (modPreventivo !== wantPreventivo) {
+    modPreventivo = wantPreventivo;
+    localStorage.setItem('gal_mod_preventivo', modPreventivo ? '1' : '0');
+    document.body.classList.toggle('preventivo-on', modPreventivo);
+  }
 
   // ripristina tipo
   if (s.tipo) {
