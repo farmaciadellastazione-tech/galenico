@@ -893,7 +893,7 @@
     </div>
     <div class="field-row" style="margin-bottom:0.75rem">
       <span class="field-label">Forma farmaceutica</span>
-      <select id="ai-prep-forma">
+      <select id="ai-prep-forma" onchange="aiPrepFormaChanged()">
         <option>Soluzione acquosa</option>
         <option>Soluzione idroalcolica</option>
         <option>Soluzione oleosa</option>
@@ -916,7 +916,7 @@
         <option>pz</option>
       </select>
     </div>
-    <div class="field-row" style="margin-bottom:0.75rem">
+    <div class="field-row" id="row-ai-dose" style="margin-bottom:0.75rem">
       <span class="field-label">Dose per pezzo</span>
       <input type="number" id="ai-prep-dose" value="" min="0" step="0.1" style="width:90px" placeholder="opz.">
       <select id="ai-prep-dose-unit" style="width:70px;margin-left:4px">
@@ -925,6 +925,13 @@
         <option>%</option>
       </select>
       <span class="field-note" style="margin-left:8px">per cartine/capsule (dose PA per singolo pezzo)</span>
+    </div>
+    <div class="field-row" id="row-ai-grado-alc" style="display:none;margin-bottom:0.75rem">
+      <span class="field-label">Grado alcolico</span>
+      <input type="number" id="ai-prep-grado-alc" value="70" min="0" max="96" step="0.1" style="width:90px"
+        onchange="aiGradoAlcChanged()">
+      <span style="font-family:var(--mono);font-size:13px;color:var(--text-faint);margin-left:4px">% v/v</span>
+      <span class="field-note" style="margin-left:8px">modifica per ricalcolare etanolo/acqua dopo la risposta AI</span>
     </div>
     <button class="btn-add" onclick="aiAvviaPreparazione()">🤖 Chiedi all'AI la formula</button>
   </div>
@@ -3665,7 +3672,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 86;
+const APP_VERSION = 87;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -4609,6 +4616,25 @@ async function aiChiama(userMsg) {
         card.innerHTML = aiRenderImportCard(parsed.comps, parsed.daOrdinare, parsed.tipo);
         document.getElementById('ai-messages').appendChild(card);
         document.getElementById('ai-messages').scrollTop = 99999;
+        // Memorizza riferimenti per ricalcolo grado alcolico bidirezionale
+        _aiLastImportCardEl = card;
+        _aiLastImportComps = parsed.comps;
+        _aiLastImportDaOrdinare = parsed.daOrdinare;
+        _aiLastImportTipo = parsed.tipo;
+        // Aggiorna il campo Grado alcolico con il valore calcolato dalla formula ricevuta
+        const gradoEl = document.getElementById('ai-prep-grado-alc');
+        if (gradoEl) {
+          let totMl = 0, etMl = 0;
+          parsed.comps.forEach(c => {
+            const ml = _aiRigaMl(c);
+            totMl += ml;
+            if (_aiIsEtanolo(c.nome)) etMl += ml;
+          });
+          if (totMl > 0 && etMl > 0) {
+            const calcG = etMl * 0.96 / totMl * 100;
+            gradoEl.value = calcG.toFixed(1).replace(/\.0$/, '');
+          }
+        }
         // Aggiungi automaticamente alla lista ordini
         parsed.daOrdinare.forEach(nome => {
           if (typeof ordinaAggiungi === 'function') ordinaAggiungi(nome, '');
@@ -4639,6 +4665,81 @@ function aiInvia() {
 
 function aiChip(msg) { aiChiama(msg); }
 
+// Forme con etanolo: per queste mostriamo "Grado alcolico" al posto di "Dose per pezzo".
+function _aiFormaIsAlcolica(forma) {
+  return forma === 'Soluzione idroalcolica';
+}
+
+function aiPrepFormaChanged() {
+  const forma = document.getElementById('ai-prep-forma').value;
+  const rowDose  = document.getElementById('row-ai-dose');
+  const rowGrado = document.getElementById('row-ai-grado-alc');
+  const alc = _aiFormaIsAlcolica(forma);
+  if (rowDose)  rowDose.style.display  = alc ? 'none' : '';
+  if (rowGrado) rowGrado.style.display = alc ? '' : 'none';
+}
+
+// Riferimenti all'ultima card di import generata: servono per ricalcolare etanolo/acqua
+// quando l'utente modifica "Grado alcolico" dopo la risposta AI.
+let _aiLastImportCardEl = null;
+let _aiLastImportComps = null;
+let _aiLastImportDaOrdinare = null;
+let _aiLastImportTipo = null;
+
+// Match etanolo/acqua tra i nomi proposti dall'AI.
+function _aiIsEtanolo(nome) {
+  const n = invNominalizza(nome || '');
+  return n.includes('etanolo') || n.includes('alcool') || n.includes('alcol');
+}
+function _aiIsAcqua(nome) {
+  const n = invNominalizza(nome || '');
+  return n.includes('acqua');
+}
+
+// Converte una riga di comps in ml (usa densità per le g, ignora pz/%).
+function _aiRigaMl(c) {
+  const q = parseFloat(String(c.qty).replace(',','.'))||0;
+  if (c.unit === 'ml') return q;
+  if (c.unit === 'g') {
+    const d = typeof getDensita === 'function' ? getDensita(c.nome) : null;
+    return d ? q / d : 0;
+  }
+  return 0;
+}
+
+function aiGradoAlcChanged() {
+  if (!_aiLastImportComps || !_aiLastImportCardEl) return; // nessuna formula ancora generata
+  const el = document.getElementById('ai-prep-grado-alc');
+  const desired = parseFloat(el?.value);
+  if (isNaN(desired) || desired < 0) return;
+  if (desired > 96) { alert('Grado alcolico massimo 96% v/v (etanolo 96°).'); return; }
+  // Volume totale soluzione = somma ml di tutti i liquidi (etanolo + acqua + altri liquidi)
+  let totMl = 0;
+  _aiLastImportComps.forEach(c => { totMl += _aiRigaMl(c); });
+  if (totMl <= 0) return;
+  // Nuovi ml di etanolo 96 per il grado desiderato
+  const newEtMl = totMl * desired / 100 / 0.96;
+  // Trova / crea riga etanolo
+  let etIdx = _aiLastImportComps.findIndex(c => _aiIsEtanolo(c.nome));
+  if (etIdx < 0) {
+    _aiLastImportComps.push({nome:'Etanolo 96°', qty:'0', unit:'ml'});
+    etIdx = _aiLastImportComps.length - 1;
+  }
+  const oldEtMl = _aiRigaMl(_aiLastImportComps[etIdx]);
+  _aiLastImportComps[etIdx].qty = String(parseFloat(newEtMl.toFixed(2)));
+  _aiLastImportComps[etIdx].unit = 'ml';
+  // Compensa con la riga acqua (se presente)
+  const acIdx = _aiLastImportComps.findIndex(c => _aiIsAcqua(c.nome));
+  if (acIdx >= 0) {
+    const oldAcMl = _aiRigaMl(_aiLastImportComps[acIdx]);
+    const newAcMl = Math.max(0, oldAcMl - (newEtMl - oldEtMl));
+    _aiLastImportComps[acIdx].qty = String(parseFloat(newAcMl.toFixed(2)));
+    _aiLastImportComps[acIdx].unit = 'ml';
+  }
+  // Re-render della card in place
+  _aiLastImportCardEl.innerHTML = aiRenderImportCard(_aiLastImportComps, _aiLastImportDaOrdinare, _aiLastImportTipo);
+}
+
 function aiAvviaPreparazione() {
   const nome = document.getElementById('ai-prep-nome').value.trim();
   const forma = document.getElementById('ai-prep-forma').value;
@@ -4646,6 +4747,7 @@ function aiAvviaPreparazione() {
   const unit = document.getElementById('ai-prep-unit').value;
   const doseRaw  = document.getElementById('ai-prep-dose')?.value || '';
   const doseUnit = document.getElementById('ai-prep-dose-unit')?.value || 'mg';
+  const gradoRaw = document.getElementById('ai-prep-grado-alc')?.value || '';
   if (!nome) { aiAddSys('Inserisci il nome della preparazione prima di procedere.'); return; }
   const navBtns = document.querySelectorAll('.nav-btn');
   showPage('formulario', navBtns[navBtns.length - 1]);
@@ -4667,10 +4769,16 @@ function aiAvviaPreparazione() {
                    : 'per pezzo';
     doseLine = ' Dose principio attivo ' + perPezzo + ': ' + doseVal + ' ' + doseUnit + '.';
   }
+  // Grado alcolico (obbligatorio nella richiesta per soluzioni idroalcoliche)
+  const gradoVal = parseFloat(gradoRaw) || 0;
+  let gradoLine = '';
+  if (_aiFormaIsAlcolica(forma) && gradoVal > 0) {
+    gradoLine = ' Grado alcolico finale: ' + gradoVal + '% v/v (calcola etanolo 96 e acqua di conseguenza per ottenere il grado richiesto sul volume totale).';
+  }
   const msg = 'Prepara la formula magistrale per: ' + nome +
     ', forma farmaceutica: ' + forma +
     ', quantita totale: ' + qt + ' ' + unit +
-    '.' + doseLine +
+    '.' + doseLine + gradoLine +
     ' Indica le sostanze con quantita, procedura passo-passo, frasi H/P, scadenza raccomandata FU XII e avvertenze.' +
     tipoLine;
   aiChiama(msg);
@@ -4726,6 +4834,7 @@ function aiReset() {
 }
 
 aiCaricaKey();
+if (typeof aiPrepFormaChanged === 'function') aiPrepFormaChanged();
 
 // ═══════════════════════════════════════════
 // ARCHIVIO SCHEDE
