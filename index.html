@@ -1421,6 +1421,16 @@ function getDensita(nome) {
   return null; // solidi: nessuna conversione
 }
 
+// Riga di procedura: verbo + strumento corretti per unità (ml → misurare, g/mg → pesare).
+// pz/% → fallback generico "Prelevare ... q.b.".
+function _pesataMisuraLine(r) {
+  const u = (r.unit || '').toLowerCase();
+  const qtyTag = '<strong>'+r.qty+' '+r.unit+'</strong>';
+  if (u === 'ml') return 'Misurare '+qtyTag+' di '+r.nome+' con cilindro graduato.';
+  if (u === 'g' || u === 'mg') return 'Pesare '+qtyTag+' di '+r.nome+' su bilancia analitica.';
+  return 'Prelevare '+qtyTag+' di '+r.nome+'.';
+}
+
 function liberaAddRiga(isPa) {
   liberaRighe.push({nome:'', qty:'', unit:'g', isPa: false, densita: null});
   liberaRenderRighe();
@@ -1907,7 +1917,7 @@ function calcPrep() {
     const hasAcqua = ingr.some(r => _n(r).includes('acqua'));
     const _etRiga = ingr.find(r => _n(r).includes('etanolo') || _n(r).includes('alcool') || _n(r).includes('alcol'));
     const acquaNote = hasAcqua ? 'acqua purificata' : 'solvente appropriato';
-    const pesate = ingr.map(r => 'Pesare <strong>'+r.qty+' '+r.unit+'</strong> di '+r.nome+' su bilancia analitica.');
+    const pesate = ingr.map(r => _pesataMisuraLine(r));
     const totLabel = totG > 0 ? fmt(totG,1)+' g' : 'volume finale';
 
     if (tipoPrep === 'polvere') {
@@ -3142,7 +3152,7 @@ function aggiornaScheda() {
       formulaItems.push({nome:'Flacone ambrato', val:String(nFlac), unit:'pz'});
       proc = [
         'Pesare e/o misurare tutti i componenti secondo la formula.',
-        ...ingrL.map(r => 'Pesare/misurare <strong>'+r.qty+' '+r.unit+'</strong> di '+r.nome+'.'),
+        ...ingrL.map(r => _pesataMisuraLine(r)),
         'Miscelare nell\'ordine indicato. Verificare aspetto e omogeneità.',
         'Trasferire nel recipiente finale. Etichettare.',
       ];
@@ -3246,7 +3256,7 @@ function aggiornaScheda() {
       formulaItems.push({nome:'Totale polvere', val:fmt(totG,2), unit:'g'});
 
       proc = [
-        ...ingrL.map(r => 'Pesare <strong>'+r.qty+' '+r.unit+'</strong> di '+r.nome+' su bilancia analitica.'),
+        ...ingrL.map(r => _pesataMisuraLine(r)),
         'Passare al setaccio n° 355 µm per omogeneizzare la granulometria.',
         'Miscelare per geometria (porzioni successive) per almeno 5 minuti.',
         'Trasferire in flacone/bustine. Etichettare con nome, concentrazione, data e scadenza.',
@@ -3682,7 +3692,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 89;
+const APP_VERSION = 90;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
