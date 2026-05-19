@@ -3692,7 +3692,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 90;
+const APP_VERSION = 91;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -4007,6 +4007,10 @@ function invModifica(lsIdx) {
   tr.innerHTML = `
     <td colspan="7" style="padding:10px 8px;background:var(--accent-light);border-radius:var(--radius)">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+        <div style="grid-column:1/-1">
+          <label style="font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:2px">Nome sostanza</label>
+          <input id="mod-nome" type="text" value="${(item.nome||'').replace(/"/g,'&quot;')}" style="width:100%;font-family:var(--mono);font-size:13px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface)">
+        </div>
         <div>
           <label style="font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:2px">Lotto fornitore</label>
           <input id="mod-lotto" type="text" value="${item.lotto||''}" oninput="
@@ -4075,8 +4079,10 @@ function invSalvaModifica(idx) {
   const inv = invLoad();
   const scadRaw = document.getElementById('mod-scad').value;
   const ddtRaw  = document.getElementById('mod-ddt-data').value;
+  const nomeNew = (document.getElementById('mod-nome')?.value || '').trim();
   inv[idx] = {
     ...inv[idx],
+    nome:     nomeNew || inv[idx].nome,
     lotto:    document.getElementById('mod-lotto').value.trim(),
     lottoInt: document.getElementById('mod-lotto-int').value.trim(),
     scad:     scadRaw || scadDefaultStandard(ddtRaw),
