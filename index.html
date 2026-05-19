@@ -910,7 +910,7 @@
     </div>
     <div style="margin-bottom:0.75rem">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-        <span class="field-label" style="margin:0">Soluti (principi attivi)</span>
+        <span class="field-label" style="margin:0">Principi attivi</span>
         <button onclick="aiAddSoluto()" style="font-size:11px;padding:2px 10px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">+ aggiungi</button>
       </div>
       <div id="ai-soluti-rows"></div>
@@ -3736,7 +3736,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 97;
+const APP_VERSION = 98;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -5013,7 +5013,7 @@ function aiAvviaPreparazione() {
       }
       return s.nome.trim();
     });
-    solutiLine = ' Soluti (principi attivi da includere): ' + parts.join('; ') + '.';
+    solutiLine = ' Principi attivi da includere: ' + parts.join('; ') + '.';
   }
   // Co-solventi (lista dinamica, oltre alla base implicita della forma)
   const solventiValid = aiSolventi.filter(s => s.nome && s.nome.trim());
