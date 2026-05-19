@@ -272,13 +272,26 @@
     .etiq-form { grid-template-columns:1fr; }
   }
 
+  /* ── Modalità preventivo ───────────────────────────────────────────── */
+  #prev-banner { display:none; background:#fde8d8; color:#7d3c0c; border-bottom:1px solid #c46d2c; padding:6px 16px; font-family:var(--mono); font-size:12px; text-align:center; letter-spacing:0.05em; }
+  body.preventivo-on #prev-banner { display:block; }
+  #prev-toggle { font-size:11px; font-family:var(--mono); padding:4px 10px; border:1px solid var(--border-strong); border-radius:99px; background:var(--surface); color:var(--text-muted); cursor:pointer; margin-left:8px; white-space:nowrap; }
+  body.preventivo-on #prev-toggle { background:#fde8d8; color:#7d3c0c; border-color:#c46d2c; font-weight:700; }
+  .arch-prev-badge { display:inline-block; font-size:10px; font-family:var(--mono); padding:1px 6px; border-radius:99px; background:#fde8d8; color:#7d3c0c; border:1px solid #c46d2c; margin-left:6px; letter-spacing:0.05em; }
+  .scheda-prev-watermark { display:none; }
+  body.preventivo-on .scheda-prev-watermark { display:block; background:#fde8d8; color:#7d3c0c; border:2px dashed #c46d2c; padding:10px 16px; font-family:var(--mono); font-size:13px; text-align:center; letter-spacing:0.08em; font-weight:700; margin-bottom:12px; border-radius:var(--radius); }
+  .prev-edit-row { display:flex; gap:6px; align-items:center; margin-top:4px; padding:4px 6px; background:#fff3e0; border:1px dashed #c46d2c; border-radius:var(--radius); font-size:11px; flex-wrap:wrap; width:100%; }
+  .prev-edit-row label { font-family:var(--mono); color:#7d3c0c; font-size:11px; }
+  .prev-edit-row input[type=number] { width:90px; font-family:var(--mono); font-size:12px; padding:2px 6px; border:1px solid #c46d2c; border-radius:var(--radius); background:#fff; }
+
   @media print {
-    header, footer, .print-btn, #scheda-inputs, .subtitle { display: none !important; }
+    header, footer, .print-btn, #scheda-inputs, .subtitle, #prev-banner, #prev-toggle { display: none !important; }
     body { background: #fff; }
     main { padding: 0; max-width: 100%; }
     .page { display: none !important; }
     #page-scheda { display: block !important; }
     #scheda-preview { border: none; padding: 0; border-radius: 0; box-shadow: none; }
+    body.preventivo-on .scheda-prev-watermark { display:block; background:#fff; color:#000; border:3px dashed #000; }
   }
   @media (max-width: 600px) {
     header { padding: 0 1rem; }
@@ -304,10 +317,12 @@
   </nav>
   <button onclick="resetRicetta()" title="Azzera ricetta corrente (Preparazione, Tariffazione, Scheda)"
     style="margin-left:auto;font-size:12px;font-family:var(--sans);padding:5px 12px;border:1px solid var(--danger-border);border-radius:var(--radius);background:var(--danger-bg);color:var(--danger);cursor:pointer;white-space:nowrap">↺ Nuova ricetta</button>
+  <button id="prev-toggle" onclick="togglePreventivo()" title="Modalità preventivo: prezzi/H modificabili a mano, schede marcate PREVENTIVO con numerazione separata">🧪 Preventivo</button>
   <button id="theme-toggle" onclick="toggleTheme()" title="Cambia tema chiaro/scuro"
     style="margin-left:8px;font-size:14px;font-family:var(--sans);padding:4px 10px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text-muted);cursor:pointer;line-height:1">☾</button>
   <div id="app-version-badge" style="margin-left:8px;font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:99px;background:var(--badge-bg);color:var(--badge-fg);white-space:nowrap;cursor:default" title="Versione app"></div>
 </header>
+<div id="prev-banner">⚠ MODALITÀ PREVENTIVO ATTIVA — i prezzi/H mancanti sono modificabili a mano; le schede salvate saranno marcate PREVENTIVO con numerazione separata, non valide come preparazioni reali.</div>
 
 <main>
 
@@ -1247,6 +1262,13 @@ function getHDaInventario(nome) {
   return found ? (found.h || '') : '';
 }
 
+// Considera anche il flag manuale hPreventivo (solo se modPreventivo è attivo).
+function rigaHazardous(r) {
+  if (!r || !r.nome) return false;
+  if (modPreventivo && r.hPreventivo === true) return true;
+  return hasHazard(r.h || getHDaInventario(r.nome));
+}
+
 function hasHazard(hStr) {
   // Ritorna true se c'è almeno un codice H che giustifica supplemento Art.8a
   // Escludi H4xx puramente ambientali senza rischio umano diretto
@@ -1569,6 +1591,26 @@ function liberaRenderRighe() {
       : '';
     const paBtn = `<button type="button" onclick="liberaSetPa(${i})" title="${r.isPa?'Rimuovi marcatura PA':'Marca come Principio Attivo'}"
         style="font-size:10px;padding:2px 7px;border:1px solid ${r.isPa?'var(--accent)':'var(--border-strong)'};border-radius:var(--radius);background:${r.isPa?'var(--accent)':'var(--bg)'};color:${r.isPa?'white':'var(--text-faint)'};cursor:pointer;font-weight:${r.isPa?'700':'500'};letter-spacing:0.5px">PA</button>`;
+    // In modalità preventivo: edit box per prezzo/H sulle righe SENZA match Allegato A
+    // (Allegato A è legalmente vincolante, non si tocca).
+    let prevEdit = '';
+    if (modPreventivo && r.nome) {
+      const qN = invNominalizza(r.nome);
+      const isAllA = qN ? Object.keys(ALLEGATO_A).some(k => k.includes(qN) || qN.includes(k.split(' ')[0])) : false;
+      if (!isAllA) {
+        const prezzoVal = (r.prezzoAcq && r.prezzoAcq > 0) ? r.prezzoAcq : '';
+        prevEdit = `<div class="prev-edit-row">
+          <label>Prezzo €/g (preventivo)</label>
+          <input type="number" step="0.0001" min="0" value="${prezzoVal}" placeholder="0.0000"
+            oninput="liberaRighe[${i}].prezzoAcq=parseFloat(this.value)||0; calcPrep()">
+          <label style="margin-left:10px;display:inline-flex;align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" ${r.hPreventivo?'checked':''}
+              onchange="liberaRighe[${i}].hPreventivo=this.checked; calcPrep()">
+            ⚠ H pericoloso (Art. 8a)
+          </label>
+        </div>`;
+      }
+    }
     return `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;padding:6px 8px;border:1px solid ${r.isPa?'var(--accent)':'var(--border-strong)'};border-radius:var(--radius);background:${r.isPa?'rgba(0,0,0,0.02)':'transparent'}">
       ${paBtn}
       <input type="text" value="${r.nome}" placeholder="Sostanza" autocomplete="off"
@@ -1587,6 +1629,7 @@ function liberaRenderRighe() {
       <span data-conv="${i}" style="font-size:11px;color:var(--accent)">${convNote}</span>
       <button onclick="liberaRemoveRiga(${i})" style="font-size:11px;padding:2px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">✕</button>
       <div id="libera-sug-${i}" style="width:100%;display:flex;flex-wrap:wrap;gap:4px;margin-top:2px"></div>
+      ${prevEdit}
     </div>`;
   }).join('');
 }
@@ -2843,7 +2886,8 @@ function calcTariff() {
   const dop   = parseInt(document.getElementById('t-dop').value)||0;
   const notte = parseFloat(document.getElementById('t-notte').value)||0;
   // suppH auto (Art. 8a): €2,50 se almeno un ingrediente ha un codice H di pericolo per la salute
-  const _hRilevato = liberaRighe.some(r => r.nome && hasHazard(r.h || getHDaInventario(r.nome)));
+  // In modalità preventivo considera anche il flag manuale hPreventivo (vedi rigaHazardous).
+  const _hRilevato = liberaRighe.some(rigaHazardous);
   const suppH = _hRilevato ? 2.50 : 0;
   const suppSt = stupp*2.50, suppDop = dop*2.50;
 
@@ -3417,7 +3461,7 @@ function aggiornaScheda() {
 
   // ═══════ calcolo tariff ═══════
   // Modalità unica libera: PA, etanolo ed extra sono in liberaRigheExtra/liberaCostoExtra
-  const _hS = liberaRighe.some(r => r.nome && hasHazard(r.h || getHDaInventario(r.nome)));
+  const _hS = liberaRighe.some(rigaHazardous);
   const suppH  = _hS ? 2.50 : 0;
   const inc40  = baseB * 0.40;
   const nettoMaterie = liberaCostoExtra;
@@ -3445,6 +3489,7 @@ function aggiornaScheda() {
                 : (document.getElementById('s-qt').value||'—')+' g';
 
   document.getElementById('scheda-preview').innerHTML =
+    '<div class="scheda-prev-watermark">⚠ PREVENTIVO — Stampa di calcolo, non valida come scheda di preparazione</div>' +
     '<div class="scheda-header">' +
       '<div class="scheda-farmacia"><strong>Farmacia della Stazione</strong>Via Fiume 75 \u2014 La Spezia<br>Farmacista: '+farm+'</div>' +
       '<div class="scheda-title"><h2>Scheda n. '+num+'</h2><p>Preparato magistrale \xb7 '+
@@ -3608,6 +3653,14 @@ function getNextNumScheda() {
   return anno + '/' + String(n).padStart(3, '0');
 }
 
+function getNextNumPreventivo() {
+  const anno = new Date().getFullYear();
+  const key = 'gal_scheda_counter_preventivo_' + anno;
+  const n = parseInt(localStorage.getItem(key) || '0') + 1;
+  localStorage.setItem(key, n);
+  return 'PREV-' + anno + '/' + String(n).padStart(3, '0');
+}
+
 function getLastNumScheda() {
   const anno = new Date().getFullYear();
   const key = 'gal_scheda_counter_' + anno;
@@ -3736,7 +3789,43 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 99;
+const APP_VERSION = 100;
+
+// ── Modalità preventivo ──────────────────────────────────────────────
+// Quando attiva: in libera mode i prezzi/H mancanti diventano editabili,
+// e le schede salvate usano una numerazione separata "PREV-YYYY/NNN" con
+// flag preventivo:true (non confonde le preparazioni reali).
+let modPreventivo = localStorage.getItem('gal_mod_preventivo') === '1';
+
+function togglePreventivo() {
+  modPreventivo = !modPreventivo;
+  localStorage.setItem('gal_mod_preventivo', modPreventivo ? '1' : '0');
+  document.body.classList.toggle('preventivo-on', modPreventivo);
+  // Refresh tutti i punti che dipendono dallo stato.
+  if (typeof liberaRenderRighe === 'function') liberaRenderRighe();
+  if (typeof calcPrep === 'function') calcPrep();
+  if (typeof calcTariff === 'function') calcTariff();
+  if (typeof aggiornaScheda === 'function') aggiornaScheda();
+  if (typeof archivioRender === 'function') archivioRender(document.getElementById('archivio-search')?.value || '');
+  refreshSchedaNumDisplay();
+}
+
+function refreshSchedaNumDisplay() {
+  const el = document.getElementById('s-num');
+  if (!el) return;
+  const anno = new Date().getFullYear();
+  if (modPreventivo) {
+    const key = 'gal_scheda_counter_preventivo_' + anno;
+    const n = (parseInt(localStorage.getItem(key) || '0')||0) + 1;
+    el.value = 'PREV-' + anno + '/' + String(n).padStart(3, '0');
+  } else {
+    const key = 'gal_scheda_counter_' + anno;
+    const n = (parseInt(localStorage.getItem(key) || '0')||0);
+    // Stesso pattern di initNumScheda: mostra il counter corrente, getNextNumScheda lo incrementa.
+    el.value = anno + '/' + String(n).padStart(3, '0');
+  }
+}
+
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -5110,12 +5199,14 @@ function archLoad() {
 function archSave(d) { localStorage.setItem(ARCH_KEY, JSON.stringify(d)); }
 
 function salvaInArchivio() {
-  // Incrementa il numero scheda solo al salvataggio definitivo
-  const nuovoNum = getNextNumScheda();
+  // Incrementa il numero scheda solo al salvataggio definitivo.
+  // In modalità preventivo usa counter + prefisso PREV-: non occupa numeri ufficiali.
+  const nuovoNum = modPreventivo ? getNextNumPreventivo() : getNextNumScheda();
   document.getElementById('s-num').value = nuovoNum;
   const scheda = {
     id: Date.now(),
     num: nuovoNum,
+    preventivo: modPreventivo || false,
     prep:   document.getElementById('s-prep').value,
     tipo:   tipoScheda,
     qt:     document.getElementById('s-qt').value,
@@ -5181,8 +5272,9 @@ function archivioRender(filtro) {
   lista.innerHTML = filtered.map(s => {
     const dataFmt = s.data ? s.data.split('-').reverse().join('/') : '—';
     const prezzoFmt = s.prezzo ? '€ ' + parseFloat(s.prezzo).toFixed(2) : '—';
+    const prevBadge = s.preventivo ? '<span class="arch-prev-badge">PREVENTIVO</span>' : '';
     return '<div class="arch-row">' +
-      '<div><div class="arch-num">' + (s.num||'—') + '</div><div class="arch-sub">' + dataFmt + '</div></div>' +
+      '<div><div class="arch-num">' + (s.num||'—') + prevBadge + '</div><div class="arch-sub">' + dataFmt + '</div></div>' +
       '<div><div class="arch-prep">' + (s.prep||'—') + '</div><div class="arch-sub">' + (s.paz||'') + (s.conc ? ' · ' + s.conc + '%' : '') + (s.qt ? ' · ' + s.qt + ' ml' : '') + '</div></div>' +
       '<div class="arch-data">' + (s.farm||'') + '</div>' +
       '<div class="arch-prezzo">' + prezzoFmt + '</div>' +
@@ -5340,6 +5432,11 @@ updateThemeToggleLabel();
 calcPrep();
 setTimeout(appRenderVersionBadge, 100);
 ordiniRender();
+// Applica modalità preventivo persistente
+if (modPreventivo) {
+  document.body.classList.add('preventivo-on');
+  refreshSchedaNumDisplay();
+}
 </script>
 </body>
 </html>
