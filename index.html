@@ -3736,7 +3736,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 98;
+const APP_VERSION = 99;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -4432,6 +4432,15 @@ function aiGetSystemPrompt() {
     '  - finasteride orale: 1 mg/cps (alopecia androgenetica). Max 5 mg/cps.\n' +
     '  - dutasteride orale: 0,5 mg/cps. Max 2,5 mg/cps.\n' +
     '  - minoxidil: solo soluzioni topiche 2\u20135% p/v (mai in capsule).\n' +
+    'COERENZA E NON-DUPLICAZIONE (REGOLA OBBLIGATORIA):\n' +
+    '  - NON elencare lo stesso principio attivo due volte sotto nomi sinonimi. Consolida sempre in UNA sola riga. Sinonimi frequenti:\n' +
+    '    \u2022 Ittiolo = Ictammolo = Ichthammol = Ammonio bituminosolfonato = Solfobituminato d\'ammonio (stesso INN; "Ittiolo" e "Ictammolo" sono due grade \u2014 chiaro/scuro \u2014 ma in una stessa formula se ne usa UNO solo, non entrambi).\n' +
+    '    \u2022 Paracetamolo = Acetaminofene.\n' +
+    '    \u2022 Vitamina C = Acido ascorbico.\n' +
+    '    \u2022 Bicarbonato di sodio = Sodio bicarbonato.\n' +
+    '    \u2022 Acido salicilico \u2260 Salicilato di metile \u2260 Salicilato di sodio (sostanze diverse, NON consolidare).\n' +
+    '    Quando esistono pi\u00f9 nomi per la stessa sostanza, scegli quello presente in inventario; in assenza, scegli il nome italiano pi\u00f9 comune.\n' +
+    '  - La PROCEDURA deve descrivere l\'uso di TUTTI e SOLI i componenti elencati in FORMULA. Se aggiungi un eccipiente in FORMULA (es. lanolina, mentolo, lattosio), il passaggio corrispondente DEVE comparire in PROCEDURA. Viceversa, non descrivere in PROCEDURA passaggi su sostanze assenti dalla FORMULA.\n' +
     'SANITY CHECK: prima di scrivere la FORMULA, verifica che (massa_PA \u00f7 massa_totale) \u00d7 100 sia coerente con la dose richiesta. Se la percentuale supera il 50%, ricontrolla i calcoli.\n\n' +
     invTxt;
 }
