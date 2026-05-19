@@ -1110,15 +1110,26 @@ function fmt(n, dec) { dec = dec === undefined ? 2 : dec; return n.toFixed(dec).
 // Normalizza un nome sostanza in Title Case, preservando acronimi (CBD, HPMC, ...) e numeri romani (II, IV, ...).
 // Preposizioni italiane (di, da, del, ...) restano minuscole se non in prima posizione.
 const _TITLECASE_ACRONYMS = new Set(['CBD','HPMC','SDS','DDT','ASA','FU','PA','GHS','AIFA','NBP','IPA','EDTA','BHT','BHA','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII']);
-const _TITLECASE_LOWER = new Set(['di','da','del','della','dei','degli','delle','in','su','con','per','tra','fra','il','la','lo','i','gli','le','e','o','a','ai','al','allo','agli','alle']);
+const _TITLECASE_LOWER = new Set([
+  'di','da','del','della','dei','degli','delle','in','su','con','per','tra','fra',
+  'il','la','lo','i','gli','le','e','o','a','ai','al','allo','agli','alle',
+  // unità di misura: vanno SEMPRE minuscole, anche dentro parentesi tipo "(≈33,8 ml)"
+  'ml','mg','g','kg','cc','cl','l','pz','mcg','mol','meq',
+]);
 function titleCase(s) {
   if (!s) return '';
   return s.toLowerCase().split(/(\s+|[-/])/).map((part, i) => {
     if (!part || /^\s+$/.test(part) || /^[-/]$/.test(part)) return part;
-    const upper = part.toUpperCase();
-    if (_TITLECASE_ACRONYMS.has(upper)) return upper;
-    if (_TITLECASE_LOWER.has(part) && i > 0) return part;
-    return part.charAt(0).toUpperCase() + part.slice(1);
+    // Estrai solo le lettere (senza punteggiatura tipo "(", ")", ",") per il match
+    const letters = part.replace(/[^a-zàèéìòóùπµ]/gi, '');
+    if (!letters) return part; // solo numeri/punteggiatura
+    const upper = letters.toUpperCase();
+    if (_TITLECASE_ACRONYMS.has(upper)) {
+      return part.replace(/[a-zàèéìòóùπµ]/gi, ch => ch.toUpperCase());
+    }
+    if (_TITLECASE_LOWER.has(letters) && i > 0) return part;
+    // Capitalizza la PRIMA LETTERA, saltando eventuale punteggiatura iniziale
+    return part.replace(/^([^a-zàèéìòóùπµ]*)([a-zàèéìòóùπµ])/i, (m, pre, c) => pre + c.toUpperCase());
   }).join('');
 }
 function fmtE(n) {
@@ -3134,6 +3145,10 @@ function aggiornaScheda() {
     if (liberaRighe.length > 0) {
       const {totG, paG, conc: concCalcA, ingr} = liberaCalcTotale();
       qt = totG; conc = concCalcA; grPA = paG; // conc sempre auto-calcolata
+      // Sync agli input di scheda così il meta header (qt/conc) vede i valori calcolati
+      // anche senza passare prima da "Compila scheda di lavorazione".
+      if (document.getElementById('s-qt'))   document.getElementById('s-qt').value   = fmt(qt, 1);
+      if (document.getElementById('s-conc')) document.getElementById('s-conc').value = fmt(conc, 2);
       const etRiga = ingr.find(r => { const n=invNominalizza(r.nome); return n.includes('etanolo')||n.includes('alcool')||n.includes('alcol'); });
       mlET96s = etRiga ? (parseFloat(etRiga.qty)||0) / 0.807 : 0;
       percEt = mlET96s > 0 ? mlET96s / qt * 96 : 0;
@@ -3255,9 +3270,12 @@ function aggiornaScheda() {
   } else if (tipoScheda === 'polvere') {
     let qt, grPA, eccip, grEccip;
     if (liberaRighe.length > 0) {
-      const {totG, paG, ingr: ingrL} = liberaCalcTotale();
+      const {totG, paG, conc: concCalcP, ingr: ingrL} = liberaCalcTotale();
       qt = totG; grPA = paG; grEccip = Math.max(0, totG - paG);
       eccip = ingrL.length > 1 ? ingrL.slice(1).map(r => r.nome).join(' + ') : 'Eccipiente';
+      // Sync s-qt e s-conc così il meta header non mostra "0 g / 0% p/v"
+      if (document.getElementById('s-qt'))   document.getElementById('s-qt').value   = fmt(qt, 2);
+      if (document.getElementById('s-conc')) document.getElementById('s-conc').value = fmt(concCalcP, 2);
 
       formulaItems = ingrL.map(r => ({nome: r.nome, val: r.qty, unit: r.unit}));
       formulaItems.push({nome:'Totale polvere', val:fmt(totG,2), unit:'g'});
@@ -3699,7 +3717,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 94;
+const APP_VERSION = 95;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
