@@ -3699,7 +3699,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 93;
+const APP_VERSION = 94;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -4767,13 +4767,60 @@ function aiPrepFormaChanged() {
 }
 
 // ─── Soluti e co-solventi (righe dinamiche nel form AI) ───
-let aiSoluti = [{nome:'', conc:'', unit:'%'}];
+let aiSoluti = [{nome:'', conc:'', unit:'% p/v'}];
 let aiSolventi = [];
+
+// Converte un valore di concentrazione fra unità: % p/v, % v/v, mg/ml, g/100g.
+// density: g/ml della sostanza (per p/v ↔ v/v). Default 1 (acqua) se sconosciuta.
+// Ritorna numero o null se la coppia non è convertibile.
+function _aiConvertConc(value, oldUnit, newUnit, density) {
+  if (oldUnit === newUnit) return value;
+  const d = density && density > 0 ? density : 1;
+  // Normalizza vs g per 100 ml di soluzione (% p/v come pivot)
+  let pivotPv;
+  switch (oldUnit) {
+    case '% p/v':  pivotPv = value; break;
+    case '% v/v':  pivotPv = value * d; break;        // ml/100ml × d → g/100ml
+    case 'mg/ml':  pivotPv = value / 10; break;       // mg/ml → g/100ml
+    case 'g/100g': pivotPv = value; break;            // approssima soluzione d=1
+    default: return null;
+  }
+  switch (newUnit) {
+    case '% p/v':  return pivotPv;
+    case '% v/v':  return pivotPv / d;
+    case 'mg/ml':  return pivotPv * 10;
+    case 'g/100g': return pivotPv;
+    default: return null;
+  }
+}
+
+// Cambio unit con conversione del valore. arrayName: 'soluti' | 'solventi'.
+function aiUnitChanged(arrayName, i, newUnit) {
+  const arr = arrayName === 'soluti' ? aiSoluti : aiSolventi;
+  const item = arr[i];
+  if (!item) return;
+  const valKey = arrayName === 'soluti' ? 'conc' : 'qty';
+  const oldUnit = item.unit;
+  const oldRaw = String(item[valKey] || '').trim();
+  const oldNum = parseFloat(oldRaw.replace(',','.'));
+  if (!isNaN(oldNum) && oldNum > 0 && oldUnit !== newUnit) {
+    const d = (typeof getDensita === 'function' ? getDensita(item.nome) : null) || 1;
+    const converted = _aiConvertConc(oldNum, oldUnit, newUnit, d);
+    if (converted !== null && !isNaN(converted)) {
+      // Arrotonda intelligentemente: 4 decimali, rimuove zeri finali
+      item[valKey] = String(parseFloat(converted.toFixed(4)));
+    }
+  }
+  item.unit = newUnit;
+  if (arrayName === 'soluti') aiSolutiRender(); else aiSolventiRender();
+}
 
 function aiSolutiRender() {
   const c = document.getElementById('ai-soluti-rows');
   if (!c) return;
-  if (!aiSoluti.length) aiSoluti.push({nome:'', conc:'', unit:'%'});
+  if (!aiSoluti.length) aiSoluti.push({nome:'', conc:'', unit:'% p/v'});
+  // Migrazione retro-compat: "%" → "% p/v"
+  aiSoluti.forEach(s => { if (s.unit === '%') s.unit = '% p/v'; });
   c.innerHTML = aiSoluti.map((s,i) => {
     const nomeEsc = (s.nome||'').replace(/"/g,'&quot;');
     const concEsc = (s.conc||'').replace(/"/g,'&quot;');
@@ -4781,8 +4828,9 @@ function aiSolutiRender() {
     return '<div style="display:flex;gap:4px;align-items:center;margin-bottom:4px">'
       + '<input type="text" value="'+nomeEsc+'" placeholder="es. Acido borico" oninput="aiSoluti['+i+'].nome=this.value" style="flex:1;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">'
       + '<input type="text" value="'+concEsc+'" placeholder="conc. o ss" title="numero o codice saturazione (ss, sat, saturo, saturazione)" oninput="aiSoluti['+i+'].conc=this.value" style="width:80px;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">'
-      + '<select onchange="aiSoluti['+i+'].unit=this.value" style="width:80px;font-family:var(--mono);font-size:13px;padding:4px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">'
-        + '<option'+sel('%')+'>%</option>'
+      + '<select onchange="aiUnitChanged(\'soluti\','+i+',this.value)" title="Il valore viene convertito automaticamente al cambio unità" style="width:95px;font-family:var(--mono);font-size:13px;padding:4px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">'
+        + '<option'+sel('% p/v')+'>% p/v</option>'
+        + '<option'+sel('% v/v')+'>% v/v</option>'
         + '<option'+sel('mg/ml')+'>mg/ml</option>'
         + '<option'+sel('g/100g')+'>g/100g</option>'
       + '</select>'
@@ -4790,7 +4838,7 @@ function aiSolutiRender() {
       + '</div>';
   }).join('');
 }
-function aiAddSoluto() { aiSoluti.push({nome:'', conc:'', unit:'%'}); aiSolutiRender(); }
+function aiAddSoluto() { aiSoluti.push({nome:'', conc:'', unit:'% p/v'}); aiSolutiRender(); }
 function aiRemSoluto(i) { aiSoluti.splice(i,1); aiSolutiRender(); }
 
 function aiSolventiRender() {
@@ -4803,10 +4851,12 @@ function aiSolventiRender() {
     return '<div style="display:flex;gap:4px;align-items:center;margin-bottom:4px">'
       + '<input type="text" value="'+nomeEsc+'" placeholder="es. Glicole propilenico" oninput="aiSolventi['+i+'].nome=this.value" style="flex:1;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">'
       + '<input type="text" value="'+qtyEsc+'" placeholder="q.b." oninput="aiSolventi['+i+'].qty=this.value" style="width:70px;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">'
-      + '<select onchange="aiSolventi['+i+'].unit=this.value" style="width:80px;font-family:var(--mono);font-size:13px;padding:4px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">'
+      + '<select onchange="aiUnitChanged(\'solventi\','+i+',this.value)" title="Il valore viene convertito automaticamente fra % p/v ↔ % v/v ↔ mg/ml" style="width:95px;font-family:var(--mono);font-size:13px;padding:4px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">'
         + '<option'+sel('ml')+'>ml</option>'
-        + '<option'+sel('% v/v')+'>% v/v</option>'
         + '<option'+sel('g')+'>g</option>'
+        + '<option'+sel('% v/v')+'>% v/v</option>'
+        + '<option'+sel('% p/v')+'>% p/v</option>'
+        + '<option'+sel('mg/ml')+'>mg/ml</option>'
       + '</select>'
       + '<button onclick="aiRemSolvente('+i+')" title="Rimuovi" style="font-size:11px;padding:2px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">✕</button>'
       + '</div>';
