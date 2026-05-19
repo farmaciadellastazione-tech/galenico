@@ -764,7 +764,8 @@
       </div>
     </div>
 
-    <div style="display:flex;justify-content:flex-end;gap:8px">
+    <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">
+      <button onclick="invNormalizzaNomi()" title="Corregge MAIUSCOLO/minuscolo, inserisce spazi tra numero e unità (200ML → 200 ml), riconosce acronimi (CBD, HPMC). Mostra anteprima prima di applicare." style="font-family:var(--sans);font-size:13px;padding:6px 14px;background:none;border:1px solid var(--border-strong);color:var(--text-muted);border-radius:var(--radius);cursor:pointer">⚙ Normalizza nomi</button>
       <button onclick="invCompilaMancanti()" title="Aggiunge lotto/scad/dataAp fittizi alle voci dell'inventario locale che ne sono prive — non sovrascrive dati esistenti" style="font-family:var(--sans);font-size:13px;padding:6px 14px;background:none;border:1px solid var(--border-strong);color:var(--text-muted);border-radius:var(--radius);cursor:pointer">⚙ Compila dati mancanti</button>
       <button class="btn-add" onclick="invAggiungi()">+ Aggiungi</button>
     </div>
@@ -3692,7 +3693,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 91;
+const APP_VERSION = 92;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -3977,6 +3978,54 @@ function invCompilaMancanti() {
   invSave(inv);
   invRender();
   alert(touched + ' voce/voci completate con dati fittizi (lotto, scadenza 3y, data apertura odierna). Modificale a mano se serve.');
+}
+
+// Normalizza un nome sostanza: spazi tra cifra/unità, casing sentence-case se
+// tutto MAIUSC o tutto minusc, acronimi noti (CBD/HPMC/SDS), numeri romani.
+// Conservativo: i nomi già in Title/Sentence case non vengono toccati.
+function _normalizzaNomeSostanza(nome) {
+  if (!nome) return nome;
+  let s = String(nome).trim();
+  // 1) Spazio tra numero e unità: "200ML" → "200 ML", "50CC" → "50 CC", "125ml" → "125 ml"
+  s = s.replace(/(\d)(ml|mg|cc|cl|kg|pz)\b/gi, '$1 $2');
+  // 2) Casing: se tutto maiuscolo o tutto minuscolo, applica sentence case
+  const hasLetters = /[A-Za-z]/.test(s);
+  const isUpper = hasLetters && s === s.toUpperCase();
+  const isLower = hasLetters && s === s.toLowerCase();
+  if (isUpper || isLower) {
+    s = s.toLowerCase();
+    s = s.charAt(0).toUpperCase() + s.slice(1);
+  }
+  // 3) Acronimi noti — sempre maiuscolo
+  s = s.replace(/\bcbd\b/gi, 'CBD');
+  s = s.replace(/\bhpmc\b/gi, 'HPMC');
+  s = s.replace(/\bsds\b/gi, 'SDS');
+  s = s.replace(/\bpeg\b/gi, 'PEG');
+  // 4) Numeri romani comuni dopo nome (II, III, IV, V, VI, VII, VIII, IX, X)
+  s = s.replace(/\b(ii|iii|iv|vi|vii|viii|ix|x)\b/g, w => w.toUpperCase());
+  // 5) Unità di misura sempre minuscole dopo "N "
+  s = s.replace(/(\d\s)(Ml|Mg|Cc|Cl|Kg|Pz|L)\b/g, (m, a, u) => a + u.toLowerCase());
+  return s;
+}
+
+function invNormalizzaNomi() {
+  const inv = invLoad();
+  if (!inv.length) { alert('Nessuna voce in inventario locale.'); return; }
+  // Calcola differenze
+  const diffs = [];
+  inv.forEach((it, i) => {
+    const nuovo = _normalizzaNomeSostanza(it.nome);
+    if (nuovo !== it.nome) diffs.push({i, vecchio: it.nome, nuovo});
+  });
+  if (!diffs.length) { alert('Nessun nome da normalizzare — tutti i nomi sono già nel formato corretto.'); return; }
+  // Preview con conferma
+  const preview = diffs.slice(0, 30).map(d => '  • "'+d.vecchio+'"  →  "'+d.nuovo+'"').join('\n');
+  const piu = diffs.length > 30 ? '\n  ... e altre '+(diffs.length-30)+' voci' : '';
+  if (!confirm('Verranno rinominate '+diffs.length+' voci:\n\n'+preview+piu+'\n\nProcedere?')) return;
+  diffs.forEach(d => { inv[d.i].nome = d.nuovo; });
+  invSave(inv);
+  invRender();
+  alert(diffs.length + ' voce/voci rinominate. I nomi che restano sospetti (es. concatenazioni come "Capsuletipo") vanno corretti a mano via il pulsante ✏.');
 }
 
 function invPromuviPredefinita(nome) {
