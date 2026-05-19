@@ -908,6 +908,16 @@
       </select>
     </div>
     <div class="field-row" style="margin-bottom:0.75rem">
+      <span class="field-label">Principio attivo</span>
+      <input type="text" id="ai-prep-pa" placeholder="es. Acido borico (opz.)" style="flex:1">
+      <input type="number" id="ai-prep-pa-conc" min="0" step="0.1" placeholder="conc." style="width:70px;margin-left:4px">
+      <select id="ai-prep-pa-conc-unit" style="width:70px;margin-left:4px">
+        <option>%</option>
+        <option>mg/ml</option>
+        <option>g/100g</option>
+      </select>
+    </div>
+    <div class="field-row" style="margin-bottom:0.75rem">
       <span class="field-label">Quantità totale</span>
       <input type="number" id="ai-prep-qt" value="100" min="1" style="width:90px">
       <select id="ai-prep-unit" style="width:70px;margin-left:4px">
@@ -3672,7 +3682,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 87;
+const APP_VERSION = 88;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
@@ -4748,6 +4758,9 @@ function aiAvviaPreparazione() {
   const doseRaw  = document.getElementById('ai-prep-dose')?.value || '';
   const doseUnit = document.getElementById('ai-prep-dose-unit')?.value || 'mg';
   const gradoRaw = document.getElementById('ai-prep-grado-alc')?.value || '';
+  const paNome  = document.getElementById('ai-prep-pa')?.value.trim() || '';
+  const paConc  = document.getElementById('ai-prep-pa-conc')?.value || '';
+  const paConcUnit = document.getElementById('ai-prep-pa-conc-unit')?.value || '%';
   if (!nome) { aiAddSys('Inserisci il nome della preparazione prima di procedere.'); return; }
   const navBtns = document.querySelectorAll('.nav-btn');
   showPage('formulario', navBtns[navBtns.length - 1]);
@@ -4775,10 +4788,16 @@ function aiAvviaPreparazione() {
   if (_aiFormaIsAlcolica(forma) && gradoVal > 0) {
     gradoLine = ' Grado alcolico finale: ' + gradoVal + '% v/v (calcola etanolo 96 e acqua di conseguenza per ottenere il grado richiesto sul volume totale).';
   }
+  // Principio attivo: nome + concentrazione opzionale
+  let paLine = '';
+  if (paNome) {
+    const concVal = parseFloat(paConc) || 0;
+    paLine = ' Principio attivo: ' + paNome + (concVal > 0 ? ' alla concentrazione ' + concVal + ' ' + paConcUnit : '') + '.';
+  }
   const msg = 'Prepara la formula magistrale per: ' + nome +
     ', forma farmaceutica: ' + forma +
     ', quantita totale: ' + qt + ' ' + unit +
-    '.' + doseLine + gradoLine +
+    '.' + paLine + doseLine + gradoLine +
     ' Indica le sostanze con quantita, procedura passo-passo, frasi H/P, scadenza raccomandata FU XII e avvertenze.' +
     tipoLine;
   aiChiama(msg);
