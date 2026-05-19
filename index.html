@@ -3144,7 +3144,12 @@ function aggiornaScheda() {
     let qt, conc, percEt, grPA, mlET96s;
     if (liberaRighe.length > 0) {
       const {totG, paG, conc: concCalcA, ingr} = liberaCalcTotale();
-      qt = totG; conc = concCalcA; grPA = paG; // conc sempre auto-calcolata
+      // Per le soluzioni: usa il VOLUME REALE (somma ml dei liquidi tramite densità),
+      // non i grammi totali. La concentrazione diventa vera % p/v (g PA / 100 ml).
+      const volMl = (typeof liberaSommaVolumeLiquidi === 'function') ? liberaSommaVolumeLiquidi() : 0;
+      qt = volMl > 0 ? volMl : totG;
+      conc = (volMl > 0 && paG > 0) ? (paG / volMl * 100) : concCalcA;
+      grPA = paG;
       // Sync agli input di scheda così il meta header (qt/conc) vede i valori calcolati
       // anche senza passare prima da "Compila scheda di lavorazione".
       if (document.getElementById('s-qt'))   document.getElementById('s-qt').value   = fmt(qt, 1);
@@ -3717,7 +3722,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 95;
+const APP_VERSION = 96;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
