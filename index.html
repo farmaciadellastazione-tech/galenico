@@ -3790,7 +3790,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 101;
+const APP_VERSION = 102;
 
 // ── Modalità preventivo ──────────────────────────────────────────────
 // Quando attiva: in libera mode i prezzi/H mancanti diventano editabili,
@@ -5199,6 +5199,130 @@ function archLoad() {
 
 function archSave(d) { localStorage.setItem(ARCH_KEY, JSON.stringify(d)); }
 
+// ── Snapshot/restore stato Preparazione e Tariffazione ─────────────────
+// Servono a salvare l'input completo della lavorazione nell'Archivio Schede,
+// così archDuplica() può richiamare una scheda passata come bozza di una
+// nuova preparazione. Senza questi snapshot l'archivio conserva solo i dati
+// di output della Scheda (qt, conc, paNome, lotti) — insufficienti a
+// ricostruire la formula con tutti gli ingredienti, op. tecnologiche, ecc.
+function prepSnap() {
+  const getVal = id => { const e = document.getElementById(id); return e ? e.value : ''; };
+  return {
+    v: 1,
+    tipoPrep,
+    opTecnologicheDesc,
+    liberaGrPA, liberaCostoExtra,
+    liberaRighe:      liberaRighe.map(r => ({...r})),
+    liberaRigheExtra: liberaRigheExtra.map(r => ({...r})),
+    inputs: {
+      'prep-pa-nome':     getVal('prep-pa-nome'),
+      'qt':               getVal('qt'),
+      'conc':             getVal('conc'),
+      'perc-et':          getVal('perc-et'),
+      'n-caps':           getVal('n-caps'),
+      'mg-pa-cps':        getVal('mg-pa-cps'),
+      'totale-prep':      getVal('totale-prep'),
+      'totale-prep-unit': getVal('totale-prep-unit'),
+      'vol-soluzione':    getVal('vol-soluzione'),
+      'grado-alc':        getVal('grado-alc'),
+      'caps-ncaps-lib':   getVal('caps-ncaps-lib'),
+      'caps-taglia-lib':  getVal('caps-taglia-lib'),
+      'caps-vuote-cerca': getVal('caps-vuote-cerca'),
+      'caps-vuote-prezzo':getVal('caps-vuote-prezzo'),
+      'caps-vuote-nome':  getVal('caps-vuote-nome'),
+      'cart-ncart-lib':   getVal('cart-ncart-lib'),
+      'cart-dose-lib':    getVal('cart-dose-lib')
+    }
+  };
+}
+
+function prepRestore(snap) {
+  if (!snap) return;
+  tipoPrep           = snap.tipoPrep || 'soluzione';
+  opTecnologicheDesc = snap.opTecnologicheDesc || '';
+  liberaGrPA         = +snap.liberaGrPA || 0;
+  liberaCostoExtra   = +snap.liberaCostoExtra || 0;
+  liberaRighe        = (snap.liberaRighe || []).map(r => ({...r}));
+  liberaRigheExtra   = (snap.liberaRigheExtra || []).map(r => ({...r}));
+
+  // Segmento Tipo Preparazione (#tariff-card-tipo è naming legacy, container dei
+  // seg-btn della Preparazione — ordine: soluzione,unguento,capsule,cartine,polvere,sospensione)
+  const mapIdx = {soluzione:0, unguento:1, capsule:2, cartine:3, polvere:4, sospensione:5};
+  const prepBtns = document.querySelectorAll('#tariff-card-tipo .seg .seg-btn');
+  const idx = mapIdx[tipoPrep] != null ? mapIdx[tipoPrep] : 0;
+  if (prepBtns[idx]) setTipo(tipoPrep, prepBtns[idx]);
+
+  const setVal = (id, v) => { const e = document.getElementById(id); if (e) e.value = (v != null ? v : ''); };
+  Object.entries(snap.inputs || {}).forEach(([id, v]) => setVal(id, v));
+
+  if (typeof liberaRenderRighe === 'function') liberaRenderRighe();
+  if (typeof calcPrep === 'function') calcPrep();
+}
+
+function tariffSnap() {
+  const getVal = id => { const e = document.getElementById(id); return e ? e.value : ''; };
+  const extraRows = Array.from(document.querySelectorAll('#tt-extra-rows .tt-extra-row')).map(row => ({
+    nome:   row.querySelector('.t-extra-nome')   ? row.querySelector('.t-extra-nome').value   : '',
+    qty:    row.querySelector('.t-extra-qty')    ? row.querySelector('.t-extra-qty').value    : '',
+    unit:   row.querySelector('.t-extra-unit')   ? row.querySelector('.t-extra-unit').value   : 'g',
+    prezzo: row.querySelector('.t-extra-prezzo') ? row.querySelector('.t-extra-prezzo').value : ''
+  }));
+  return {
+    v: 1,
+    tipoTariff,
+    tarPADaAllegatoA,
+    suppManRighe: _suppManRighe.map(r => ({...r})),
+    extraRows,
+    inputs: {
+      't-qt':      getVal('t-qt'),
+      't-conc':    getVal('t-conc'),
+      't-ncaps':   getVal('t-ncaps'),
+      't-mgpa':    getVal('t-mgpa'),
+      't-eccip':   getVal('t-eccip'),
+      't-cpsvuote':getVal('t-cpsvuote'),
+      't-ncart':   getVal('t-ncart'),
+      't-pa-nome': getVal('t-pa-nome'),
+      't-pa':      getVal('t-pa'),
+      't-fl':      getVal('t-fl'),
+      't-fl-cerca':getVal('t-fl-cerca'),
+      't-comp':    getVal('t-comp'),
+      't-op':      getVal('t-op'),
+      't-stupp':   getVal('t-stupp'),
+      't-dop':     getVal('t-dop'),
+      't-notte':   getVal('t-notte')
+    }
+  };
+}
+
+function tariffRestore(snap) {
+  if (!snap) return;
+  tipoTariff       = snap.tipoTariff || 'liquida';
+  tarPADaAllegatoA = !!snap.tarPADaAllegatoA;
+  _suppManRighe    = (snap.suppManRighe || []).map(r => ({...r}));
+
+  // Segmento Tipo Tariffazione (ordine: liquida,sospensione,semisolida,polvere,capsule,cartine)
+  const mapIdx = {liquida:0, sospensione:1, semisolida:2, polvere:3, capsule:4, cartine:5};
+  const tarBtns = document.querySelectorAll('#page-tariffazione .seg-btn');
+  const idx = mapIdx[tipoTariff] != null ? mapIdx[tipoTariff] : 0;
+  if (tarBtns[idx]) setTipoTariff(tipoTariff, tarBtns[idx]);
+
+  // Righe extra (3 statiche)
+  const rows = document.querySelectorAll('#tt-extra-rows .tt-extra-row');
+  (snap.extraRows || []).forEach((data, i) => {
+    const row = rows[i]; if (!row) return;
+    const nm = row.querySelector('.t-extra-nome');   if (nm) nm.value = data.nome   || '';
+    const qt = row.querySelector('.t-extra-qty');    if (qt) qt.value = data.qty    || '';
+    const un = row.querySelector('.t-extra-unit');   if (un) un.value = data.unit   || 'g';
+    const pz = row.querySelector('.t-extra-prezzo'); if (pz) pz.value = data.prezzo || '';
+  });
+
+  const setVal = (id, v) => { const e = document.getElementById(id); if (e) e.value = (v != null ? v : ''); };
+  Object.entries(snap.inputs || {}).forEach(([id, v]) => setVal(id, v));
+
+  if (typeof suppManRender === 'function') suppManRender();
+  if (typeof calcTariff === 'function') calcTariff();
+}
+
 function salvaInArchivio() {
   // Incrementa il numero scheda solo al salvataggio definitivo.
   // In modalità preventivo usa counter + prefisso PREV-: non occupa numeri ufficiali.
@@ -5229,6 +5353,10 @@ function salvaInArchivio() {
     lottoET: document.getElementById('s-lotto-et') ? document.getElementById('s-lotto-et').value : '',
     lottoAC: document.getElementById('s-lotto-ac') ? document.getElementById('s-lotto-ac').value : '',
     lottoEC: document.getElementById('s-lotto-eccip') ? document.getElementById('s-lotto-eccip').value : '',
+    // Snapshot completo dello stato di input — abilita archDuplica() a ricostruire
+    // formula, op. tecnologiche, supplementi, ecc. in una nuova preparazione.
+    prepSnap:   prepSnap(),
+    tariffSnap: tariffSnap(),
     salvata: new Date().toISOString()
   };
 
@@ -5281,6 +5409,7 @@ function archivioRender(filtro) {
       '<div class="arch-prezzo">' + prezzoFmt + '</div>' +
       '<div class="arch-btns">' +
         (s.preventivo ? '<button onclick="archApprova(' + s.id + ')" title="Approva preventivo → scheda definitiva" style="font-size:12px;padding:3px 8px;border:1px solid #c46d2c;border-radius:4px;background:#fde8d8;cursor:pointer;color:#7d3c0c;font-weight:600">✓ Approva</button>' : '') +
+        (s.prepSnap && s.tariffSnap ? '<button onclick="archDuplica(' + s.id + ')" title="Duplica come nuova preparazione (ricarica formula e tariffazione, azzera paziente/lotti)" style="font-size:12px;padding:3px 8px;border:1px solid var(--accent);border-radius:4px;background:none;cursor:pointer;color:var(--accent)">📋 Duplica</button>' : '') +
         '<button onclick="archRiapri(' + s.id + ')" title="Riapri scheda" style="font-size:12px;padding:3px 8px;border:1px solid var(--border-strong);border-radius:4px;background:none;cursor:pointer;color:var(--accent)">↩</button>' +
         '<button onclick="archElimina(' + s.id + ')" title="Elimina" style="font-size:12px;padding:3px 8px;border:1px solid #e0a0a0;border-radius:4px;background:none;cursor:pointer;color:var(--red,#8b1a1a)">✕</button>' +
       '</div>' +
@@ -5326,6 +5455,59 @@ function archApprova(id) {
   // 4. Refresh visuale
   if (typeof aggiornaScheda === 'function') aggiornaScheda();
   alert('Preventivo ' + s.num + ' riaperto come bozza scheda definitiva ' + nuovoNum + '.\nVerifica i dati, poi clicca "Salva in archivio".');
+}
+
+// Duplica una scheda archiviata come bozza di una nuova preparazione: ripristina
+// lo stato di Preparazione e Tariffazione dagli snapshot, ma azzera i dati
+// anagrafici (paziente, data, lotti, numero scheda, prezzo) perché sono
+// specifici della nuova lavorazione. Atterra in pagina Preparazione.
+function archDuplica(id) {
+  const arch = archLoad();
+  const s = arch.find(s => s.id === id);
+  if (!s) return;
+  if (!s.prepSnap || !s.tariffSnap) {
+    alert('Questa scheda è stata salvata prima dell\'introduzione della funzione Duplica e non contiene lo snapshot completo della lavorazione.\nPuoi solo riaprirla in sola consultazione.');
+    return;
+  }
+  if (!confirm('Duplicare la scheda ' + s.num + ' come nuova preparazione?\n\n• Formula e tariffazione vengono ricaricate identiche\n• Paziente, data, lotti, prezzo vengono azzerati\n• Il numero verrà assegnato al salvataggio\n• I dati correnti di Preparazione/Tariffazione/Scheda verranno persi')) return;
+
+  // 1. Ripristina input completo
+  prepRestore(s.prepSnap);
+  tariffRestore(s.tariffSnap);
+
+  // 2. Riallinea tipo Scheda al tipo Preparazione (la scheda originale potrebbe
+  //    avere un altro tipoScheda salvato; qui ricalchiamo il tipo di prep).
+  const mapIdx = {soluzione:0, unguento:1, capsule:2, cartine:3, polvere:4, sospensione:5};
+  const sBtn = document.querySelectorAll('#scheda-inputs .seg-btn');
+  const sIdx = mapIdx[s.prepSnap.tipoPrep] != null ? mapIdx[s.prepSnap.tipoPrep] : 0;
+  if (sBtn[sIdx]) setTipoScheda(s.prepSnap.tipoPrep, sBtn[sIdx]);
+
+  // 3. Anagrafica scheda: tieni nome preparazione e farmacista; azzera il resto.
+  //    Il numero scheda viene assegnato a salvaInArchivio() in base allo stato
+  //    di modPreventivo in quel momento — non lo precalcoliamo qui.
+  const setVal = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+  setVal('s-num', '');
+  setVal('s-paz', '');
+  setVal('s-data', new Date().toISOString().slice(0, 10));
+  setVal('s-prezzo', '');
+  setVal('s-lotto-as', '');
+  setVal('s-lotto-et', '');
+  setVal('s-lotto-ac', '');
+  setVal('s-lotto-eccip', '');
+  // s-prep (nome preparazione) e s-farm (farmacista): li manteniamo come template
+  setVal('s-prep', s.prep || '');
+  setVal('s-farm', s.farm || '');
+  setVal('s-mesi', s.mesi || '2');
+  sMesiAuto = false;
+  const sInfo = document.getElementById('s-mesi-info'); if (sInfo) { sInfo.textContent = '(da duplicato)'; sInfo.style.color = 'var(--text-muted)'; }
+
+  if (typeof aggiornaScheda === 'function') aggiornaScheda();
+
+  // 4. Vai in Preparazione perché è da lì che si parte per verificare la formula
+  const prepNavBtn = document.querySelector('.nav-btn[onclick*="preparazione"]');
+  if (prepNavBtn) showPage('preparazione', prepNavBtn);
+
+  alert('Scheda ' + s.num + ' duplicata.\nVerifica formula e prezzi, compila paziente/lotti, poi vai in Scheda e salva.');
 }
 
 function archRiapri(id) {
