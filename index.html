@@ -1887,24 +1887,34 @@ function liberaCalcTotale() {
     totG += grams;
     if (i === paIdx) paG = grams;
   });
-  // Percentuale PA
-  const conc = totG > 0 && paG > 0 ? (paG / totG * 100) : 0;
+  // Concentrazione PA. Per soluzioni/sospensioni: vera % p/v (g PA / 100 ml soluzione).
+  // Volume = somma ml dei liquidi (via densità per le righe in g). Per polveri/unguenti: % p/p.
+  const isLiquidForm = tipoPrep === 'soluzione' || tipoPrep === 'sospensione';
+  const volMl = isLiquidForm && typeof liberaSommaVolumeLiquidi === 'function'
+    ? liberaSommaVolumeLiquidi() : 0;
+  let conc;
+  if (isLiquidForm && volMl > 0 && paG > 0) {
+    conc = paG / volMl * 100; // % p/v
+  } else {
+    conc = totG > 0 && paG > 0 ? (paG / totG * 100) : 0; // % p/p
+  }
   const _concEl = document.getElementById('libera-conc');
   const _concNote = document.getElementById('libera-conc-note');
   if (_concEl) _concEl.value = conc > 0 ? fmt(conc,2) : '';
   if (_concNote) {
-    if (tipoPrep === 'polvere') _concNote.textContent = '% p/p — calcolata (PA/totale)';
+    if (tipoPrep === 'polvere') _concNote.textContent = '% p/p — g PA / 100 g preparato';
     else if (tipoPrep === 'capsule') _concNote.textContent = 'mg/cps — vedi sotto';
-    else _concNote.textContent = '% p/v — calcolata (PA/totale)';
+    else if (isLiquidForm) _concNote.textContent = '% p/v — g PA / 100 ml di preparato';
+    else _concNote.textContent = '% p/p — g PA / 100 g preparato';
   }
   aggiornaTotaleDerived();
-  return {totG, paG, conc, ingr};
+  return {totG, paG, conc, ingr, volMl};
 }
 
 
 function calcPrep() {
   liberaRenderRighe();
-  const {totG, paG, conc: concCalc, ingr} = liberaCalcTotale();
+  const {totG, paG, conc: concCalc, ingr, volMl} = liberaCalcTotale();
   const concDich = parseFloat(document.getElementById('libera-conc')?.value)||0;
   const conc = concDich > 0 ? concDich : concCalc;
 
@@ -2191,19 +2201,25 @@ function calcPrep() {
       tipoPrep === 'capsule' ? Math.max(1, parseInt(document.getElementById('caps-ncaps-lib')?.value || '0') || 1) :
       1;
 
-    if (document.getElementById('qt'))   document.getElementById('qt').value   = fmt(totG * _perUnitFactor, 2);
-    if (document.getElementById('conc')) document.getElementById('conc').value = fmt(conc, 2); // % invariata
+    // Per soluzioni/sospensioni: qt nascosta = volume in ml (così Tariffazione e Scheda
+    // ricevono la quantità nella stessa unità del label "Quantità totale (ml)").
+    // Per altre forme: qt = grammi totali come prima.
+    const _isLiquidForm = tipoPrep === 'soluzione' || tipoPrep === 'sospensione';
+    const _qtBase = _isLiquidForm && volMl > 0 ? volMl : totG;
+    if (document.getElementById('qt'))   document.getElementById('qt').value   = fmt(_qtBase * _perUnitFactor, 2);
+    if (document.getElementById('conc')) document.getElementById('conc').value = fmt(conc, 2); // ora vera % p/v per soluzioni
 
-    // Etanolo: calcola % v/v equivalente per il campo nascosto 'perc-et' (usato da Tariffazione/Scheda)
+    // Etanolo: % v/v equivalente per il campo nascosto 'perc-et' (Tariffazione/Scheda).
+    // Denominatore corretto: il volume soluzione (volMl), non i grammi totali.
     const etRiga = ingr.find(r => {
       const n = invNominalizza(r.nome);
       return n.includes('etanolo') || n.includes('alcool') || n.includes('alcol');
     });
-    if (etRiga && totG > 0) {
-      // g etanolo → % v/v: (g/densità_et) / totG_ml * 100
-      // usiamo densità 0.807 e totG come volume approssimativo
-      const mlEt = parseFloat(etRiga.qty) / 0.807;
-      const percEtCalc = mlEt / totG * 100;
+    const _volForEt = volMl > 0 ? volMl : totG; // fallback se non c'è volume calcolato
+    if (etRiga && _volForEt > 0) {
+      const etQty = parseFloat(etRiga.qty) || 0;
+      const mlEt = etRiga.unit === 'ml' ? etQty : (etRiga.unit === 'g' ? etQty / 0.807 : 0);
+      const percEtCalc = mlEt / _volForEt * 100;
       if (document.getElementById('perc-et')) document.getElementById('perc-et').value = fmt(percEtCalc,1);
     } else {
       if (document.getElementById('perc-et')) document.getElementById('perc-et').value = '0';
@@ -3143,12 +3159,10 @@ function aggiornaScheda() {
     // In modalità libera leggi direttamente da liberaRighe
     let qt, conc, percEt, grPA, mlET96s;
     if (liberaRighe.length > 0) {
-      const {totG, paG, conc: concCalcA, ingr} = liberaCalcTotale();
-      // Per le soluzioni: usa il VOLUME REALE (somma ml dei liquidi tramite densità),
-      // non i grammi totali. La concentrazione diventa vera % p/v (g PA / 100 ml).
-      const volMl = (typeof liberaSommaVolumeLiquidi === 'function') ? liberaSommaVolumeLiquidi() : 0;
+      const {totG, paG, conc: concCalcA, ingr, volMl} = liberaCalcTotale();
+      // qt = volume reale in ml per soluzione; conc è già vera % p/v restituita da liberaCalcTotale.
       qt = volMl > 0 ? volMl : totG;
-      conc = (volMl > 0 && paG > 0) ? (paG / volMl * 100) : concCalcA;
+      conc = concCalcA;
       grPA = paG;
       // Sync agli input di scheda così il meta header (qt/conc) vede i valori calcolati
       // anche senza passare prima da "Compila scheda di lavorazione".
@@ -3722,7 +3736,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 96;
+const APP_VERSION = 97;
 const VER_COLORS = [
   {bg:'#d4edda', color:'#1a6b2e'},
   {bg:'#cce5ff', color:'#0056b3'},
