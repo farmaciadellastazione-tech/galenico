@@ -2028,12 +2028,22 @@ function calcPrep() {
       // Filtrazione = 3ª operazione → extra se PA non si scioglie immediatamente
       const needsFiltrazione = hasCrystalline || conc > 3;
       if (needsFiltrazione) { opTecnologicheExtra += 1; opTecnologicheDesc = 'filtrazione (Art. 6)'; }
+      // Co-solventi liquidi (glicole propilenico, glicerina, PEG, ecc.): tutto ciò
+      // che non è PA, etanolo o acqua va aggiunto esplicitamente nella procedura.
+      const coSolventi = ingr.filter((r, i) => {
+        if (i === 0) return false; // PA
+        const n = _n(r);
+        if (n.includes('etanolo') || n.includes('alcool') || n.includes('alcol')) return false;
+        if (n.includes('acqua')) return false;
+        return true;
+      });
       proc = [
         ...pesate,
         ...(hasEt
           ? ['Sciogliere il principio attivo in <strong>'+_etRiga.qty+' '+_etRiga.unit+'</strong> di etanolo 96°, agitando fino a completa dissoluzione.']
           : ['Sciogliere il principio attivo in circa '+fmt(totG*0.8,0)+' ml di '+acquaNote+', agitando.']),
-        ...(hasAcqua && hasEt ? ["Aggiungere gradualmente l'acqua purificata alla soluzione alcolica, mescolando."] : []),
+        ...coSolventi.map(r => 'Aggiungere <strong>'+r.qty+' '+r.unit+'</strong> di '+r.nome+' alla soluzione, mescolando.'),
+        ...(hasAcqua && hasEt ? ["Aggiungere gradualmente l'acqua purificata alla soluzione, mescolando."] : []),
         ...(needsFiltrazione ? ['Filtrare su carta da filtro o membrana. <em>(Op. tecnologica aggiuntiva — Art. 6)</em>'] : []),
         'Trasferire in matraccio tarato. Portare a volume con '+acquaNote+' q.b. a '+totLabel+'.',
         'Verificare limpidezza. Trasferire in flacone ambrato. Chiudere ed etichettare.',
@@ -3214,10 +3224,27 @@ function aggiornaScheda() {
         return {nome: r.nome + convNote, val: r.qty, unit: r.unit};
       });
       formulaItems.push({nome:'Flacone ambrato', val:String(nFlac), unit:'pz'});
+      // Procedura intelligente coerente con calcPrep: PA → etanolo → co-solventi → acqua.
+      const _nmS = r => invNominalizza(r.nome);
+      const _etRS    = ingrL.find(r => { const n=_nmS(r); return n.includes('etanolo')||n.includes('alcool')||n.includes('alcol'); });
+      const _hasEtS  = !!_etRS;
+      const _hasAcS  = ingrL.some(r => _nmS(r).includes('acqua'));
+      const _coSolvS = ingrL.filter((r, i) => {
+        if (i === 0) return false; // PA
+        const n = _nmS(r);
+        if (n.includes('etanolo') || n.includes('alcool') || n.includes('alcol')) return false;
+        if (n.includes('acqua')) return false;
+        return true;
+      });
       proc = [
         'Pesare e/o misurare tutti i componenti secondo la formula.',
         ...ingrL.map(r => _pesataMisuraLine(r)),
-        'Miscelare nell\'ordine indicato. Verificare aspetto e omogeneità.',
+        ...(_hasEtS
+          ? ['Sciogliere il principio attivo in <strong>'+_etRS.qty+' '+_etRS.unit+'</strong> di etanolo 96°, agitando fino a completa dissoluzione.']
+          : []),
+        ..._coSolvS.map(r => 'Aggiungere <strong>'+r.qty+' '+r.unit+'</strong> di '+r.nome+' alla soluzione, mescolando.'),
+        ...(_hasAcS && _hasEtS ? ['Aggiungere gradualmente l\'acqua purificata alla soluzione, mescolando.'] : []),
+        'Verificare aspetto e omogeneità.',
         'Trasferire nel recipiente finale. Etichettare.',
       ];
       // Lotti da liberaRighe
@@ -3782,7 +3809,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 111;
+const APP_VERSION = 112;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
