@@ -3415,18 +3415,21 @@ function aggiornaScheda() {
     const grPA        = (mgPAcart * nCart)/1000;
     const grEccip     = (mgEccipcart * nCart)/1000;
 
+    const _conEccip = grEccip > 0;
     formulaItems = [
       {nome:nomePA+' (totale)', val:fmt(grPA,3), unit:'g'},
-      {nome:eccip+' (totale)', val:fmt(grEccip,2), unit:'g'},
+      ...(_conEccip ? [{nome:eccip+' (totale)', val:fmt(grEccip,2), unit:'g'}] : []),
       {nome:'Cartine', val:String(nCart), unit:'pz'},
       {nome:'PA per cartina', val:fmt(mgPAcart,2), unit:'mg'},
-      {nome:'Eccipiente per cartina', val:fmt(mgEccipcart,1), unit:'mg'},
+      ...(_conEccip ? [{nome:'Eccipiente per cartina', val:fmt(mgEccipcart,1), unit:'mg'}] : []),
       {nome:'Peso per cartina', val:fmt(mgCart,0), unit:'mg'},
     ];
     proc = [
       'Pesare <strong>'+fmt(grPA,3)+' g</strong> di '+nomePA+' su bilancia analitica.',
-      'Pesare <strong>'+fmt(grEccip,2)+' g</strong> di '+eccip+'.',
-      'Miscelare PA ed eccipiente per almeno 5 minuti fino ad omogeneità (triturare in mortaio se necessario).',
+      ...(_conEccip
+        ? ['Pesare <strong>'+fmt(grEccip,2)+' g</strong> di '+eccip+'.',
+           'Miscelare PA ed eccipiente per almeno 5 minuti fino ad omogeneità (triturare in mortaio se necessario).']
+        : ['Polverizzare in mortaio se necessario per omogeneizzare la granulometria.']),
       'Ripartire la polvere in <strong>'+nCart+' cartine</strong> di carta velina (atteso: '+fmt(mgCart,0)+' mg/cartina, di cui PA '+fmt(mgPAcart,2)+' mg).',
       'Verificare il peso di almeno 3 cartine (tolleranza ±5%).',
       'Piegare le cartine e conservare in busta o scatola chiusa. Etichettare.',
@@ -3434,7 +3437,8 @@ function aggiornaScheda() {
     ];
     lottiItems = [
       {nome:nomePA, lotto:lottoAS},
-      {nome:eccip, lotto:document.getElementById('s-lotto-eccip').value||'—'},
+      // Eccipiente: mostra il lotto solo se effettivamente usato (massa > 0).
+      ...(grEccip > 0 ? [{nome:eccip, lotto:document.getElementById('s-lotto-eccip').value||'—'}] : []),
     ];
     costoPA = grPA*pPA; costoFL_s = pFL;
     const diff10c = Math.ceil(Math.abs(nCart-120)/10);
@@ -3697,7 +3701,8 @@ function compilaScheda() {
     const mgPAcps = document.getElementById('mg-pa-cps')?.value || '';
     const taglia  = document.getElementById('caps-taglia-lib')?.value || '0';
     if (document.getElementById('s-ncaps')) document.getElementById('s-ncaps').value = nCaps;
-    if (document.getElementById('s-mgpa'))  document.getElementById('s-mgpa').value  = mgPAcps;
+    // s-mgpa è type=number: convertire la virgola italiana di fmt() in punto, altrimenti il browser scarta la value.
+    if (document.getElementById('s-mgpa'))  document.getElementById('s-mgpa').value  = mgPAcps.replace(',', '.');
     if (document.getElementById('s-taglia'))document.getElementById('s-taglia').value = taglia;
     const prepNome = nomePA ? nomePA+' '+mgPAcps+' mg/cps capsule' : 'Capsule';
     document.getElementById('s-prep').value = prepNome;
@@ -3710,7 +3715,8 @@ function compilaScheda() {
     const mgPAcart = (paGcart > 0) ? fmt(paGcart * 1000, 2) : '';
     const mgCart   = (totGcart > 0) ? fmt(totGcart * 1000, 0) : '';
     if (document.getElementById('s-ncart'))    document.getElementById('s-ncart').value    = nCart;
-    if (document.getElementById('s-mgpacart')) document.getElementById('s-mgpacart').value = mgPAcart;
+    // s-mgpacart è type=number: convertire la virgola italiana di fmt() in punto.
+    if (document.getElementById('s-mgpacart')) document.getElementById('s-mgpacart').value = mgPAcart.replace(',', '.');
     if (document.getElementById('s-mgcart'))   document.getElementById('s-mgcart').value   = mgCart;
     const prepNome = nomePA ? nomePA+' '+mgPAcart+' mg/cartina' : 'Cartine';
     document.getElementById('s-prep').value = prepNome;
@@ -3774,7 +3780,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 106;
+const APP_VERSION = 107;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
