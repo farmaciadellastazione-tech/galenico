@@ -1123,6 +1123,21 @@ function setTipo(t, btn) {
 
 function fmt(n, dec) { dec = dec === undefined ? 2 : dec; return n.toFixed(dec).replace('.', ','); }
 
+// Smart g/mg: ≥1000 mg → grammi (2 dec); altrimenti mg con decMg decimali. Restituisce {val, unit}.
+function fmtMgAuto(mg, decMg) {
+  decMg = decMg === undefined ? 1 : decMg;
+  return mg >= 1000
+    ? {val: fmt(mg/1000, 2), unit: 'g'}
+    : {val: fmt(mg, decMg), unit: 'mg'};
+}
+// Stessa logica come stringa "val unit".
+function fmtMgAutoStr(mg, decMg) { const f = fmtMgAuto(mg, decMg); return f.val + ' ' + f.unit; }
+// Smart g/mg per quantità in unità arbitraria: se input è 'mg' applica fmtMgAuto, altrimenti rispetta l'unità.
+function fmtQtyAuto(qty, unit, decMg) {
+  if (unit === 'mg') return fmtMgAuto(qty, decMg);
+  return {val: fmt(qty, 2), unit: unit};
+}
+
 // Normalizza un nome sostanza in Title Case, preservando acronimi (CBD, HPMC, ...) e numeri romani (II, IV, ...).
 // Preposizioni italiane (di, da, del, ...) restano minuscole se non in prima posizione.
 const _TITLECASE_ACRONYMS = new Set(['CBD','HPMC','SDS','DDT','ASA','FU','PA','GHS','AIFA','NBP','IPA','EDTA','BHT','BHA','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII']);
@@ -2076,13 +2091,11 @@ function calcPrep() {
       if (tCps && prezCps > 0) tCps.value = prezCps.toFixed(4);
       const tNcaps = document.getElementById('t-ncaps');
       if (tNcaps && nCaps > 0) tNcaps.value = nCaps;
-      // Helper: formato smart g/mg per masse in mg
-      const fmtMg = mg => mg >= 1000 ? {val: fmt(mg/1000, 2), unit: 'g'} : {val: fmt(mg, 1), unit: 'mg'};
       // Formula display
       items.push({name:'Taglia capsula', val:String(taglia), unit:''});
       if (nCaps > 0) items.push({name:'Numero capsule', val:String(nCaps), unit:'pz'});
-      if (mgCps > 0) { const f = fmtMg(mgCps); items.push({name:'Massa per capsula', val:f.val, unit:f.unit}); }
-      if (mgPACps > 0) { const f = fmtMg(mgPACps); items.push({name:'PA per capsula', val:f.val, unit:f.unit}); }
+      if (mgCps > 0) { const f = fmtMgAuto(mgCps); items.push({name:'Massa per capsula', val:f.val, unit:f.unit}); }
+      if (mgPACps > 0) { const f = fmtMgAuto(mgPACps); items.push({name:'PA per capsula', val:f.val, unit:f.unit}); }
       if (grTotale > 0 && nCaps > 0) items.push({name:'Massa totale da pesare', val:fmt(grTotale, 2), unit:'g'});
       if (grPATot > 0 && nCaps > 0) items.push({name:'PA totale', val:fmt(grPATot, 2), unit:'g'});
       if (prezCps > 0) items.push({name:nomeCps+' (al costo, escluse dal peso)', val:'€'+fmt(costoCps,2), unit:''});
@@ -2091,15 +2104,8 @@ function calcPrep() {
       const pesateCps = nCaps > 0
         ? ingr.map(r => {
             const q = parseFloat(r.qty)||0;
-            const qTot = q * nCaps;
-            let dispVal, dispUnit;
-            if (r.unit === 'mg') {
-              if (qTot >= 1000) { dispVal = fmt(qTot/1000, 2); dispUnit = 'g'; }
-              else              { dispVal = fmt(qTot, 1);      dispUnit = 'mg'; }
-            } else {
-              dispVal = fmt(qTot, 2); dispUnit = r.unit;
-            }
-            return 'Pesare <strong>'+dispVal+' '+dispUnit+'</strong> di '+r.nome+' (= '+r.qty+' '+r.unit+'/capsula × '+nCaps+').';
+            const f = fmtQtyAuto(q * nCaps, r.unit);
+            return 'Pesare <strong>'+f.val+' '+f.unit+'</strong> di '+r.nome+' (= '+r.qty+' '+r.unit+'/capsula × '+nCaps+').';
           })
         : pesate;
       proc = [
@@ -2107,7 +2113,7 @@ function calcPrep() {
         ...(hasCrystalline ? ['Setacciare i componenti cristallini al setaccio n° 355 µm prima della miscelazione. <em>(Op. tecnologica aggiuntiva — Art. 6)</em>'] : []),
         'Miscelare PA ed eccipienti per almeno 5 minuti fino ad omogeneità cromatica.',
         'Eseguire la prova volumetrica nell\'opercolatrice da '+nCaps+' capsule taglia '+taglia+'.',
-        'Riempire le capsule. Controllare il peso di almeno 5 capsule (atteso: '+(mgCps>=1000?fmt(mgCps/1000,2)+' g':fmt(mgCps,1)+' mg')+'/cps).',
+        'Riempire le capsule. Controllare il peso di almeno 5 capsule (atteso: '+fmtMgAutoStr(mgCps)+'/cps).',
         'Chiudere le capsule. Conservare in flacone ben chiuso. Etichettare.',
       ];
       opTecnologicheExtra += 1; // setacciatura PA sempre
@@ -2129,36 +2135,25 @@ function calcPrep() {
       // Propaga il numero cartine alla tariffazione
       const tNcart = document.getElementById('t-ncart');
       if (tNcart && nCart > 0) tNcart.value = nCart;
-      // Helper: formato smart g/mg per masse in mg (g con 2 decimali, mg con 1)
-      const fmtMg = mg => mg >= 1000 ? {val: fmt(mg/1000, 2), unit: 'g'} : {val: fmt(mg, 1), unit: 'mg'};
       // Formula display
       if (nCart > 0) items.push({name:'Numero cartine', val:String(nCart), unit:'pz'});
-      if (mgCart > 0) { const f = fmtMg(mgCart); items.push({name:'Massa per cartina', val:f.val, unit:f.unit}); }
-      if (mgPACart > 0) { const f = fmtMg(mgPACart); items.push({name:'PA per cartina', val:f.val, unit:f.unit}); }
+      if (mgCart > 0) { const f = fmtMgAuto(mgCart); items.push({name:'Massa per cartina', val:f.val, unit:f.unit}); }
+      if (mgPACart > 0) { const f = fmtMgAuto(mgPACart); items.push({name:'PA per cartina', val:f.val, unit:f.unit}); }
       if (grTotale > 0 && nCart > 0) items.push({name:'Massa totale da pesare', val:fmt(grTotale, 2), unit:'g'});
       if (grPATot > 0 && nCart > 0) items.push({name:'PA totale', val:fmt(grPATot, 2), unit:'g'});
       // Procedura: pesate totali (× nCart rispetto al per-cartina inserito)
       const pesateCart = nCart > 0
         ? ingr.map(r => {
             const q = parseFloat(r.qty)||0;
-            const qTot = q * nCart;
-            let dispVal, dispUnit;
-            if (r.unit === 'mg') {
-              if (qTot >= 1000) { dispVal = fmt(qTot/1000, 2); dispUnit = 'g'; }
-              else              { dispVal = fmt(qTot, 1);      dispUnit = 'mg'; }
-            } else {
-              dispVal = fmt(qTot, 2); dispUnit = r.unit;
-            }
-            return 'Pesare <strong>'+dispVal+' '+dispUnit+'</strong> di '+r.nome+' (= '+r.qty+' '+r.unit+'/cartina × '+nCart+').';
+            const f = fmtQtyAuto(q * nCart, r.unit);
+            return 'Pesare <strong>'+f.val+' '+f.unit+'</strong> di '+r.nome+' (= '+r.qty+' '+r.unit+'/cartina × '+nCart+').';
           })
         : pesate;
-      const massaCartFmt = mgCart >= 1000 ? fmt(mgCart/1000, 2)+' g' : fmt(mgCart, 1)+' mg';
-      const paCartFmt    = mgPACart >= 1000 ? fmt(mgPACart/1000, 2)+' g' : fmt(mgPACart, 1)+' mg';
       proc = [
         ...pesateCart,
         ...(hasCrystalline ? ['Setacciare i componenti cristallini al setaccio n° 355 µm prima della miscelazione. <em>(Op. tecnologica aggiuntiva — Art. 6)</em>'] : []),
         'Miscelare PA ed eccipienti per almeno 5 minuti fino ad omogeneità cromatica.',
-        'Ripartire la polvere in <strong>'+nCart+' cartine</strong> di carta velina (atteso: '+massaCartFmt+'/cartina, di cui PA '+paCartFmt+').',
+        'Ripartire la polvere in <strong>'+nCart+' cartine</strong> di carta velina (atteso: '+fmtMgAutoStr(mgCart)+'/cartina, di cui PA '+fmtMgAutoStr(mgPACart)+').',
         'Verificare il peso di almeno 3 cartine (tolleranza ±5%).',
         'Piegare e sigillare. Conservare in scatola/contenitore opaco. Etichettare.',
       ];
@@ -3416,13 +3411,16 @@ function aggiornaScheda() {
     const grEccip     = (mgEccipcart * nCart)/1000;
 
     const _conEccip = grEccip > 0;
+    const _fPA  = fmtMgAuto(mgPAcart, 2);
+    const _fEcc = fmtMgAuto(mgEccipcart, 1);
+    const _fTot = fmtMgAuto(mgCart, 0);
     formulaItems = [
       {nome:nomePA+' (totale)', val:fmt(grPA,3), unit:'g'},
       ...(_conEccip ? [{nome:eccip+' (totale)', val:fmt(grEccip,2), unit:'g'}] : []),
       {nome:'Cartine', val:String(nCart), unit:'pz'},
-      {nome:'PA per cartina', val:fmt(mgPAcart,2), unit:'mg'},
-      ...(_conEccip ? [{nome:'Eccipiente per cartina', val:fmt(mgEccipcart,1), unit:'mg'}] : []),
-      {nome:'Peso per cartina', val:fmt(mgCart,0), unit:'mg'},
+      {nome:'PA per cartina', val:_fPA.val, unit:_fPA.unit},
+      ...(_conEccip ? [{nome:'Eccipiente per cartina', val:_fEcc.val, unit:_fEcc.unit}] : []),
+      {nome:'Peso per cartina', val:_fTot.val, unit:_fTot.unit},
     ];
     proc = [
       'Pesare <strong>'+fmt(grPA,3)+' g</strong> di '+nomePA+' su bilancia analitica.',
@@ -3430,10 +3428,10 @@ function aggiornaScheda() {
         ? ['Pesare <strong>'+fmt(grEccip,2)+' g</strong> di '+eccip+'.',
            'Miscelare PA ed eccipiente per almeno 5 minuti fino ad omogeneità (triturare in mortaio se necessario).']
         : ['Polverizzare in mortaio se necessario per omogeneizzare la granulometria.']),
-      'Ripartire la polvere in <strong>'+nCart+' cartine</strong> di carta velina (atteso: '+fmt(mgCart,0)+' mg/cartina, di cui PA '+fmt(mgPAcart,2)+' mg).',
+      'Ripartire la polvere in <strong>'+nCart+' cartine</strong> di carta velina (atteso: '+fmtMgAutoStr(mgCart,0)+'/cartina, di cui PA '+fmtMgAutoStr(mgPAcart,2)+').',
       'Verificare il peso di almeno 3 cartine (tolleranza ±5%).',
       'Piegare le cartine e conservare in busta o scatola chiusa. Etichettare.',
-      'Etichettare: '+nomePA+' '+fmt(mgPAcart,2)+' mg/cartina — N° '+nCart+' cartine — data e scadenza.',
+      'Etichettare: '+nomePA+' '+fmtMgAutoStr(mgPAcart,2)+'/cartina — N° '+nCart+' cartine — data e scadenza.',
     ];
     lottiItems = [
       {nome:nomePA, lotto:lottoAS},
@@ -3780,7 +3778,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 107;
+const APP_VERSION = 108;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
