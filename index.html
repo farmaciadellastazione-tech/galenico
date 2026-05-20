@@ -3188,8 +3188,9 @@ function aggiornaScheda() {
       grPA = paG;
       // Sync agli input di scheda così il meta header (qt/conc) vede i valori calcolati
       // anche senza passare prima da "Compila scheda di lavorazione".
-      if (document.getElementById('s-qt'))   document.getElementById('s-qt').value   = fmt(qt, 1);
-      if (document.getElementById('s-conc')) document.getElementById('s-conc').value = fmt(conc, 2);
+      // NB: <input type="number"> rifiuta la virgola → usare toFixed() che produce "."
+      if (document.getElementById('s-qt'))   document.getElementById('s-qt').value   = qt.toFixed(1);
+      if (document.getElementById('s-conc')) document.getElementById('s-conc').value = conc.toFixed(2);
       const etRiga = ingr.find(r => { const n=invNominalizza(r.nome); return n.includes('etanolo')||n.includes('alcool')||n.includes('alcol'); });
       mlET96s = etRiga ? (parseFloat(etRiga.qty)||0) / 0.807 : 0;
       percEt = mlET96s > 0 ? mlET96s / qt * 96 : 0;
@@ -3315,8 +3316,9 @@ function aggiornaScheda() {
       qt = totG; grPA = paG; grEccip = Math.max(0, totG - paG);
       eccip = ingrL.length > 1 ? ingrL.slice(1).map(r => r.nome).join(' + ') : 'Eccipiente';
       // Sync s-qt e s-conc così il meta header non mostra "0 g / 0% p/v"
-      if (document.getElementById('s-qt'))   document.getElementById('s-qt').value   = fmt(qt, 2);
-      if (document.getElementById('s-conc')) document.getElementById('s-conc').value = fmt(concCalcP, 2);
+      // NB: <input type="number"> rifiuta la virgola → usare toFixed() che produce "."
+      if (document.getElementById('s-qt'))   document.getElementById('s-qt').value   = qt.toFixed(2);
+      if (document.getElementById('s-conc')) document.getElementById('s-conc').value = concCalcP.toFixed(2);
 
       formulaItems = ingrL.map(r => ({nome: r.nome, val: r.qty, unit: r.unit}));
       formulaItems.push({nome:'Totale polvere', val:fmt(totG,2), unit:'g'});
@@ -3468,10 +3470,11 @@ function aggiornaScheda() {
   );
 
   // ═══════ HTML scheda ═══════
+  const _sQtRaw = parseFloat(document.getElementById('s-qt').value)||0;
+  const _sQtUnit = (tipoScheda==='soluzione'||tipoScheda==='sospensione') ? ' ml' : ' g';
   const qtLabel = tipoScheda==='capsule' ? (document.getElementById('s-ncaps').value||'—')+' pz'
                 : tipoScheda==='cartine' ? (document.getElementById('s-ncart').value||'—')+' pz'
-                : tipoScheda==='soluzione'||tipoScheda==='sospensione' ? (document.getElementById('s-qt').value||'—')+' ml'
-                : (document.getElementById('s-qt').value||'—')+' g';
+                : (_sQtRaw > 0 ? fmt(_sQtRaw, 1) : '—') + _sQtUnit;
 
   document.getElementById('scheda-preview').innerHTML =
     '<div class="scheda-prev-watermark">⚠ PREVENTIVO — Stampa di calcolo, non valida come scheda di preparazione</div>' +
@@ -3726,8 +3729,9 @@ function compilaScheda() {
     const tipoStr = tipoPrep === 'soluzione' ? 'Soluzione' : tipoPrep === 'unguento' ? 'Unguento' : tipoPrep === 'polvere' ? 'Polvere' : 'Sospensione';
     const prepNome = nomePA ? nomePA + ' ' + concStr + tipoStr : tipoStr;
     document.getElementById('s-prep').value = prepNome;
-    document.getElementById('s-qt').value   = fmt(totG,1);
-    document.getElementById('s-conc').value = fmt(concL,2);
+    // NB: <input type="number"> rifiuta la virgola → usare toFixed() che produce "."
+    document.getElementById('s-qt').value   = totG.toFixed(1);
+    document.getElementById('s-conc').value = concL.toFixed(2);
     const etRiga = ingr.find(r => {
       const n = invNominalizza(r.nome);
       return n.includes('etanolo') || n.includes('alcool') || n.includes('alcol');
@@ -3778,7 +3782,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 108;
+const APP_VERSION = 111;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
@@ -5188,11 +5192,135 @@ if (typeof aiSolventiRender === 'function') aiSolventiRender();
 
 const ARCH_KEY = 'gal_archivio_schede_v1';
 
+// ─── Gist preventivi (pubblico — solo preventivi, no schede definitive) ───
+// Il Gist deve essere PUBBLICO per permettere la lettura anonima da parte dei
+// clienti che ricevono un link condiviso. Solo le schede con preventivo:true
+// vengono mirror-ate (le definitive contengono dati paziente e restano locali).
+const GIST_ID_PREV   = 'db931286b9608648fd17c1ed834b55f6'; // Gist pubblico farmaciadellastazione-tech (file: galenico_preventivi.json)
+const GIST_FILE_PREV = 'galenico_preventivi.json';
+
 function archLoad() {
   try { return JSON.parse(localStorage.getItem(ARCH_KEY) || '[]'); } catch { return []; }
 }
 
 function archSave(d) { localStorage.setItem(ARCH_KEY, JSON.stringify(d)); }
+
+// Filtra solo i preventivi (per il sync online).
+function archGetPreventivi(arch) { return (arch || archLoad()).filter(s => s.preventivo === true); }
+
+// Sync: scrive su Gist (richiede token GitHub) tutti i preventivi.
+async function prevSyncToGist() {
+  if (!GIST_ID_PREV || GIST_ID_PREV === 'PASTE_HERE') return;
+  const token = ghGetToken();
+  if (!token) {
+    ghStatus('⚠ Nessun token — preventivi solo in locale', 'var(--warn)');
+    return;
+  }
+  const preventivi = archGetPreventivi();
+  try {
+    const r = await fetch(`https://api.github.com/gists/${GIST_ID_PREV}`, {
+      method: 'PATCH',
+      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files: { [GIST_FILE_PREV]: { content: JSON.stringify(preventivi, null, 2) } } })
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    ghStatus('✓ Preventivi sincronizzati su Gist (' + preventivi.length + ')', 'var(--accent)');
+  } catch(e) {
+    ghStatus('⚠ Sync preventivi fallito: ' + e.message, 'var(--warn)');
+  }
+}
+
+// Fetch puro dal Gist (no localStorage mutation). Usabile sia dal proprietario
+// che da un visitatore esterno via link condiviso.
+async function prevFetchGist() {
+  if (!GIST_ID_PREV || GIST_ID_PREV === 'PASTE_HERE') return [];
+  try {
+    const token = ghGetToken();
+    const headers = { Accept: 'application/vnd.github.v3+json' };
+    if (token) headers.Authorization = `token ${token}`;
+    const res = await fetch(`https://api.github.com/gists/${GIST_ID_PREV}`, { headers });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const content = data.files[GIST_FILE_PREV]?.content || '[]';
+    const remote = JSON.parse(content);
+    return Array.isArray(remote) ? remote : [];
+  } catch(e) {
+    console.warn('prevFetchGist:', e.message);
+    return [];
+  }
+}
+
+// Sync: fetch + merge nell'archivio locale. Usato solo nel boot del
+// proprietario (mai per visitatori del link condiviso).
+// Strategia merge: i preventivi remoti sovrascrivono i locali con stesso `num`;
+// i locali non presenti remotamente restano. Le schede definitive locali non
+// vengono toccate.
+async function prevSyncFromGist() {
+  const remote = await prevFetchGist();
+  if (remote.length === 0) return remote;
+  const arch = archLoad();
+  const byNum = new Map(remote.map(p => [p.num, p]));
+  const merged = arch.map(s => (s.preventivo && byNum.has(s.num)) ? byNum.get(s.num) : s);
+  const localNums = new Set(arch.map(s => s.num));
+  remote.filter(p => !localNums.has(p.num)).forEach(p => merged.unshift(p));
+  archSave(merged);
+  return remote;
+}
+
+// Costruisce l'URL condivisibile per un preventivo.
+function prevShareUrl(num) {
+  const base = window.location.origin + window.location.pathname;
+  return base + '#prev=' + encodeURIComponent(num);
+}
+
+// Copia il link di un preventivo negli appunti.
+async function prevCondividi(id) {
+  const arch = archLoad();
+  const s = arch.find(s => s.id === id);
+  if (!s) return;
+  if (!s.preventivo) { alert('Solo i preventivi possono essere condivisi online.'); return; }
+  if (!GIST_ID_PREV || GIST_ID_PREV === 'PASTE_HERE') {
+    alert('Funzione non configurata: manca l\'ID del Gist preventivi nel codice.');
+    return;
+  }
+  const url = prevShareUrl(s.num);
+  try {
+    await navigator.clipboard.writeText(url);
+    alert('Link copiato negli appunti:\n\n' + url + '\n\nIl destinatario potrà aprirlo da qualsiasi browser senza login.');
+  } catch {
+    prompt('Copia il link:', url);
+  }
+}
+
+// Render read-only: mostra un preventivo a schermo intero, senza form, senza nav.
+// Usato quando l'app viene aperta con hash #prev=<NUM>.
+function prevRenderShared(scheda) {
+  if (!scheda || !scheda.html) {
+    document.body.innerHTML = '<div style="padding:2rem;font-family:sans-serif;text-align:center;color:#666">Preventivo non trovato o non più disponibile.</div>';
+    return;
+  }
+  // Nascondi tutto, mostra solo il preventivo in un contenitore stampabile.
+  document.body.innerHTML =
+    '<style>@media print{.no-print{display:none!important}}body{background:#f5f3ee;padding:2rem;font-family:DM Sans,sans-serif}.shared-wrap{max-width:900px;margin:0 auto;background:#fff;padding:2rem;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.06)}.shared-bar{max-width:900px;margin:0 auto 1rem;display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#666}.shared-bar button{padding:.5rem 1rem;border:1px solid #999;background:#fff;border-radius:4px;cursor:pointer;font-size:13px}</style>' +
+    '<div class="shared-bar no-print"><span>📋 Preventivo condiviso — Farmacia della Stazione, La Spezia</span><button onclick="window.print()">🖶 Stampa</button></div>' +
+    '<div class="shared-wrap">' + scheda.html + '</div>';
+}
+
+// Controlla l'URL al boot: se contiene #prev=<NUM>, mostra il preventivo
+// in modalità read-only invece di avviare l'app normale.
+// NB: usa prevFetchGist (no merge in localStorage) per non sporcare lo storage
+// del visitatore esterno.
+async function prevCheckSharedLink() {
+  const hash = window.location.hash || '';
+  const m = hash.match(/^#prev=(.+)$/);
+  if (!m) return false;
+  const num = decodeURIComponent(m[1]);
+  document.body.innerHTML = '<div style="padding:2rem;font-family:sans-serif;text-align:center;color:#666">Caricamento preventivo ' + num + '...</div>';
+  const remote = await prevFetchGist();
+  const found = remote.find(p => p.num === num);
+  prevRenderShared(found);
+  return true;
+}
 
 // ── Snapshot/restore stato Preparazione e Tariffazione ─────────────────
 // Servono a salvare l'input completo della lavorazione nell'Archivio Schede,
@@ -5359,6 +5487,13 @@ function salvaInArchivio() {
     return;
   }
 
+  // Per i preventivi: snapshot dell'HTML renderizzato dello scheda-preview,
+  // così il link condivisibile può mostrarlo senza ricostruire lo stato.
+  if (scheda.preventivo) {
+    const prev = document.getElementById('scheda-preview');
+    scheda.html = prev ? prev.innerHTML : '';
+  }
+
   const arch = archLoad();
   // Controlla duplicati per numero scheda
   const dup = arch.findIndex(s => s.num === scheda.num);
@@ -5369,6 +5504,8 @@ function salvaInArchivio() {
     arch.unshift(scheda); // più recente in cima
   }
   archSave(arch);
+  // Mirror su Gist solo per preventivi (no privacy issue) — async, non blocca.
+  if (scheda.preventivo) prevSyncToGist();
   alert('Scheda ' + scheda.num + ' salvata in archivio.');
 }
 
@@ -5402,6 +5539,7 @@ function archivioRender(filtro) {
       '<div class="arch-data">' + (s.farm||'') + '</div>' +
       '<div class="arch-prezzo">' + prezzoFmt + '</div>' +
       '<div class="arch-btns">' +
+        (s.preventivo ? '<button onclick="prevCondividi(' + s.id + ')" title="Copia link condivisibile (read-only, accessibile da qualsiasi browser)" style="font-size:12px;padding:3px 8px;border:1px solid #2d6cdf;border-radius:4px;background:none;cursor:pointer;color:#2d6cdf;font-weight:600">🔗 Link</button>' : '') +
         (s.preventivo ? '<button onclick="archApprova(' + s.id + ')" title="Approva preventivo → scheda definitiva" style="font-size:12px;padding:3px 8px;border:1px solid #c46d2c;border-radius:4px;background:#fde8d8;cursor:pointer;color:#7d3c0c;font-weight:600">✓ Approva</button>' : '') +
         (s.prepSnap && s.tariffSnap ? '<button onclick="archDuplica(' + s.id + ')" title="Duplica come nuova preparazione (ricarica formula e tariffazione, azzera paziente/lotti)" style="font-size:12px;padding:3px 8px;border:1px solid var(--accent);border-radius:4px;background:none;cursor:pointer;color:var(--accent)">📋 Duplica</button>' : '') +
         '<button onclick="archRiapri(' + s.id + ')" title="Riapri scheda" style="font-size:12px;padding:3px 8px;border:1px solid var(--border-strong);border-radius:4px;background:none;cursor:pointer;color:var(--accent)">↩</button>' +
@@ -5418,6 +5556,8 @@ function archElimina(id) {
   if (!confirm('Eliminare la scheda ' + scheda.num + ' — ' + scheda.prep + '?\n\nAttenzione: questa operazione è irreversibile.')) return;
   if (!confirm('Sei proprio sicuro di voler eliminare la scheda ' + scheda.num + '?')) return;
   archSave(arch.filter(s => s.id !== id));
+  // Se era un preventivo, rispecchia anche su Gist (così sparisce per i link).
+  if (scheda.preventivo) prevSyncToGist();
   archivioRender(document.getElementById('archivio-search').value);
 }
 
@@ -5638,22 +5778,31 @@ showPage = function(id, btn) {
 };
 
 // ── INIT ──
-ghCaricaToken();
-invSyncFromGist().then(() => invRender()).catch(() => invRender());
-etiqAggiorna();
-aiCaricaKey();
-initCapsuleTaglie();
-if (liberaRighe.length === 0) liberaAddRiga();
-liberaRenderRighe();
-updateThemeToggleLabel();
-calcPrep();
-setTimeout(appRenderVersionBadge, 100);
-ordiniRender();
-// Applica modalità preventivo persistente
-if (modPreventivo) {
-  document.body.classList.add('preventivo-on');
-  refreshSchedaNumDisplay();
-}
+// Se l'URL contiene #prev=<NUM>, l'app è aperta da un link condiviso: render
+// read-only e stop. Altrimenti boot normale + sync preventivi.
+(async function bootInit() {
+  if (window.location.hash && window.location.hash.startsWith('#prev=')) {
+    await prevCheckSharedLink();
+    return; // non avviare il resto dell'app
+  }
+  ghCaricaToken();
+  invSyncFromGist().then(() => invRender()).catch(() => invRender());
+  prevSyncFromGist().then(() => { if (typeof archivioRender === 'function') archivioRender(''); }).catch(()=>{});
+  etiqAggiorna();
+  aiCaricaKey();
+  initCapsuleTaglie();
+  if (liberaRighe.length === 0) liberaAddRiga();
+  liberaRenderRighe();
+  updateThemeToggleLabel();
+  calcPrep();
+  setTimeout(appRenderVersionBadge, 100);
+  ordiniRender();
+  // Applica modalità preventivo persistente
+  if (modPreventivo) {
+    document.body.classList.add('preventivo-on');
+    refreshSchedaNumDisplay();
+  }
+})();
 </script>
 </body>
 </html>
