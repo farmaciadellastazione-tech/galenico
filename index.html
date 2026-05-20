@@ -2,8 +2,16 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Galenico — Preparazione & Tariffazione</title>
+<!-- PWA: installabile su iOS/Android come icona separata dalle altre web-app -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#3a6b34">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Galenico">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script>
@@ -334,6 +342,13 @@
 <div class="page active" id="page-preparazione">
   <h1>Preparazione galenica</h1>
   <p class="subtitle" id="prep-subtitle">Calcolo formula e procedura</p>
+  <!-- Import ricetta via foto/testo (AI) — compila automaticamente i campi sotto -->
+  <div class="card" id="ricetta-import-card" style="background:var(--warn-bg);border:1px solid var(--warn-border);padding:10px 12px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <button class="btn-add" onclick="ricettaApriDialog()" style="font-size:14px">📸 Importa ricetta</button>
+      <span style="font-size:12px;color:var(--text-muted)">Foto o testo della ricetta → riconosce e compila i campi</span>
+    </div>
+  </div>
   <div class="card" id="tariff-card-tipo">
     <div class="card-title">Tipo di preparazione</div>
     <div class="seg">
@@ -1051,6 +1066,28 @@
 </main>
 
 <footer>galenico.html — uso interno farmacia · D.M. 22/09/2017 e s.m.i. (G.U. n. 24 del 30/01/2018) · FU XII</footer>
+
+<!-- Dialog import ricetta (foto / testo) — usato da pulsante in pagina Preparazione -->
+<div id="ricetta-dialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:560px;width:100%;max-height:90vh;overflow-y:auto;padding:1.2rem;box-shadow:0 8px 32px rgba(0,0,0,0.25);font-family:var(--sans)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+      <h3 style="margin:0;font-size:18px">📸 Importa ricetta</h3>
+      <button onclick="ricettaChiudiDialog()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text-muted);padding:0 6px">✕</button>
+    </div>
+    <div style="margin-bottom:1rem">
+      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px">📷 Scatta una foto della ricetta</label>
+      <input type="file" id="ricetta-foto" accept="image/*" capture="environment" onchange="ricettaDaFoto(this.files[0])" style="width:100%;padding:8px;border:1px dashed var(--border-strong);border-radius:var(--radius);background:var(--bg);font-size:13px">
+      <div style="font-size:11px;color:var(--text-faint);margin-top:4px">Su mobile apre direttamente la fotocamera. Su desktop usa il file picker.</div>
+    </div>
+    <div style="text-align:center;color:var(--text-faint);font-size:12px;margin:0.6rem 0">— oppure —</div>
+    <div style="margin-bottom:1rem">
+      <label style="display:block;font-size:13px;font-weight:500;margin-bottom:6px">📋 Incolla testo ricetta</label>
+      <textarea id="ricetta-testo" rows="6" placeholder="Es. Minoxidil 5%&#10;Etanolo 96° 50 g&#10;Glicole propilenico 35 g&#10;Acqua dep. q.b. a 100 g&#10;m.d.s. lozione" style="width:100%;padding:8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);font-family:var(--mono);font-size:13px;resize:vertical;box-sizing:border-box"></textarea>
+      <button onclick="ricettaDaTesto()" style="margin-top:6px;padding:8px 16px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:var(--radius);cursor:pointer;font-size:14px;font-weight:500">🔍 Riconosci e compila</button>
+    </div>
+    <div id="ricetta-status" style="margin-top:0.8rem;padding:0.6rem;border-radius:var(--radius);font-size:13px;display:none"></div>
+  </div>
+</div>
 
 <script>
 let tipoPrep = 'soluzione';
@@ -3840,7 +3877,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 115;
+const APP_VERSION = 116;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
@@ -5826,6 +5863,186 @@ function resetRicetta() {
   // vai a Preparazione
   const prepNavBtn = document.querySelector('.nav-btn[onclick*="preparazione"]');
   if (prepNavBtn) showPage('preparazione', prepNavBtn);
+}
+
+// ═══════════════════════════════════════════
+// IMPORT RICETTA via AI (foto/testo) — riempie tipoPrep + liberaRighe
+// ═══════════════════════════════════════════
+//
+// Provider configurabile: oggi Groq Llama 4 (riusa gal_groq_key); per cambiare
+// (es. Anthropic Claude, OpenAI) modifica RICETTA_AI_CONFIG sotto.
+const RICETTA_AI_CONFIG = {
+  endpoint:    'https://api.groq.com/openai/v1/chat/completions',
+  modelVision: 'meta-llama/llama-4-scout-17b-16e-instruct',
+  modelText:   'meta-llama/llama-4-scout-17b-16e-instruct',
+  keyName:     'gal_groq_key',
+  keyPrefix:   'gsk_',
+  authHeader:  k => 'Bearer ' + k,
+};
+
+const RICETTA_PROMPT = `Sei un esperto in galenica farmaceutica italiana. Estrai i dati di una preparazione magistrale dalla ricetta fornita (foto o testo).
+
+OUTPUT: SOLO un oggetto JSON valido, nessun commento, nessun testo prima o dopo. Struttura:
+{
+  "tipoPrep": "soluzione" | "sospensione" | "unguento" | "polvere" | "capsule" | "cartine",
+  "nomePA": "Nome principio attivo principale",
+  "concMode": "pp" | "pv",
+  "concentrazione": numero in % (o null),
+  "ingredienti": [
+    {"nome": "stringa", "qty": "numero come stringa", "unit": "g"|"ml"|"mg"|"%"|"pz", "isPa": true|false}
+  ],
+  "paziente": "stringa" | null,
+  "validitaMesi": numero | null,
+  "errore": "stringa solo se la ricetta non è interpretabile"
+}
+
+REGOLE:
+- Forma farmaceutica: lozione/loz/sol → soluzione; cps/capsule/op. → capsule; ungs/unguento/crema/pomata → unguento; polv/polvere → polvere; cartine → cartine; sosp → sospensione
+- Sigle: q.b. = quanto basta; m.d.s. = mandasi; ad/aa = parti uguali/fino a
+- Principio attivo: marca isPa:true. Solventi (acqua, etanolo, glicole propilenico, glicerina), eccipienti (lattosio, vaselina) e basi: isPa:false
+- Concentrazione: se esplicita "X%" estraila; "p/p" → concMode pp, "p/v" → pv. Default pp
+- Mantieni le unità della ricetta. Se "ml" usa "ml"; se "g" usa "g". Non convertire
+- Nomi in italiano formale: "Acqua purificata", "Etanolo 96°", "Glicole propilenico"
+- Se illeggibile o non galenica: solo { "errore": "motivo breve" }`;
+
+function ricettaApriDialog() {
+  const dlg = document.getElementById('ricetta-dialog');
+  if (!dlg) return;
+  dlg.style.display = 'flex';
+  document.getElementById('ricetta-testo').value = '';
+  document.getElementById('ricetta-foto').value = '';
+  ricettaStatus('', '');
+}
+
+function ricettaChiudiDialog() {
+  const dlg = document.getElementById('ricetta-dialog');
+  if (dlg) dlg.style.display = 'none';
+}
+
+function ricettaStatus(msg, color) {
+  const el = document.getElementById('ricetta-status');
+  if (!el) return;
+  if (!msg) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.textContent = msg;
+  el.style.background = color === 'err' ? 'var(--danger-bg)' : color === 'ok' ? 'var(--accent-light)' : 'var(--warn-bg)';
+  el.style.color = color === 'err' ? 'var(--danger)' : color === 'ok' ? 'var(--accent)' : 'var(--warn)';
+  el.style.border = '1px solid ' + (color === 'err' ? 'var(--danger-border)' : color === 'ok' ? 'var(--accent-border)' : 'var(--warn-border)');
+}
+
+function ricettaGetKey() {
+  const k = localStorage.getItem(RICETTA_AI_CONFIG.keyName) || '';
+  if (!k || (RICETTA_AI_CONFIG.keyPrefix && k.indexOf(RICETTA_AI_CONFIG.keyPrefix) !== 0)) {
+    ricettaStatus('⚠ Inserisci la chiave AI in Formulario AI prima di importare ricette.', 'err');
+    return null;
+  }
+  return k;
+}
+
+// File foto → base64 data URL → invio a modello vision.
+async function ricettaDaFoto(file) {
+  if (!file) return;
+  if (!ricettaGetKey()) return;
+  ricettaStatus('⟳ Lettura foto e analisi AI in corso...', '');
+  try {
+    const dataUrl = await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = e => resolve(e.target.result);
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+    const content = [
+      { type: 'text', text: RICETTA_PROMPT },
+      { type: 'image_url', image_url: { url: dataUrl } }
+    ];
+    await ricettaCallAI(content, RICETTA_AI_CONFIG.modelVision);
+  } catch(e) {
+    ricettaStatus('⚠ Errore lettura foto: ' + e.message, 'err');
+  }
+}
+
+async function ricettaDaTesto() {
+  const testo = document.getElementById('ricetta-testo').value.trim();
+  if (!testo) { ricettaStatus('⚠ Incolla prima il testo della ricetta.', 'err'); return; }
+  if (!ricettaGetKey()) return;
+  ricettaStatus('⟳ Analisi AI in corso...', '');
+  const content = RICETTA_PROMPT + '\n\nRICETTA:\n' + testo;
+  await ricettaCallAI(content, RICETTA_AI_CONFIG.modelText);
+}
+
+// Chiamata generica al provider AI. content può essere stringa (testo) o array (multimodale).
+async function ricettaCallAI(content, model) {
+  const key = ricettaGetKey();
+  if (!key) return;
+  try {
+    const resp = await fetch(RICETTA_AI_CONFIG.endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': RICETTA_AI_CONFIG.authHeader(key) },
+      body: JSON.stringify({
+        model: model,
+        messages: [{ role: 'user', content: content }],
+        temperature: 0.1,
+        max_tokens: 1200,
+        response_format: { type: 'json_object' },
+      })
+    });
+    const data = await resp.json();
+    if (data.error) { ricettaStatus('⚠ Errore API: ' + data.error.message, 'err'); return; }
+    const txt = data.choices?.[0]?.message?.content || '';
+    let json;
+    try { json = JSON.parse(txt); }
+    catch { ricettaStatus('⚠ Risposta AI non valida (JSON malformato).', 'err'); return; }
+    if (json.errore) { ricettaStatus('⚠ AI: ' + json.errore, 'err'); return; }
+    ricettaApplicaJson(json);
+  } catch(e) {
+    ricettaStatus('⚠ Errore rete: ' + e.message, 'err');
+  }
+}
+
+// Applica il JSON decodificato sui campi dell'app: tipoPrep, liberaRighe, nomePA,
+// paziente, concentrazione. Poi rilancia calcPrep() e chiude il dialog.
+function ricettaApplicaJson(json) {
+  // 1. tipoPrep + segmento attivo
+  const validTipi = {soluzione:0, unguento:1, capsule:2, cartine:3, polvere:4, sospensione:5};
+  if (json.tipoPrep && validTipi[json.tipoPrep] != null) {
+    const btns = document.querySelectorAll('#tariff-card-tipo .seg-btn');
+    const btn = btns[validTipi[json.tipoPrep]];
+    if (btn) setTipo(json.tipoPrep, btn);
+  }
+  // 2. concMode
+  if (json.concMode === 'pp' || json.concMode === 'pv') setConcMode(json.concMode);
+  // 3. Nome PA in campo hidden
+  if (json.nomePA) {
+    const el = document.getElementById('prep-pa-nome');
+    if (el) el.value = json.nomePA;
+  }
+  // 4. Ingredienti → liberaRighe
+  if (Array.isArray(json.ingredienti) && json.ingredienti.length > 0) {
+    liberaRighe = json.ingredienti.map(i => ({
+      nome: String(i.nome || ''),
+      qty:  String(i.qty != null ? i.qty : ''),
+      unit: String(i.unit || 'g'),
+      isPa: !!i.isPa,
+      densita: null,
+    }));
+    if (typeof liberaRenderRighe === 'function') liberaRenderRighe();
+  }
+  // 5. Paziente in scheda
+  if (json.paziente) {
+    const pz = document.getElementById('s-paz');
+    if (pz) pz.value = json.paziente;
+  }
+  // 6. Validità mesi
+  if (json.validitaMesi) {
+    const m = document.getElementById('s-mesi');
+    if (m) m.value = String(json.validitaMesi);
+  }
+  // 7. Ricalcola tutto
+  if (typeof calcPrep === 'function') calcPrep();
+  if (typeof aggiornaScheda === 'function') aggiornaScheda();
+  ricettaStatus('✓ Ricetta importata. Verifica i valori prima di procedere.', 'ok');
+  // Chiudi dopo un attimo per dare tempo di leggere il messaggio.
+  setTimeout(ricettaChiudiDialog, 1400);
 }
 
 // Render archivio quando si apre la pagina

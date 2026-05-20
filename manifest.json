@@ -1,0 +1,20 @@
+{
+  "name": "Galenico — Farmacia della Stazione",
+  "short_name": "Galenico",
+  "description": "Calcoli galenici, schede di preparazione, tariffazione D.M. 22/09/2017",
+  "lang": "it",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#efece5",
+  "theme_color": "#3a6b34",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
