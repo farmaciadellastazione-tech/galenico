@@ -399,6 +399,11 @@
       <span class="field-label">Concentrazione</span>
       <input type="text" id="libera-conc" value="" readonly
         style="width:90px;background:var(--accent-light);border:1px solid var(--border);border-radius:var(--radius);padding:4px 8px;font-family:var(--mono);font-size:13px;color:var(--accent);text-align:right">
+      <select id="libera-conc-mode" onchange="setConcMode(this.value)" title="p/p = g PA / 100 g preparato · p/v = g PA / 100 ml di soluzione"
+        style="margin-left:8px;font-family:var(--mono);font-size:12px;padding:3px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">
+        <option value="pp">% p/p</option>
+        <option value="pv">% p/v</option>
+      </select>
       <span class="field-note" id="libera-conc-note">% — calcolata automaticamente</span>
     </div>
     <div id="libera-righe" style="margin-top:6px"></div>
@@ -1049,6 +1054,16 @@
 
 <script>
 let tipoPrep = 'soluzione';
+
+// Modalità concentrazione: 'pp' (g PA / 100 g preparato) o 'pv' (g PA / 100 ml).
+// Persistita in localStorage; default 'pp'.
+let concMode = (function(){ try { return localStorage.getItem('gal_conc_mode') || 'pp'; } catch { return 'pp'; } })();
+function setConcMode(m) {
+  concMode = (m === 'pv') ? 'pv' : 'pp';
+  try { localStorage.setItem('gal_conc_mode', concMode); } catch {}
+  if (typeof calcPrep === 'function') calcPrep();
+  if (typeof aggiornaScheda === 'function') aggiornaScheda();
+}
 
 function showPage(id, btn) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -1954,13 +1969,16 @@ function liberaCalcTotale() {
     totG += grams;
     if (i === paIdx) paG = grams;
   });
-  // Concentrazione PA. Per soluzioni/sospensioni: vera % p/v (g PA / 100 ml soluzione).
-  // Volume = somma ml dei liquidi (via densità per le righe in g). Per polveri/unguenti: % p/p.
+  // Concentrazione PA. Modalità scelta dall'operatore (concMode, persistita in
+  // localStorage): 'pp' = g PA / 100 g preparato; 'pv' = g PA / 100 ml soluzione.
+  // Default 'pp'. La modalità 'pv' è disponibile solo per soluzioni/sospensioni
+  // (richiede un volume calcolabile dai liquidi della formula).
   const isLiquidForm = tipoPrep === 'soluzione' || tipoPrep === 'sospensione';
   const volMl = isLiquidForm && typeof liberaSommaVolumeLiquidi === 'function'
     ? liberaSommaVolumeLiquidi() : 0;
   let conc;
-  if (isLiquidForm && volMl > 0 && paG > 0) {
+  const usePv = concMode === 'pv' && isLiquidForm && volMl > 0 && paG > 0;
+  if (usePv) {
     conc = paG / volMl * 100; // % p/v
   } else {
     conc = totG > 0 && paG > 0 ? (paG / totG * 100) : 0; // % p/p
@@ -1971,7 +1989,9 @@ function liberaCalcTotale() {
   if (_concNote) {
     if (tipoPrep === 'polvere') _concNote.textContent = '% p/p — g PA / 100 g preparato';
     else if (tipoPrep === 'capsule') _concNote.textContent = 'mg/cps — vedi sotto';
-    else if (isLiquidForm) _concNote.textContent = '% p/v — g PA / 100 ml di preparato';
+    else if (isLiquidForm) _concNote.textContent = usePv
+      ? '% p/v — g PA / 100 ml di preparato'
+      : '% p/p — g PA / 100 g preparato';
     else _concNote.textContent = '% p/p — g PA / 100 g preparato';
   }
   aggiornaTotaleDerived();
@@ -3816,7 +3836,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 113;
+const APP_VERSION = 114;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
@@ -5827,6 +5847,9 @@ showPage = function(id, btn) {
   initCapsuleTaglie();
   if (liberaRighe.length === 0) liberaAddRiga();
   liberaRenderRighe();
+  // Sincronizza il <select> della modalità concentrazione con lo stato persistito
+  const _cmSel = document.getElementById('libera-conc-mode');
+  if (_cmSel) _cmSel.value = concMode;
   updateThemeToggleLabel();
   calcPrep();
   setTimeout(appRenderVersionBadge, 100);
