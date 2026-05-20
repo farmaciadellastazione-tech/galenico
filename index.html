@@ -1920,13 +1920,20 @@ function liberaCalcTotale() {
   const ingr = liberaGetIngr();
   // Totale preparazione (usato per risolvere righe con unità %)
   const totalePrep = parseFloat(document.getElementById('totale-prep')?.value)||0;
-  // PA esplicito (marker isPa). Se nessuno marcato, fallback all'euristica precedente
-  // (prima sostanza Allegato A, altrimenti prima riga).
+  // PA esplicito (marker isPa). Se nessuno marcato, euristica: prima riga che
+  // NON è un solvente noto. Il vecchio approccio "primo match Allegato A" non
+  // funzionava per PA moderni non in D.M. 2017 (es. Minoxidil): pescava il
+  // primo solvente in Allegato A (Glicole Propilenico) come falso PA.
   let paIdx = ingr.findIndex(r => r.isPa);
   if (paIdx < 0) {
+    // Solventi/eccipienti "ovvi" che NON sono mai PA. Lista volutamente stretta:
+    // niente 'olio' (può essere olio di calendula/neem come PA), niente
+    // 'vaselina'/'lanolina'/'paraffina' (in unguenti potrebbero essere PA in rari casi).
+    const SOLVENTI_NOTI = ['etanolo','alcool','alcol','acqua',
+      'glicole propilenico','glicerina','glicerolo'];
     paIdx = ingr.findIndex(r => {
-      const qNorm = invNominalizza(r.nome);
-      return Object.keys(ALLEGATO_A).some(k => k.includes(qNorm) || qNorm.includes(k.split(' ')[0]));
+      const n = invNominalizza(r.nome);
+      return !SOLVENTI_NOTI.some(s => n.includes(s));
     });
     if (paIdx < 0 && ingr.length > 0) paIdx = 0;
   }
@@ -3809,7 +3816,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 112;
+const APP_VERSION = 113;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
