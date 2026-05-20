@@ -311,6 +311,19 @@
     .formula-grid, .scheda-formula { grid-template-columns: 1fr 1fr; }
     .totale-box, .scheda-meta { grid-template-columns: 1fr; }
     .nav-btn { padding: 6px 8px; font-size: 12px; }
+    /* Dialog import ricetta: fullscreen su mobile (il centering flex non funziona
+       bene con le mobile browser chrome dinamiche; meglio coprire tutta la viewport). */
+    #ricetta-dialog { padding: 0 !important; align-items: stretch !important; justify-content: stretch !important; }
+    #ricetta-dialog > div {
+      max-width: 100% !important;
+      width: 100% !important;
+      max-height: 100dvh !important;
+      min-height: 100dvh;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+    }
+    #ricetta-dialog textarea,
+    #ricetta-dialog input[type="file"] { width: 100%; box-sizing: border-box; }
   }
 </style>
 </head>
@@ -3877,7 +3890,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 116;
+const APP_VERSION = 117;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
