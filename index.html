@@ -1096,6 +1096,10 @@ function setTipo(t, btn) {
   // Concentrazione: non ha senso per capsule/cartine
   const rowConc = document.getElementById('row-libera-conc');
   if (rowConc) rowConc.style.display = (t === 'capsule' || t === 'cartine') ? 'none' : '';
+  // Toggle p/p · p/v: visibile solo per soluzione/sospensione (per gli altri tipi
+  // la concentrazione è sempre p/p — il toggle non avrebbe effetto).
+  const concModeSel = document.getElementById('libera-conc-mode');
+  if (concModeSel) concModeSel.style.display = (t === 'soluzione' || t === 'sospensione') ? '' : 'none';
   // Alert uso: specifico per tipo
   const alertUsoPre = document.getElementById('alert-uso-prep-testo');
   if (alertUsoPre) {
@@ -3836,7 +3840,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 114;
+const APP_VERSION = 115;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
