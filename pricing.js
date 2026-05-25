@@ -328,17 +328,27 @@ function rigaHazardous(r, inv) {
   return hasHazard(r.h || getHDaInventario(r.nome, inv));
 }
 
-// Canonical price lookup. Comportamento attuale: prova prima inventario
-// (se ha prezzo > 0), poi Allegato A. Ritorna {prezzo, fonte, lotto?} o null.
-// Nota: CLAUDE.md descrive l'intent "Allegato A wins" — il codice qui mostra
-// il prezzo dell'inventario quando disponibile. Discrepanza pre-esistente
-// preservata in questo refactor; valutare separatamente se sia bug regolatorio.
+// Canonical price lookup. Precedenza: Allegato A vince sempre (prezzi
+// obbligatori per legge — D.M. 22/09/2017 mod. 13/12/2017, Art. 4 e 10),
+// inventario solo come fallback. Ritorna {prezzo, fonte, lotto?} o null.
+//
+// Match Allegato A in 3 tier (più stretto al più lasco):
+//   1. exact: q === chiave canonica
+//   2. substring: la chiave contiene q (es. q="atropina" → "atropina solfato")
+//   3. first-word: q contiene il primo termine della chiave (fuzzy legacy)
+// Senza la tier 1, "acido salicilico" matcherebbe "acido acetilsalicilico"
+// per via del tier 3, restituendo il prezzo sbagliato (0.122 invece di 0.049).
 function invGetPrezzo(nomeSostanza, inv) {
   const q = invNominalizza(nomeSostanza);
+  if (!q) return null;
+  const chiaveAll =
+    (ALLEGATO_A[q] !== undefined ? q : null)
+    || Object.keys(ALLEGATO_A).find(k => k.includes(q))
+    || Object.keys(ALLEGATO_A).find(k => q.includes(k.split(' ')[0]));
+  if (chiaveAll) return { prezzo: ALLEGATO_A[chiaveAll], fonte: 'allegatoA' };
+  // Fallback inventario per sostanze non regolate. Solo se prezzo > 0.
   const found = inv.find(s => invNominalizza(s.nome).includes(q) || q.includes(invNominalizza(s.nome).split(' ')[0]));
   if (found && found.prezzo) return { prezzo: found.prezzo, fonte: 'inventario', lotto: found.lottoInt || found.lotto || '—' };
-  const chiaveAll = Object.keys(ALLEGATO_A).find(k => k.includes(q) || q.includes(k.split(' ')[0]));
-  if (chiaveAll) return { prezzo: ALLEGATO_A[chiaveAll], fonte: 'allegatoA' };
   return null;
 }
 

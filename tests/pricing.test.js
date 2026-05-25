@@ -405,9 +405,13 @@ describe('invGetPrezzo — lookup canonico prezzo', () => {
     expect(r).toEqual({ prezzo: 0.01474, fonte: 'inventario', lotto: 'F2509100' });
   });
 
-  it('sostanza in inventario con prezzo > 0 — preferisce lottoInt se presente', () => {
-    const r = invGetPrezzo('Acido salicilico', FIXTURE_INV);
-    expect(r.lotto).toBe('14/26'); // lottoInt vince su lotto
+  it('inventario: lottoInt preferito su lotto (nome non in Allegato A)', () => {
+    // Uso ad-hoc inv perché tutte le sostanze in FIXTURE_INV con lottoInt sono
+    // anche in Allegato A (e con il fix di precedenza non finirebbero mai in
+    // questa branch).
+    const inv = [{ nome: 'Test sostanza Z', h: '', unit: 'g', prezzo: 0.5, lotto: 'L001', lottoInt: '14/26' }];
+    const r = invGetPrezzo('Test sostanza Z', inv);
+    expect(r.lotto).toBe('14/26');
     expect(r.fonte).toBe('inventario');
   });
 
@@ -422,15 +426,34 @@ describe('invGetPrezzo — lookup canonico prezzo', () => {
     expect(invGetPrezzo('Finasteride', FIXTURE_INV)).toBe(null);
   });
 
-  it('sostanza in inventario CON prezzo E in Allegato A → vince inventario (comportamento attuale)', () => {
-    // Caveat documentato: il commento in CLAUDE.md dice "Allegato A wins" ma il codice
-    // attuale ritorna il prezzo dell'inventario se > 0. Questo test PINNA il comportamento
-    // attuale — se viene un giorno fixato il bug regolatorio, questo test fallirà
-    // intenzionalmente come segnale che il fix è andato live.
-    // Acido salicilico è 0.0512 in FIXTURE_INV e 0.049 in Allegato A.
+  it('sostanza in inventario CON prezzo E in Allegato A → vince Allegato A (D.M. obbligatorio)', () => {
+    // Regola legale: i prezzi dell'Allegato A sono obbligatori per legge
+    // (D.M. 22/09/2017 mod. 13/12/2017, Art. 4 e 10). Anche se la farmacia
+    // ha la sostanza in inventario a prezzo diverso, la tariffa al cliente
+    // deve usare il prezzo dell'Allegato A.
+    // Acido salicilico: inventario 0.0512, Allegato A 0.049 → vince 0.049.
     const r = invGetPrezzo('Acido salicilico', FIXTURE_INV);
-    expect(r.prezzo).toBe(0.0512);
-    expect(r.fonte).toBe('inventario');
+    expect(r.prezzo).toBe(0.049);
+    expect(r.fonte).toBe('allegatoA');
+  });
+
+  it('disambiguazione "acido X": exact match deve vincere sul fuzzy first-word', () => {
+    // Regressione: senza la tier 1 (exact match), "acido salicilico" e tutti gli
+    // altri "acido Y" verrebbero matchati su "acido acetilsalicilico" (primo
+    // nella keys order di Allegato A) per via del fallback first-word, ritornando
+    // 0.122 invece del prezzo corretto.
+    expect(invGetPrezzo('acido salicilico', []).prezzo).toBe(0.049);
+    expect(invGetPrezzo('acido borico', []).prezzo).toBe(0.110);
+    expect(invGetPrezzo('acido tartarico', []).prezzo).toBe(0.071);
+    expect(invGetPrezzo('acido ascorbico', []).prezzo).toBe(0.059);
+    expect(invGetPrezzo('acido acetilsalicilico', []).prezzo).toBe(0.122);
+  });
+
+  it('match fuzzy: q substring del nome canonico (es. "atropina" → "atropina solfato")', () => {
+    // L'utente che digita solo "atropina" ottiene il prezzo dell'unica forma in
+    // Allegato A (solfato). Comportamento legacy preservato.
+    const r = invGetPrezzo('atropina', []);
+    expect(r).toEqual({ prezzo: 31.223, fonte: 'allegatoA' });
   });
 
   it('sostanza sconosciuta → null', () => {
