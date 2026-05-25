@@ -598,10 +598,10 @@
 
   <div class="card">
     <div class="card-title">Operazioni e supplementi</div>
-    <div class="field-row"><span class="field-label">Componenti aggiuntivi</span><input type="number" id="t-comp" value="0" step="1" min="0" max="4" oninput="calcTariff()"><span class="field-note">oltre PA (etanolo auto)</span></div>
-    <div class="field-row"><span class="field-label">Op. tecnologiche aggiuntive</span><input type="number" id="t-op" value="0" step="1" min="0" max="10" oninput="calcTariff()"><span class="field-note">×€2,30 cad.</span></div>
-    <div class="field-row"><span class="field-label">Supplemento stupefacenti (Art. 8b)</span><input type="number" id="t-stupp" value="0" step="1" min="0" max="3" oninput="calcTariff()"><span class="field-note">×€2,50 cad.</span></div>
-    <div class="field-row"><span class="field-label">Supplemento doping (Art. 8c)</span><input type="number" id="t-dop" value="0" step="1" min="0" max="1" oninput="calcTariff()"><span class="field-note">×€2,50</span></div>
+    <div class="field-row"><span class="field-label">Componenti aggiuntivi</span><input type="number" id="t-comp" value="0" step="1" min="0" max="4" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto da formula (oltre PA, max 4)</span></div>
+    <div class="field-row"><span class="field-label">Op. tecnologiche aggiuntive</span><input type="number" id="t-op" value="0" step="1" min="0" max="10" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto da tipo prep. (×€2,30 cad.)</span></div>
+    <div class="field-row"><span class="field-label">Supplemento stupefacenti (Art. 8b)</span><input type="number" id="t-stupp" value="0" step="1" min="0" max="3" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto da formula (×€2,50 cad.)</span></div>
+    <div class="field-row"><span class="field-label">Supplemento doping (Art. 8c)</span><input type="number" id="t-dop" value="0" step="1" min="0" max="1" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto da formula (×€2,50)</span></div>
     <div class="field-row"><span class="field-label">Diritto addizionale notturno</span><input type="number" id="t-notte" value="0" step="7.5" min="0" max="10" oninput="calcTariff()"><span class="field-note">€7,50 urb. / €10,00 rus.</span></div>
     <div style="margin-top:0.75rem;border-top:1px solid var(--border);padding-top:0.75rem">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -2396,6 +2396,24 @@ function sincronizzaTariffazione() {
     if (document.getElementById('t-qt'))   document.getElementById('t-qt').value   = document.getElementById('qt').value;
     if (document.getElementById('t-conc')) document.getElementById('t-conc').value = document.getElementById('conc').value;
   }
+  // Componenti aggiuntivi (Art. 5) auto-calcolati da liberaRigheExtra: esclude solo PA e capsule vuote (etanolo conta), clamp a 4.
+  const _compEl = document.getElementById('t-comp');
+  if (_compEl) {
+    const _compAuto = liberaRigheExtra.filter(r => !r.isPa && !r.isCapsule).length;
+    _compEl.value = Math.min(4, _compAuto);
+  }
+  // Op. tecnologiche aggiuntive (Art. 7) — derivate da tipoTariff (vedi OP_TECNOLOGICHE_AUTO in pricing.js).
+  const _opEl = document.getElementById('t-op');
+  if (_opEl) _opEl.value = getOpTecnologicheAuto(tipoTariff);
+  // Supplemento stupefacenti (Art. 8b) — conta ingredienti che matchano radici STUPEFACENTI, clamp a 3.
+  const _stuppEl = document.getElementById('t-stupp');
+  if (_stuppEl) {
+    const _ns = liberaRigheExtra.filter(r => isStupefacente(r.nome)).length;
+    _stuppEl.value = Math.min(3, _ns);
+  }
+  // Supplemento doping (Art. 8c) — flag 0/1: basta che almeno un ingrediente sia doping.
+  const _dopEl = document.getElementById('t-dop');
+  if (_dopEl) _dopEl.value = liberaRigheExtra.some(r => isDoping(r.nome)) ? 1 : 0;
   calcTariff();
 }
 
@@ -2424,6 +2442,9 @@ function setTipoTariff(t, btn) {
     cartine:     'Rif.: D.M. 22/09/2017 e s.m.i. All. B voce 7 — Cartine/bustine €22,00/120 pz (comp.extra €0,60)',
   };
   document.getElementById('tariff-ref').textContent = refMap[t] || '';
+  // Op. tecnologiche (Art. 7) dipendono dal tipoTariff: aggiorna anche qui (sincronizzaTariffazione non viene chiamata su click tab).
+  const _opEl = document.getElementById('t-op');
+  if (_opEl) _opEl.value = getOpTecnologicheAuto(t);
   calcTariff();
 }
 
@@ -3535,7 +3556,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 120;
+const APP_VERSION = 121;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).

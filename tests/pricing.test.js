@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   ALLEGATO_A, DENSITA, INV_HARDCODED, INV_OBBLIGATORIE,
+  STUPEFACENTI, DOPING, OP_TECNOLOGICHE_AUTO,
   ALLEGATO_B_VOCI, IVA_RATE, ART_7_INCREMENTO, ART_8_PER_UNIT, COMP_MAX, OP_TECNOLOGICA_COSTO,
   fmt, invNominalizza, invMatchScore, hasHazard, getDensita, tarNormalizza, tarCercaPA,
+  isStupefacente, isDoping, getOpTecnologicheAuto,
   invFindBest, getHDaInventario, rigaHazardous, invGetPrezzo,
   calcAllegatoB, calcAllegatoBVoce7, calcSupplementi, calcIvaTotale,
 } from '../pricing.js';
@@ -834,5 +836,122 @@ describe('scenari completi D.M. 22/09/2017 — invarianti fine-to-fine', () => {
     // s-prezzo e lo usa al posto del calcolato). I test pure non lo coprono —
     // serve un test UI / e2e. Questo test pinna SOLO la matematica auto.
     expect(true).toBe(true);
+  });
+});
+
+describe('isStupefacente — supplemento Art. 8b automatico', () => {
+  it('riconosce stupefacenti chiave (Tab. I-II DPR 309/90)', () => {
+    expect(isStupefacente('Morfina cloridrato')).toBe(true);
+    expect(isStupefacente('Codeina fosfato')).toBe(true);
+    expect(isStupefacente('Fentanyl citrato')).toBe(true);
+    expect(isStupefacente('Fentanile')).toBe(true);
+    expect(isStupefacente('Ossicodone')).toBe(true);
+    expect(isStupefacente('Buprenorfina')).toBe(true);
+    expect(isStupefacente('Metadone cloridrato')).toBe(true);
+    expect(isStupefacente('Ketamina')).toBe(true);
+    expect(isStupefacente('Cannabis FM2')).toBe(true);
+    expect(isStupefacente('Cannabis infiorescenze')).toBe(true);
+    expect(isStupefacente('Tetraidrocannabinolo')).toBe(true);
+    expect(isStupefacente('Fenobarbital')).toBe(true);
+    expect(isStupefacente('Metilfenidato')).toBe(true);
+  });
+
+  it('case-insensitive e tollera accenti', () => {
+    expect(isStupefacente('MORFINA')).toBe(true);
+    expect(isStupefacente('mòrfina')).toBe(true);
+  });
+
+  it('non matcha sostanze non stupefacenti comuni', () => {
+    expect(isStupefacente('Acido salicilico')).toBe(false);
+    expect(isStupefacente('Minoxidil')).toBe(false);
+    expect(isStupefacente('Finasteride')).toBe(false);
+    expect(isStupefacente('Lattosio monoidrato')).toBe(false);
+    expect(isStupefacente('Etanolo 96°')).toBe(false);
+    expect(isStupefacente('Glicole propilenico')).toBe(false);
+    expect(isStupefacente('CBD')).toBe(false); // cannabidiolo non è stupefacente
+  });
+
+  it('non matcha radici brevi ambigue (no falsi positivi su "thc")', () => {
+    // "thc" non è in STUPEFACENTI proprio per evitare match su "methotrexate" etc.
+    expect(isStupefacente('Metotrexato')).toBe(false);
+  });
+
+  it('input vuoto/nullo ritorna false', () => {
+    expect(isStupefacente('')).toBe(false);
+    expect(isStupefacente(null)).toBe(false);
+    expect(isStupefacente(undefined)).toBe(false);
+  });
+});
+
+describe('isDoping — supplemento Art. 8c automatico', () => {
+  it('riconosce anabolizzanti androgeni (PCT bodybuilding)', () => {
+    expect(isDoping('Testosterone propionato')).toBe(true);
+    expect(isDoping('Testosterone enantato')).toBe(true);
+    expect(isDoping('Nandrolone decanoato')).toBe(true);
+    expect(isDoping('Stanozololo')).toBe(true);
+    expect(isDoping('Oxandrolone')).toBe(true);
+    expect(isDoping('Trenbolone acetato')).toBe(true);
+    expect(isDoping('Oxymetolone')).toBe(true);
+  });
+
+  it('riconosce SERM e inibitori aromatasi', () => {
+    expect(isDoping('Clomifene citrato')).toBe(true);
+    expect(isDoping('Tamoxifene')).toBe(true);
+    expect(isDoping('Anastrozolo')).toBe(true);
+    expect(isDoping('Letrozolo')).toBe(true);
+    expect(isDoping('Exemestane')).toBe(true);
+  });
+
+  it('riconosce stimolanti e beta-2 agonisti', () => {
+    expect(isDoping('Modafinil')).toBe(true);
+    expect(isDoping('Efedrina')).toBe(true);
+    expect(isDoping('Pseudoefedrina')).toBe(true); // contiene "efedrin"
+    expect(isDoping('Clenbuterolo')).toBe(true);
+  });
+
+  it('riconosce diuretici mascheranti', () => {
+    expect(isDoping('Furosemide')).toBe(true);
+    expect(isDoping('Idroclorotiazide')).toBe(true);
+  });
+
+  it('non matcha sostanze galeniche comuni', () => {
+    expect(isDoping('Acido salicilico')).toBe(false);
+    expect(isDoping('Minoxidil')).toBe(false);
+    expect(isDoping('Finasteride')).toBe(false);
+    expect(isDoping('Etanolo 96°')).toBe(false);
+    expect(isDoping('Vaselina filante')).toBe(false);
+    expect(isDoping('Lattosio')).toBe(false);
+  });
+
+  it('input vuoto/nullo ritorna false', () => {
+    expect(isDoping('')).toBe(false);
+    expect(isDoping(null)).toBe(false);
+  });
+});
+
+describe('getOpTecnologicheAuto — Art. 7 derivato da tipoTariff', () => {
+  it('liquida e capsule = 0 (operazioni già coperte da Allegato B base)', () => {
+    expect(getOpTecnologicheAuto('liquida')).toBe(0);
+    expect(getOpTecnologicheAuto('capsule')).toBe(0);
+  });
+
+  it('sospensione/semisolida/polvere/cartine = 1 (omogeneizzazione, emulsionamento, polverizzazione)', () => {
+    expect(getOpTecnologicheAuto('sospensione')).toBe(1);
+    expect(getOpTecnologicheAuto('semisolida')).toBe(1);
+    expect(getOpTecnologicheAuto('polvere')).toBe(1);
+    expect(getOpTecnologicheAuto('cartine')).toBe(1);
+  });
+
+  it('tipo sconosciuto o vuoto ritorna 0', () => {
+    expect(getOpTecnologicheAuto('inesistente')).toBe(0);
+    expect(getOpTecnologicheAuto('')).toBe(0);
+    expect(getOpTecnologicheAuto(undefined)).toBe(0);
+  });
+
+  it('copre tutti i 6 tipoTariff esistenti — se ne aggiungi uno, aggiorna OP_TECNOLOGICHE_AUTO', () => {
+    const tipiNoti = ['liquida', 'sospensione', 'semisolida', 'polvere', 'capsule', 'cartine'];
+    for (const t of tipiNoti) {
+      expect(OP_TECNOLOGICHE_AUTO[t]).toBeDefined();
+    }
   });
 });

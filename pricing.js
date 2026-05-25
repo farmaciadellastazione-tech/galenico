@@ -233,6 +233,55 @@ const INV_HARDCODED = [
 // Sostanze pinned in cima ai risultati di ricerca inventario (anche se assenti).
 const INV_OBBLIGATORIE = new Set(['carbone attivo','potassio ioduro','acqua depurata','acqua purificata','alcool etilico','etanolo']);
 
+// Radici (≥5 char) per match substring "è uno stupefacente?" su nome sostanza
+// normalizzato. DPR 309/90 Tab. I-V, sostanze realisticamente preparate in
+// galenica. Radici brevi/ambigue (es. "thc") evitate: rischio falsi positivi.
+const STUPEFACENTI = Object.freeze([
+  'morfina', 'codeina', 'metadone', 'ossicodone',
+  'fentanyl', 'fentanile', 'petidina', 'tapentadolo',
+  'buprenorfina', 'idromorfone',
+  'ketamina', 'cannabis', 'tetraidrocannabinolo',
+  'dronabinol', 'nabilone',
+  'metilfenidato', 'amfetamin', 'anfetamin',
+  'fenobarbital',
+]);
+
+// Radici per match "è doping?" su nome sostanza normalizzato. Lista WADA /
+// DM 11/06/2010 limitata a sostanze realisticamente preparate in galenica
+// (bodybuilding, PCT, stimolanti, mascheranti).
+const DOPING = Object.freeze([
+  // anabolizzanti androgeni
+  'testosteron', 'nandrolon', 'stanozol', 'oxandrolon',
+  'methandrostenolon', 'oxymetolon', 'trenbolon',
+  'methenolon', 'metenolon', 'drostanolon', 'mesterolon',
+  // SARMs
+  'ostarine', 'ostarina', 'ligandrol',
+  // SERM / inibitori aromatasi (PCT)
+  'clomifene', 'tamoxifen', 'anastrozol', 'letrozol',
+  'exemestan', 'raloxifen',
+  // beta-2 agonisti
+  'clenbuterol',
+  // stimolanti
+  'modafinil', 'efedrin',
+  // pre-ormoni
+  'deidroepiandrosteron', 'prasteron',
+  // diuretici mascheranti
+  'furosemid', 'idroclorotiazid',
+]);
+
+// Operazioni tecnologiche aggiuntive (Art. 7) derivate dal tipo di tariffazione.
+// Allegato B base copre già pesatura, miscelazione, dissoluzione, capsulazione.
+// Aggiunte: omogeneizzazione (sospensione), emulsionamento (semisolida),
+// polverizzazione/setacciatura (polvere/cartine). Liquida e capsule = 0.
+const OP_TECNOLOGICHE_AUTO = Object.freeze({
+  liquida: 0,
+  sospensione: 1,
+  semisolida: 1,
+  polvere: 1,
+  cartine: 1,
+  capsule: 0,
+});
+
 // ── Helper puri ──────────────────────────────────────────────────────────
 
 // Formatta numero con virgola decimale italiana. fmt(1.234) → "1,23".
@@ -241,6 +290,24 @@ function fmt(n, dec) { dec = dec === undefined ? 2 : dec; return n.toFixed(dec).
 // Normalizza un nome sostanza per match fuzzy: lowercase, accenti rimossi, trim.
 function invNominalizza(s) {
   return (s||'').toLowerCase().replace(/[àáâ]/g,'a').replace(/[èéê]/g,'e').replace(/[ìí]/g,'i').replace(/[òó]/g,'o').replace(/[ùú]/g,'u').trim();
+}
+
+// True se il nome corrisponde (substring) a una radice in STUPEFACENTI/DOPING.
+function isStupefacente(nome) {
+  const n = invNominalizza(nome);
+  if (!n) return false;
+  return STUPEFACENTI.some(needle => n.includes(needle));
+}
+function isDoping(nome) {
+  const n = invNominalizza(nome);
+  if (!n) return false;
+  return DOPING.some(needle => n.includes(needle));
+}
+
+// Ritorna il numero di op. tecnologiche aggiuntive (Art. 7) per tipoTariff.
+// 0 se tipo sconosciuto.
+function getOpTecnologicheAuto(tipoTariff) {
+  return OP_TECNOLOGICHE_AUTO[tipoTariff] || 0;
 }
 
 // Token-based fuzzy match: estrae parole significative (≥3 char), conta token comuni.
@@ -446,8 +513,10 @@ function calcIvaTotale(netto) {
 
 const _exports = {
   ALLEGATO_A, DENSITA, INV_HARDCODED, INV_OBBLIGATORIE,
+  STUPEFACENTI, DOPING, OP_TECNOLOGICHE_AUTO,
   ALLEGATO_B_VOCI, IVA_RATE, ART_7_INCREMENTO, ART_8_PER_UNIT, COMP_MAX, OP_TECNOLOGICA_COSTO,
   fmt, invNominalizza, invMatchScore, hasHazard, getDensita, tarNormalizza, tarCercaPA,
+  isStupefacente, isDoping, getOpTecnologicheAuto,
   invFindBest, getHDaInventario, rigaHazardous, invGetPrezzo,
   calcAllegatoB, calcAllegatoBVoce7, calcSupplementi, calcIvaTotale,
 };
