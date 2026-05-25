@@ -97,3 +97,11 @@ Renders two Dymo labels (32×57 mm, format S0722540) and prints via the local **
 ## Pharmacy identity (hardcoded)
 
 `Farmacia della Stazione`, `Via Fiume 75 — 19122 La Spezia`, `Tel. 0187-706147`, `P.I. 01317570115`, `Cod. QU Farma 6706`. This appears in the Scheda header, label defaults, and order email. If the user asks to change branding, search for these strings rather than assuming a single config location.
+
+## Testing rules
+- Never modify existing tests to make them pass (fix the implementation)
+- Never update snapshots without explicit instruction
+- Use transactions for database tests (roll back after each test)
+- Mark flaky tests with @pytest.mark.flaky
+- Write the failing test before fixing any reported bug
+- Run the full suite before declaring work complete
