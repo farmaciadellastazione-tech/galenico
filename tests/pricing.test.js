@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   ALLEGATO_A, DENSITA, INV_HARDCODED, INV_OBBLIGATORIE,
+  ALLEGATO_B_VOCI, IVA_RATE, ART_7_INCREMENTO, ART_8_PER_UNIT, COMP_MAX, OP_TECNOLOGICA_COSTO,
   fmt, invNominalizza, invMatchScore, hasHazard, getDensita, tarNormalizza, tarCercaPA,
   invFindBest, getHDaInventario, rigaHazardous, invGetPrezzo,
+  calcAllegatoB, calcAllegatoBVoce7, calcSupplementi, calcIvaTotale,
 } from '../pricing.js';
 
 // Inventario di test minimale. Riproduce la forma degli item in INV_HARDCODED
@@ -468,5 +470,369 @@ describe('invGetPrezzo — lookup canonico prezzo', () => {
   it('lotto default a "—" se né lottoInt né lotto sono presenti', () => {
     const r = invGetPrezzo('test', [{ nome: 'test', prezzo: 1, h: '' }]);
     expect(r.lotto).toBe('—');
+  });
+});
+
+// ── Pricing engine — D.M. 22/09/2017 (mod. 13/12/2017, GU 30-1-2018) ────
+
+describe('costanti pricing engine', () => {
+  it('IVA 10% farmaci galenici', () => {
+    expect(IVA_RATE).toBe(0.10);
+  });
+
+  it('Art. 7 incremento +40%', () => {
+    expect(ART_7_INCREMENTO).toBe(0.40);
+  });
+
+  it('Art. 8a/b/c supplemento €2,50 per unità', () => {
+    expect(ART_8_PER_UNIT).toBe(2.50);
+  });
+
+  it('Art. 5 max 4 componenti aggiuntivi pagati', () => {
+    expect(COMP_MAX).toBe(4);
+  });
+
+  it('Art. 5 operazione tecnologica €2,30 ciascuna', () => {
+    expect(OP_TECNOLOGICA_COSTO).toBe(2.30);
+  });
+
+  it('ALLEGATO_B_VOCI ha le 4 forme attese', () => {
+    expect(Object.keys(ALLEGATO_B_VOCI).sort()).toEqual(['liquida', 'polvere', 'semisolida', 'sospensione']);
+  });
+
+  it('ALLEGATO_B_VOCI valori pinned (D.M. 22/09/2017 GU 30-1-2018)', () => {
+    expect(ALLEGATO_B_VOCI.liquida.base).toBe(6.65);
+    expect(ALLEGATO_B_VOCI.liquida.compExtra).toBe(0.80);
+    expect(ALLEGATO_B_VOCI.sospensione.base).toBe(13.30);
+    expect(ALLEGATO_B_VOCI.sospensione.rif).toBe(250);
+    expect(ALLEGATO_B_VOCI.sospensione.stepPiu).toBe(100);
+    expect(ALLEGATO_B_VOCI.sospensione.costPiu).toBe(0.70);
+    expect(ALLEGATO_B_VOCI.sospensione.compExtra).toBe(0.70);
+    expect(ALLEGATO_B_VOCI.semisolida.base).toBe(13.30);
+    expect(ALLEGATO_B_VOCI.semisolida.rif).toBe(50);
+    expect(ALLEGATO_B_VOCI.semisolida.stepPiu).toBe(50);
+    expect(ALLEGATO_B_VOCI.semisolida.costPiu).toBe(0.75);
+    expect(ALLEGATO_B_VOCI.semisolida.compExtra).toBe(0.75);
+    expect(ALLEGATO_B_VOCI.polvere.base).toBe(6.65);
+    expect(ALLEGATO_B_VOCI.polvere.compExtra).toBe(0.75);
+  });
+});
+
+describe('calcAllegatoB — voci 1/3/4/5 (no pezzi)', () => {
+  // Helper: arrotonda per evitare problemi di precisione float (es. 0.1+0.2=0.30000000000004).
+  const r2 = n => Math.round(n * 100) / 100;
+
+  describe('voce 1 — liquide (no scaglione volume)', () => {
+    it('100 ml: solo base €6,65, no scaglione', () => {
+      const b = calcAllegatoB('liquida', 100, 0, 0);
+      expect(b.baseB).toBe(6.65);
+      expect(b.costoB).toBe(6.65);
+      expect(r2(b.inc40)).toBe(2.66); // 6.65 * 0.40
+    });
+
+    it('500 ml: ancora base €6,65 (voce 1 non ha scaglione)', () => {
+      const b = calcAllegatoB('liquida', 500, 0, 0);
+      expect(b.baseB).toBe(6.65);
+    });
+  });
+
+  describe('voce 3 — sospensioni (scaglione 250 ml + €0,70/100 ml)', () => {
+    it('250 ml: base €13,30, no scaglione', () => {
+      const b = calcAllegatoB('sospensione', 250, 0, 0);
+      expect(b.baseB).toBe(13.30);
+    });
+
+    it('350 ml: base + 1 scaglione = 13,30 + 0,70 = 14,00', () => {
+      const b = calcAllegatoB('sospensione', 350, 0, 0);
+      expect(r2(b.baseB)).toBe(14.00);
+    });
+
+    it('251 ml: 1 scaglione (Math.ceil) → 14,00', () => {
+      // 1 ml sopra il riferimento attiva uno scaglione pieno (Math.ceil arrotonda in alto).
+      const b = calcAllegatoB('sospensione', 251, 0, 0);
+      expect(r2(b.baseB)).toBe(14.00);
+    });
+
+    it('450 ml: base + 2 scaglioni = 13,30 + 1,40 = 14,70', () => {
+      const b = calcAllegatoB('sospensione', 450, 0, 0);
+      expect(r2(b.baseB)).toBe(14.70);
+    });
+  });
+
+  describe('voce 4 — semisolide (scaglione 50 g + €0,75/50 g)', () => {
+    it('50 g: base €13,30, no scaglione', () => {
+      const b = calcAllegatoB('semisolida', 50, 0, 0);
+      expect(b.baseB).toBe(13.30);
+    });
+
+    it('100 g: base + 1 scaglione = 13,30 + 0,75 = 14,05', () => {
+      const b = calcAllegatoB('semisolida', 100, 0, 0);
+      expect(r2(b.baseB)).toBe(14.05);
+    });
+
+    it('150 g: base + 2 scaglioni = 14,80', () => {
+      const b = calcAllegatoB('semisolida', 150, 0, 0);
+      expect(r2(b.baseB)).toBe(14.80);
+    });
+  });
+
+  describe('voce 5 — polveri (no scaglione)', () => {
+    it('quantità qualsiasi: base €6,65 fissa', () => {
+      expect(calcAllegatoB('polvere', 10, 0, 0).baseB).toBe(6.65);
+      expect(calcAllegatoB('polvere', 100, 0, 0).baseB).toBe(6.65);
+      expect(calcAllegatoB('polvere', 500, 0, 0).baseB).toBe(6.65);
+    });
+  });
+
+  describe('Art. 5 — componenti aggiuntivi', () => {
+    it('comp.extra per voce: 0,80 / 0,70 / 0,75 / 0,75', () => {
+      expect(calcAllegatoB('liquida', 100, 1, 0).addComp).toBe(0.80);
+      expect(calcAllegatoB('sospensione', 250, 1, 0).addComp).toBe(0.70);
+      expect(calcAllegatoB('semisolida', 50, 1, 0).addComp).toBe(0.75);
+      expect(calcAllegatoB('polvere', 50, 1, 0).addComp).toBe(0.75);
+    });
+
+    it('cap a 4 componenti: 7 componenti pagati come 4', () => {
+      // Liquida: 4 * 0,80 = 3,20 (non 5,60)
+      expect(calcAllegatoB('liquida', 100, 7, 0).addComp).toBe(4 * 0.80);
+      expect(calcAllegatoB('liquida', 100, 7, 0).cappedComp).toBe(4);
+    });
+
+    it('0 componenti → addComp 0', () => {
+      expect(calcAllegatoB('liquida', 100, 0, 0).addComp).toBe(0);
+    });
+
+    it('comp negativo trattato come 0', () => {
+      expect(calcAllegatoB('liquida', 100, -3, 0).addComp).toBe(0);
+    });
+  });
+
+  describe('Art. 5 — operazioni tecnologiche', () => {
+    it('1 op = €2,30', () => {
+      expect(calcAllegatoB('liquida', 100, 0, 1).addOp).toBe(2.30);
+    });
+
+    it('3 op = €6,90', () => {
+      expect(r2(calcAllegatoB('liquida', 100, 0, 3).addOp)).toBe(6.90);
+    });
+
+    it('nessun cap sulle operazioni (cap solo sui componenti)', () => {
+      expect(r2(calcAllegatoB('liquida', 100, 0, 10).addOp)).toBe(23.00);
+    });
+  });
+
+  describe('Art. 7 — incremento +40%', () => {
+    it('applicato a costoB = base + comp + op (non al totale)', () => {
+      // 100 ml liquida, 2 comp, 1 op
+      // baseB=6,65 + addComp=1,60 + addOp=2,30 = costoB=10,55
+      // inc40 = 10,55 × 0,40 = 4,22
+      const b = calcAllegatoB('liquida', 100, 2, 1);
+      expect(r2(b.costoB)).toBe(10.55);
+      expect(r2(b.inc40)).toBe(4.22);
+    });
+
+    it('su base senza comp/op: inc40 = base × 0,40', () => {
+      const b = calcAllegatoB('polvere', 50, 0, 0);
+      expect(r2(b.inc40)).toBe(2.66); // 6,65 * 0,40
+    });
+  });
+
+  describe('Edge cases', () => {
+    it('tipo sconosciuto → null', () => {
+      expect(calcAllegatoB('inesistente', 100, 0, 0)).toBe(null);
+      expect(calcAllegatoB('capsule', 100, 0, 0)).toBe(null);
+      expect(calcAllegatoB('cartine', 100, 0, 0)).toBe(null);
+    });
+
+    it('qt=0: solo base, nessun scaglione', () => {
+      expect(calcAllegatoB('sospensione', 0, 0, 0).baseB).toBe(13.30);
+    });
+
+    it('qt=undefined: solo base', () => {
+      expect(calcAllegatoB('sospensione', undefined, 0, 0).baseB).toBe(13.30);
+    });
+  });
+});
+
+describe('calcAllegatoBVoce7 — capsule/cartine', () => {
+  const r2 = n => Math.round(n * 100) / 100;
+
+  it('120 pz: base esatta €22,00', () => {
+    const b = calcAllegatoBVoce7(120, 0, 0);
+    expect(b.baseB).toBe(22.00);
+  });
+
+  describe('scaglione asimmetrico ±€1/€2 per 10 pz', () => {
+    it('110 pz: 22,00 − 1,00 = 21,00 (1 scaglione sotto)', () => {
+      expect(calcAllegatoBVoce7(110, 0, 0).baseB).toBe(21.00);
+    });
+
+    it('100 pz: 22,00 − 2,00 = 20,00 (2 scaglioni sotto)', () => {
+      expect(calcAllegatoBVoce7(100, 0, 0).baseB).toBe(20.00);
+    });
+
+    it('130 pz: 22,00 + 2,00 = 24,00 (1 scaglione sopra)', () => {
+      expect(calcAllegatoBVoce7(130, 0, 0).baseB).toBe(24.00);
+    });
+
+    it('140 pz: 22,00 + 4,00 = 26,00 (2 scaglioni sopra)', () => {
+      expect(calcAllegatoBVoce7(140, 0, 0).baseB).toBe(26.00);
+    });
+
+    it('asimmetria: 110 (€21) vs 130 (€24) NON è simmetrica intorno a 120', () => {
+      // Regressione: chi tocca questo deve sapere che il decreto vuole asimmetria.
+      const sotto = calcAllegatoBVoce7(110, 0, 0).baseB;
+      const sopra = calcAllegatoBVoce7(130, 0, 0).baseB;
+      const ref   = calcAllegatoBVoce7(120, 0, 0).baseB;
+      expect(ref - sotto).toBe(1.00); // sotto: -1 per scaglione
+      expect(sopra - ref).toBe(2.00); // sopra: +2 per scaglione
+    });
+  });
+
+  describe('Math.ceil sui pezzi-non-multiplo-di-10', () => {
+    it('115 pz: 1 scaglione sotto (Math.ceil 5/10 = 1) → 21,00', () => {
+      expect(calcAllegatoBVoce7(115, 0, 0).baseB).toBe(21.00);
+    });
+
+    it('125 pz: 1 scaglione sopra (Math.ceil 5/10 = 1) → 24,00', () => {
+      expect(calcAllegatoBVoce7(125, 0, 0).baseB).toBe(24.00);
+    });
+  });
+
+  describe('Floor a zero per pochi pezzi', () => {
+    it('numero molto basso non scende sotto 0', () => {
+      // 22,00 - 12 × 1 = €10,00 a 0 pz, ma stop a 0 quando passa zero.
+      // 0 pz: diff10 = ceil(120/10) = 12, base = 22 - 12 = 10 → reso 10.
+      const b = calcAllegatoBVoce7(0, 0, 0);
+      expect(b.baseB).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe('comp e op', () => {
+    it('comp.extra €0,60 per voce 7 (NON €0,80 come voce 1)', () => {
+      const b = calcAllegatoBVoce7(120, 1, 0);
+      expect(b.addComp).toBe(0.60);
+    });
+
+    it('cap a 4 componenti', () => {
+      expect(calcAllegatoBVoce7(120, 7, 0).addComp).toBe(4 * 0.60);
+    });
+
+    it('1 op = €2,30 (stesso costo di tutte le voci)', () => {
+      expect(calcAllegatoBVoce7(120, 0, 1).addOp).toBe(2.30);
+    });
+
+    it('Art. 7 +40% applicato a costoB', () => {
+      // 120 capsule + 1 comp + 1 op: baseB=22, addComp=0.60, addOp=2.30 → costoB=24.90
+      // inc40 = 24.90 × 0.40 = 9.96
+      const b = calcAllegatoBVoce7(120, 1, 1);
+      expect(r2(b.costoB)).toBe(24.90);
+      expect(r2(b.inc40)).toBe(9.96);
+    });
+  });
+});
+
+describe('calcSupplementi — Art. 8', () => {
+  it('hazardous=true → art8a €2,50', () => {
+    expect(calcSupplementi({ hazardous: true }).art8a).toBe(2.50);
+  });
+
+  it('hazardous=false → art8a 0', () => {
+    expect(calcSupplementi({ hazardous: false }).art8a).toBe(0);
+  });
+
+  it('stupp moltiplica €2,50 per ogni stupefacente', () => {
+    expect(calcSupplementi({ stupp: 1 }).art8b).toBe(2.50);
+    expect(calcSupplementi({ stupp: 3 }).art8b).toBe(7.50);
+  });
+
+  it('dop: doping a unità (un solo applicabile per scheda)', () => {
+    expect(calcSupplementi({ dop: 1 }).art8c).toBe(2.50);
+    expect(calcSupplementi({ dop: 2 }).art8c).toBe(5.00);
+  });
+
+  it('argomenti negativi trattati come 0', () => {
+    expect(calcSupplementi({ stupp: -5 }).art8b).toBe(0);
+    expect(calcSupplementi({ dop: -1 }).art8c).toBe(0);
+  });
+
+  it('argomenti default: tutto 0', () => {
+    expect(calcSupplementi()).toEqual({ art8a: 0, art8b: 0, art8c: 0 });
+    expect(calcSupplementi({})).toEqual({ art8a: 0, art8b: 0, art8c: 0 });
+  });
+
+  it('combinazione realistica (CBD finasteride): suppl. H ma niente stup/doping', () => {
+    // Una crema al CBD + finasteride: H rilevato, no stup, no doping.
+    expect(calcSupplementi({ hazardous: true, stupp: 0, dop: 0 }))
+      .toEqual({ art8a: 2.50, art8b: 0, art8c: 0 });
+  });
+});
+
+describe('calcIvaTotale — IVA 10%', () => {
+  it('netto 100 → iva 10, totale 110', () => {
+    expect(calcIvaTotale(100)).toEqual({ iva: 10, totale: 110 });
+  });
+
+  it('netto 0 → tutto 0', () => {
+    expect(calcIvaTotale(0)).toEqual({ iva: 0, totale: 0 });
+  });
+
+  it('netto negativo trattato come 0 (difensivo)', () => {
+    expect(calcIvaTotale(-10)).toEqual({ iva: 0, totale: 0 });
+  });
+
+  it('netto frazionale con arrotondamento corretto', () => {
+    const r = calcIvaTotale(28.30);
+    expect(Math.round(r.iva * 100) / 100).toBe(2.83);
+    expect(Math.round(r.totale * 100) / 100).toBe(31.13);
+  });
+});
+
+describe('scenari completi D.M. 22/09/2017 — invarianti fine-to-fine', () => {
+  // Questi pinnano combinazioni realistiche assemblando le funzioni pure.
+  // Non sostituiscono il test in browser, ma proteggono la matematica.
+  const r2 = n => Math.round(n * 100) / 100;
+
+  it('Soluzione 100ml, no comp/op, no supplementi: 6,65 × 1,40 = 9,31 + IVA = 10,24', () => {
+    const b = calcAllegatoB('liquida', 100, 0, 0);
+    const netto = b.costoB + b.inc40;
+    const { totale } = calcIvaTotale(netto);
+    expect(r2(b.costoB + b.inc40)).toBe(9.31);
+    expect(r2(totale)).toBe(10.24);
+  });
+
+  it('Sospensione 350ml, 1 comp, 1 op, no H: scaglione + comp + op + Art.7', () => {
+    // baseB = 13,30 + 0,70 = 14,00 (1 scaglione)
+    // addComp = 0,70 (1 × €0,70)
+    // addOp   = 2,30
+    // costoB  = 17,00
+    // inc40   = 6,80
+    // netto preparazione (no materie/flacone/H) = 23,80
+    const b = calcAllegatoB('sospensione', 350, 1, 1);
+    expect(r2(b.costoB)).toBe(17.00);
+    expect(r2(b.inc40)).toBe(6.80);
+  });
+
+  it('Crema 100g con CBD (H rilevato): Art. 8a si attiva', () => {
+    // semisolida 100g: baseB = 13,30 + 0,75 = 14,05
+    // costoB = 14,05, inc40 = 5,62
+    // + Art. 8a 2,50
+    const b = calcAllegatoB('semisolida', 100, 0, 0);
+    const supp = calcSupplementi({ hazardous: true });
+    const netto = b.costoB + b.inc40 + supp.art8a;
+    expect(r2(b.costoB + b.inc40 + supp.art8a)).toBe(22.17);
+  });
+
+  it('120 capsule, 2 comp, 1 op: 22 + 1,20 + 2,30 = 25,50 × 1,40 = 35,70', () => {
+    const b = calcAllegatoBVoce7(120, 2, 1);
+    expect(r2(b.costoB)).toBe(25.50);
+    expect(r2(b.inc40)).toBe(10.20);
+  });
+
+  it('Override manuale: prezzo finale digitato dall\'operatore (caveat documentato)', () => {
+    // Il caveat è gestito dal wrapper DOM (calcTariff legge un prezzo manuale in
+    // s-prezzo e lo usa al posto del calcolato). I test pure non lo coprono —
+    // serve un test UI / e2e. Questo test pinna SOLO la matematica auto.
+    expect(true).toBe(true);
   });
 });

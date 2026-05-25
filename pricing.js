@@ -352,12 +352,104 @@ function invGetPrezzo(nomeSostanza, inv) {
   return null;
 }
 
+// ── Allegato B — costi di preparazione D.M. 22/09/2017 (GU 30-1-2018) ───
+
+// Aliquota IVA per farmaci galenici (10%).
+const IVA_RATE = 0.10;
+
+// Incremento Art. 7 — +40% sui costi di preparazione (base + comp + op).
+const ART_7_INCREMENTO = 0.40;
+
+// Art. 8a/8b/8c — supplemento unitario €2,50.
+const ART_8_PER_UNIT = 2.50;
+
+// Art. 5 — i componenti aggiuntivi sono pagati al massimo 4.
+const COMP_MAX = 4;
+
+// Voci Allegato B per forme liquide/semisolide/polveri (no pezzi):
+//   voce 1 — Soluzioni: base €6,65, no scaglioni volume, comp.extra €0,80.
+//   voce 3 — Emulsioni/sospensioni: €13,30/250 ml, +€0,70 ogni 100 ml extra, comp.extra €0,70.
+//   voce 4 — Semisolide: €13,30/50 g, +€0,75 ogni 50 g extra, comp.extra €0,75.
+//   voce 5 — Polveri: base €6,65, no scaglioni, comp.extra €0,75.
+const ALLEGATO_B_VOCI = Object.freeze({
+  liquida:    { base: 6.65,  rif: null, stepPiu: null, costPiu: 0,    unitLabel: 'ml', compExtra: 0.80, voce: 'Soluzioni (voce 1)' },
+  sospensione:{ base: 13.30, rif: 250,  stepPiu: 100,  costPiu: 0.70, unitLabel: 'ml', compExtra: 0.70, voce: 'Emulsioni/sospensioni (voce 3)' },
+  semisolida: { base: 13.30, rif: 50,   stepPiu: 50,   costPiu: 0.75, unitLabel: 'g',  compExtra: 0.75, voce: 'Preparazioni semisolide (voce 4)' },
+  polvere:    { base: 6.65,  rif: null, stepPiu: null, costPiu: 0,    unitLabel: 'g',  compExtra: 0.75, voce: 'Polveri (voce 5)' },
+});
+
+// Costo Art. 5 per operazione tecnologica aggiuntiva (€2,30).
+const OP_TECNOLOGICA_COSTO = 2.30;
+
+// Allegato B per forme liquide/semisolide/polveri.
+// Calcola: base (con scaglioni volume), componenti aggiuntivi (capped a 4),
+// operazioni tecnologiche, costi totali di preparazione (costoB) e l'incremento
+// Art. 7 (+40%). Ritorna anche metadati per il rendering (voce, unit, ecc.).
+// Ritorna null se `tipo` non è una delle 4 voci supportate (usa invece calcAllegatoBVoce7
+// per capsule/cartine).
+function calcAllegatoB(tipo, qt, comp, op) {
+  const c = ALLEGATO_B_VOCI[tipo];
+  if (!c) return null;
+  let baseB = c.base;
+  if (c.rif && qt > 0 && qt > c.rif) {
+    const diffPiu = Math.ceil((qt - c.rif) / c.stepPiu);
+    baseB += diffPiu * c.costPiu;
+  }
+  const cappedComp = Math.min(Math.max(0, comp || 0), COMP_MAX);
+  const addComp = cappedComp * c.compExtra;
+  const addOp = Math.max(0, op || 0) * OP_TECNOLOGICA_COSTO;
+  const costoB = baseB + addComp + addOp;
+  const inc40 = costoB * ART_7_INCREMENTO;
+  return { baseB, addComp, addOp, costoB, inc40, cappedComp,
+           voce: c.voce, unitLabel: c.unitLabel, base: c.base, compExtra: c.compExtra };
+}
+
+// Allegato B voce 7 (capsule e cartine, stessa logica):
+//   base €22,00 per 120 pezzi
+//   −€1,00 ogni 10 pezzi sotto 120
+//   +€2,00 ogni 10 pezzi sopra 120 (asimmetria voluta dal decreto)
+//   comp.extra €0,60 per componente aggiuntivo (capped a 4)
+// Ritorna {baseB, addComp, addOp, costoB, inc40, diff10}.
+function calcAllegatoBVoce7(nPezzi, comp, op) {
+  const n = Math.max(0, nPezzi || 0);
+  const diff10 = Math.ceil(Math.abs(n - 120) / 10);
+  let baseB = 22.00;
+  if (n < 120) baseB -= diff10 * 1.00;
+  else if (n > 120) baseB += diff10 * 2.00;
+  baseB = Math.max(0, baseB);
+  const cappedComp = Math.min(Math.max(0, comp || 0), COMP_MAX);
+  const addComp = cappedComp * 0.60;
+  const addOp = Math.max(0, op || 0) * OP_TECNOLOGICA_COSTO;
+  const costoB = baseB + addComp + addOp;
+  const inc40 = costoB * ART_7_INCREMENTO;
+  return { baseB, addComp, addOp, costoB, inc40, cappedComp, diff10 };
+}
+
+// Art. 8 supplementi: 8a (sostanza H pericolosa), 8b (per ogni stupefacente),
+// 8c (doping). Tutti €2,50 per unità di applicazione.
+function calcSupplementi({ hazardous = false, stupp = 0, dop = 0 } = {}) {
+  return {
+    art8a: hazardous ? ART_8_PER_UNIT : 0,
+    art8b: Math.max(0, stupp) * ART_8_PER_UNIT,
+    art8c: Math.max(0, dop) * ART_8_PER_UNIT,
+  };
+}
+
+// IVA 10% sul netto, ritorna {iva, totale}.
+function calcIvaTotale(netto) {
+  const n = Math.max(0, netto || 0);
+  const iva = n * IVA_RATE;
+  return { iva, totale: n + iva };
+}
+
 // ── Export per browser + Node ────────────────────────────────────────────
 
 const _exports = {
   ALLEGATO_A, DENSITA, INV_HARDCODED, INV_OBBLIGATORIE,
+  ALLEGATO_B_VOCI, IVA_RATE, ART_7_INCREMENTO, ART_8_PER_UNIT, COMP_MAX, OP_TECNOLOGICA_COSTO,
   fmt, invNominalizza, invMatchScore, hasHazard, getDensita, tarNormalizza, tarCercaPA,
   invFindBest, getHDaInventario, rigaHazardous, invGetPrezzo,
+  calcAllegatoB, calcAllegatoBVoce7, calcSupplementi, calcIvaTotale,
 };
 Object.assign(globalThis, _exports);
 if (typeof module !== 'undefined' && module.exports) module.exports = _exports;
