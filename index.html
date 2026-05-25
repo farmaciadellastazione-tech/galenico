@@ -699,7 +699,7 @@
   </div>
 
   <button class="print-btn" onclick="window.print()">&#128438;&nbsp; Stampa / Salva PDF</button>
-  <button class="print-btn" onclick="salvaInArchivio()" style="background:var(--accent-mid,#2d8a3e);margin-left:8px">📁&nbsp; Salva in archivio</button>
+  <button id="btn-salva" class="print-btn" onclick="salvaInArchivio()" style="background:var(--accent-mid,#2d8a3e);margin-left:8px">📁&nbsp; Salva in archivio</button>
 
   <div id="scheda-preview"></div>
 </div>
@@ -3757,24 +3757,18 @@ function getNextNumPreventivo() {
   return 'PREV-' + anno + '/' + String(n).padStart(3, '0');
 }
 
-function getLastNumScheda() {
+// Convenzione: il counter in localStorage è l'ULTIMO numero assegnato (0 se nessuno).
+// getNextNumScheda fa +1 e salva. peekNextNumScheda mostra +1 senza side effect.
+function peekNextNumScheda() {
   const anno = new Date().getFullYear();
   const key = 'gal_scheda_counter_' + anno;
-  const n = parseInt(localStorage.getItem(key) || '0');
+  const n = (parseInt(localStorage.getItem(key) || '0') || 0) + 1;
   return anno + '/' + String(n).padStart(3, '0');
 }
 
-// Imposta il numero scheda iniziale al valore corretto (2026/002)
 (function initNumScheda() {
-  const anno = new Date().getFullYear();
-  const key = 'gal_scheda_counter_' + anno;
-  if (!localStorage.getItem(key)) {
-    localStorage.setItem(key, '1'); // prima scheda = 001
-  }
-  // Aggiorna il campo s-num con il prossimo numero disponibile
-  const n = parseInt(localStorage.getItem(key));
   const el = document.getElementById('s-num');
-  if (el) el.value = anno + '/' + String(n).padStart(3, '0');
+  if (el) el.value = peekNextNumScheda();
 })();
 
 // ═══════════════════════════════════════════
@@ -3783,8 +3777,9 @@ function getLastNumScheda() {
 
 function compilaScheda() {
   try {
-  const numScheda = getLastNumScheda() === '2026/000' ? getNextNumScheda() : getLastNumScheda();
-  document.getElementById('s-num').value = numScheda;
+  // Compila parte da una preparazione corrente → genera nuova scheda, non aggiorna.
+  setEditingMode(null);
+  document.getElementById('s-num').value = peekNextNumScheda();
 
   // 2. Sincronizza tipo da Preparazione → Scheda
   const mapTipoPrep = {soluzione:'soluzione', unguento:'unguento', capsule:'capsule', cartine:'cartine', polvere:'polvere', sospensione:'sospensione'};
@@ -3890,7 +3885,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 117;
+const APP_VERSION = 119;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
@@ -3909,6 +3904,8 @@ function togglePreventivo() {
   modPreventivo = !modPreventivo;
   localStorage.setItem('gal_mod_preventivo', modPreventivo ? '1' : '0');
   document.body.classList.toggle('preventivo-on', modPreventivo);
+  // Cambiare tipo (preventivo ↔ definitiva) significa nuova scheda, non update.
+  setEditingMode(null);
   // Refresh tutti i punti che dipendono dallo stato.
   if (typeof liberaRenderRighe === 'function') liberaRenderRighe();
   if (typeof calcPrep === 'function') calcPrep();
@@ -3927,10 +3924,7 @@ function refreshSchedaNumDisplay() {
     const n = (parseInt(localStorage.getItem(key) || '0')||0) + 1;
     el.value = 'PREV-' + anno + '/' + String(n).padStart(3, '0');
   } else {
-    const key = 'gal_scheda_counter_' + anno;
-    const n = (parseInt(localStorage.getItem(key) || '0')||0);
-    // Stesso pattern di initNumScheda: mostra il counter corrente, getNextNumScheda lo incrementa.
-    el.value = anno + '/' + String(n).padStart(3, '0');
+    el.value = peekNextNumScheda();
   }
 }
 
@@ -5553,15 +5547,46 @@ function tariffRestore(snap) {
   if (typeof calcTariff === 'function') calcTariff();
 }
 
+// ── Modalità modifica scheda ────────────────────────────────────────
+// _editingId è settato da archRiapri: salvaInArchivio aggiorna l'entry
+// originale per id invece di crearne una nuova (niente counter +1, num e
+// flag preventivo invariati). Si esce esplicitamente da: resetRicetta,
+// archDuplica, archApprova, compilaScheda, togglePreventivo.
+let _editingId = null;
+
+function setEditingMode(id) {
+  _editingId = id;
+  const btn = document.getElementById('btn-salva');
+  if (btn) btn.innerHTML = (id != null) ? '💾&nbsp; Aggiorna scheda' : '📁&nbsp; Salva in archivio';
+  // In modifica blocchiamo il numero scheda: la rinumerazione manuale non è supportata
+  // (richiederebbe risincronizzare il counter per evitare collisioni).
+  const sNum = document.getElementById('s-num');
+  if (sNum) sNum.readOnly = (id != null);
+}
+
 function salvaInArchivio() {
-  // Incrementa il numero scheda solo al salvataggio definitivo.
-  // In modalità preventivo usa counter + prefisso PREV-: non occupa numeri ufficiali.
-  const nuovoNum = modPreventivo ? getNextNumPreventivo() : getNextNumScheda();
+  const arch = archLoad();
+  let origIdx = -1;
+  let orig = null;
+  if (_editingId != null) {
+    origIdx = arch.findIndex(x => x.id === _editingId);
+    if (origIdx >= 0) {
+      orig = arch[origIdx];
+    } else {
+      // Edit pointer stale (es. scheda eliminata da un'altra tab): ricado su create.
+      setEditingMode(null);
+    }
+  }
+
+  // In modifica: num e flag preventivo vengono dalla scheda originale (no counter touch).
+  // In creazione: pesca il prossimo numero dal counter giusto (incrementa).
+  const nuovoNum = orig ? orig.num : (modPreventivo ? getNextNumPreventivo() : getNextNumScheda());
   document.getElementById('s-num').value = nuovoNum;
+
   const scheda = {
-    id: Date.now(),
+    id: orig ? orig.id : Date.now(),
     num: nuovoNum,
-    preventivo: modPreventivo || false,
+    preventivo: orig ? orig.preventivo : (modPreventivo || false),
     prep:   document.getElementById('s-prep').value,
     tipo:   tipoScheda,
     qt:     document.getElementById('s-qt').value,
@@ -5602,8 +5627,16 @@ function salvaInArchivio() {
     scheda.html = prev ? prev.innerHTML : '';
   }
 
-  const arch = archLoad();
-  // Controlla duplicati per numero scheda
+  if (orig) {
+    // Update in place: niente check duplicati (num invariato), niente counter touch.
+    arch[origIdx] = scheda;
+    archSave(arch);
+    if (scheda.preventivo) prevSyncToGist();
+    alert('Scheda ' + scheda.num + ' aggiornata.');
+    return;
+  }
+
+  // Create: controlla collisioni (caso raro — num appena pescato dal counter).
   const dup = arch.findIndex(s => s.num === scheda.num);
   if (dup >= 0) {
     if (!confirm('Esiste già una scheda ' + scheda.num + '. Sovrascrivere?')) return;
@@ -5612,9 +5645,11 @@ function salvaInArchivio() {
     arch.unshift(scheda); // più recente in cima
   }
   archSave(arch);
-  // Mirror su Gist solo per preventivi (no privacy issue) — async, non blocca.
   if (scheda.preventivo) prevSyncToGist();
   alert('Scheda ' + scheda.num + ' salvata in archivio.');
+  // Dopo la creazione, entriamo in edit mode: ulteriori "salva" su questa
+  // scheda saranno update, non duplicati.
+  setEditingMode(scheda.id);
 }
 
 function archivioRender(filtro) {
@@ -5681,6 +5716,9 @@ function archApprova(id) {
 
   // 1. Carica i dati (sincronizza anche modPreventivo → on perché s.preventivo=true)
   archRiapri(id);
+  // Approvazione = crea una nuova scheda definitiva, non aggiorna il preventivo
+  // (archRiapri ha appena settato edit mode sul preventivo: lo annulliamo).
+  setEditingMode(null);
   // 2. Forza off la modalità preventivo (dopo il riapri, così s-num verrà rigenerato corretto)
   if (modPreventivo) {
     modPreventivo = false;
@@ -5712,6 +5750,9 @@ function archDuplica(id) {
     return;
   }
   if (!confirm('Duplicare la scheda ' + s.num + ' come nuova preparazione?\n\n• Formula e tariffazione vengono ricaricate identiche\n• Paziente, data, lotti, prezzo vengono azzerati\n• Il numero verrà assegnato al salvataggio\n• I dati correnti di Preparazione/Tariffazione/Scheda verranno persi')) return;
+
+  // Duplica = nuova scheda, non aggiornamento dell'originale.
+  setEditingMode(null);
 
   // 1. Ripristina input completo
   prepRestore(s.prepSnap);
@@ -5798,6 +5839,8 @@ function archRiapri(id) {
   if (document.getElementById('s-lotto-ac')) document.getElementById('s-lotto-ac').value = s.lottoAC || '';
   if (document.getElementById('s-lotto-eccip')) document.getElementById('s-lotto-eccip').value = s.lottoEC || '';
   aggiornaScheda();
+  // Entriamo in edit mode: salvaInArchivio aggiornerà questa entry per id.
+  setEditingMode(id);
   const navBtns = document.querySelectorAll('.nav-btn');
   showPage('scheda', navBtns[2]);
 }
@@ -5817,6 +5860,7 @@ function resetRicetta() {
   tarPADaAllegatoA = true;
   _suppManRighe = [];
   tipoScheda = 'soluzione';
+  setEditingMode(null);
 
   const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
   const setHTML = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = v; };
