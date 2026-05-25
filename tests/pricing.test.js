@@ -2,7 +2,21 @@ import { describe, it, expect } from 'vitest';
 import {
   ALLEGATO_A, DENSITA, INV_HARDCODED, INV_OBBLIGATORIE,
   fmt, invNominalizza, invMatchScore, hasHazard, getDensita, tarNormalizza, tarCercaPA,
+  invFindBest, getHDaInventario, rigaHazardous, invGetPrezzo,
 } from '../pricing.js';
+
+// Inventario di test minimale. Riproduce la forma degli item in INV_HARDCODED
+// + alcune sostanze inserite "stored" (con override prezzo) per testare
+// la precedenza inventario vs Allegato A.
+const FIXTURE_INV = [
+  { nome: 'Etanolo 96°',         h: 'H225,H319',      unit: 'ml', prezzo: 0.01474, lotto: 'F2509100' },
+  { nome: 'Acqua purificata',    h: '',               unit: 'ml', prezzo: 0.002,   lotto: 'R2426776' },
+  { nome: 'Acido salicilico',    h: 'H302,H318,H335', unit: 'g',  prezzo: 0.0512,  lotto: 'R2217272', lottoInt: '14/26' },
+  { nome: 'Glicole propilenico', h: '',               unit: 'g',  prezzo: 0.0159,  lotto: 'R2510991' },
+  { nome: 'Finasteride',         h: 'H302,H360,H372,H410', unit: 'g', prezzo: 0,   lotto: 'F2505012' },
+  { nome: 'Mentolo naturale',    h: 'H228,H317,H411', unit: 'g',  prezzo: 0.128,   lotto: 'F2506999' },
+  { nome: 'Lattosio monoidrato', h: '',               unit: 'g',  prezzo: 0.0055,  lotto: 'F2504870' },
+];
 
 describe('ALLEGATO A — D.M. 22/09/2017', () => {
   // Sostanze ad alto rischio di regressione (controlli rigorosi):
@@ -289,5 +303,147 @@ describe('INV_OBBLIGATORIE', () => {
     for (const k of INV_OBBLIGATORIE) {
       expect(k).toBe(k.toLowerCase());
     }
+  });
+});
+
+describe('invFindBest — match inventario', () => {
+  it('match esatto (case insensitive, accenti rimossi)', () => {
+    expect(invFindBest('etanolo 96°', FIXTURE_INV).nome).toBe('Etanolo 96°');
+    expect(invFindBest('ETANOLO 96°', FIXTURE_INV).nome).toBe('Etanolo 96°');
+  });
+
+  it('match per substring (legacy, veloce)', () => {
+    expect(invFindBest('etanolo', FIXTURE_INV).nome).toBe('Etanolo 96°');
+    expect(invFindBest('mentolo', FIXTURE_INV).nome).toBe('Mentolo naturale');
+  });
+
+  it('fallback token-based per varianti (score ≥ 0.5)', () => {
+    // "Acido salicilico anidro" → match con "Acido salicilico" via token "acido"+"salicilico"
+    const r = invFindBest('Acido salicilico anidro', FIXTURE_INV);
+    expect(r?.nome).toBe('Acido salicilico');
+  });
+
+  it('nessun match → null', () => {
+    expect(invFindBest('paracetamolo', FIXTURE_INV)).toBe(null);
+    expect(invFindBest('xyz', FIXTURE_INV)).toBe(null);
+  });
+
+  it('nome vuoto → null', () => {
+    expect(invFindBest('', FIXTURE_INV)).toBe(null);
+    expect(invFindBest(null, FIXTURE_INV)).toBe(null);
+  });
+
+  it('inv vuoto → null', () => {
+    expect(invFindBest('etanolo', [])).toBe(null);
+  });
+});
+
+describe('getHDaInventario — lookup codici H per nome', () => {
+  it('ritorna H codes della sostanza trovata', () => {
+    expect(getHDaInventario('Etanolo 96°', FIXTURE_INV)).toBe('H225,H319');
+    expect(getHDaInventario('Acido salicilico', FIXTURE_INV)).toBe('H302,H318,H335');
+  });
+
+  it('ritorna stringa vuota se sostanza senza H', () => {
+    expect(getHDaInventario('Acqua purificata', FIXTURE_INV)).toBe('');
+    expect(getHDaInventario('Glicole propilenico', FIXTURE_INV)).toBe('');
+  });
+
+  it('match per substring sul nome', () => {
+    expect(getHDaInventario('etanolo', FIXTURE_INV)).toBe('H225,H319');
+  });
+
+  it('sostanza non in inventario → ""', () => {
+    expect(getHDaInventario('paracetamolo', FIXTURE_INV)).toBe('');
+  });
+
+  it('nome vuoto/null → ""', () => {
+    expect(getHDaInventario('', FIXTURE_INV)).toBe('');
+    expect(getHDaInventario(null, FIXTURE_INV)).toBe('');
+  });
+});
+
+describe('rigaHazardous — Art. 8a per riga', () => {
+  it('riga con H code valido → true', () => {
+    expect(rigaHazardous({nome: 'Etanolo 96°', h: 'H225'}, FIXTURE_INV)).toBe(true);
+  });
+
+  it('riga con solo H4xx → false (vedi hasHazard)', () => {
+    expect(rigaHazardous({nome: 'Test', h: 'H410'}, FIXTURE_INV)).toBe(false);
+  });
+
+  it('riga senza H ma sostanza in inventario con H → true (lookup automatico)', () => {
+    // r.h vuoto: fallback a getHDaInventario, che trova H225,H319 per etanolo.
+    expect(rigaHazardous({nome: 'Etanolo 96°', h: ''}, FIXTURE_INV)).toBe(true);
+  });
+
+  it('riga senza H e sostanza pulita → false', () => {
+    expect(rigaHazardous({nome: 'Acqua purificata', h: ''}, FIXTURE_INV)).toBe(false);
+    expect(rigaHazardous({nome: 'Lattosio monoidrato'}, FIXTURE_INV)).toBe(false);
+  });
+
+  it('hPreventivo=true → true sempre, override anche se H code vuoto', () => {
+    expect(rigaHazardous({nome: 'Lattosio monoidrato', h: '', hPreventivo: true}, FIXTURE_INV)).toBe(true);
+    expect(rigaHazardous({nome: 'Acqua purificata', hPreventivo: true}, FIXTURE_INV)).toBe(true);
+  });
+
+  it('hPreventivo=false NON downgrada un H code reale', () => {
+    // false è ignorato (solo true ha effetto override). Il calcolo H normale procede.
+    expect(rigaHazardous({nome: 'Etanolo 96°', h: 'H225', hPreventivo: false}, FIXTURE_INV)).toBe(true);
+  });
+
+  it('riga vuota/senza nome → false', () => {
+    expect(rigaHazardous(null, FIXTURE_INV)).toBe(false);
+    expect(rigaHazardous({}, FIXTURE_INV)).toBe(false);
+    expect(rigaHazardous({nome: ''}, FIXTURE_INV)).toBe(false);
+  });
+});
+
+describe('invGetPrezzo — lookup canonico prezzo', () => {
+  it('sostanza in inventario con prezzo > 0 → fonte=inventario', () => {
+    const r = invGetPrezzo('Etanolo 96°', FIXTURE_INV);
+    expect(r).toEqual({ prezzo: 0.01474, fonte: 'inventario', lotto: 'F2509100' });
+  });
+
+  it('sostanza in inventario con prezzo > 0 — preferisce lottoInt se presente', () => {
+    const r = invGetPrezzo('Acido salicilico', FIXTURE_INV);
+    expect(r.lotto).toBe('14/26'); // lottoInt vince su lotto
+    expect(r.fonte).toBe('inventario');
+  });
+
+  it('sostanza solo in Allegato A → fonte=allegatoA', () => {
+    // Paracetamolo: in Allegato A (0.135), NON in FIXTURE_INV.
+    const r = invGetPrezzo('paracetamolo', FIXTURE_INV);
+    expect(r).toEqual({ prezzo: 0.135, fonte: 'allegatoA' });
+  });
+
+  it('sostanza in inventario con prezzo=0 → cade in Allegato A (se presente)', () => {
+    // Finasteride: nel fixture ha prezzo:0. Non in Allegato A → null.
+    expect(invGetPrezzo('Finasteride', FIXTURE_INV)).toBe(null);
+  });
+
+  it('sostanza in inventario CON prezzo E in Allegato A → vince inventario (comportamento attuale)', () => {
+    // Caveat documentato: il commento in CLAUDE.md dice "Allegato A wins" ma il codice
+    // attuale ritorna il prezzo dell'inventario se > 0. Questo test PINNA il comportamento
+    // attuale — se viene un giorno fixato il bug regolatorio, questo test fallirà
+    // intenzionalmente come segnale che il fix è andato live.
+    // Acido salicilico è 0.0512 in FIXTURE_INV e 0.049 in Allegato A.
+    const r = invGetPrezzo('Acido salicilico', FIXTURE_INV);
+    expect(r.prezzo).toBe(0.0512);
+    expect(r.fonte).toBe('inventario');
+  });
+
+  it('sostanza sconosciuta → null', () => {
+    expect(invGetPrezzo('xyz123', FIXTURE_INV)).toBe(null);
+  });
+
+  it('inv vuoto cade comunque su Allegato A', () => {
+    const r = invGetPrezzo('paracetamolo', []);
+    expect(r).toEqual({ prezzo: 0.135, fonte: 'allegatoA' });
+  });
+
+  it('lotto default a "—" se né lottoInt né lotto sono presenti', () => {
+    const r = invGetPrezzo('test', [{ nome: 'test', prezzo: 1, h: '' }]);
+    expect(r.lotto).toBe('—');
   });
 });

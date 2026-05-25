@@ -1317,40 +1317,8 @@ function initCapsuleTaglie() {
   }
 }
 
-function getHDaInventario(nome) {
-  if (!nome) return '';
-  const inv = invLoadMerged();
-  const q = invNominalizza(nome);
-  const found = inv.find(s => invNominalizza(s.nome).includes(q) || q.includes(invNominalizza(s.nome)));
-  return found ? (found.h || '') : '';
-}
-
-// Il flag manuale hPreventivo sopravvive al toggle della modalità (così disattivando
-// preventivo dopo un preventivo approvato i calcoli Art. 8a restano corretti).
-function rigaHazardous(r) {
-  if (!r || !r.nome) return false;
-  if (r.hPreventivo === true) return true;
-  return hasHazard(r.h || getHDaInventario(r.nome));
-}
-
+// getHDaInventario, rigaHazardous, invFindBest — vedi pricing.js (puri, prendono inv esplicito)
 // hasHazard, invNominalizza, invMatchScore — vedi pricing.js
-
-// Cerca in inventario il miglior match per `nome`. Prima prova substring (compatibilità),
-// poi fallback al match token-based con soglia 0.5. Ritorna l'item o null.
-function invFindBest(nome, inv) {
-  const q = invNominalizza(nome);
-  if (!q) return null;
-  // 1) substring stretto (legacy, veloce)
-  const strict = inv.find(s => invNominalizza(s.nome).includes(q) || q.includes(invNominalizza(s.nome)));
-  if (strict) return strict;
-  // 2) fuzzy token-based, prendi il miglior score ≥ 0.5
-  let best = null, bestScore = 0;
-  inv.forEach(s => {
-    const sc = invMatchScore(nome, s.nome);
-    if (sc > bestScore && sc >= 0.5) { best = s; bestScore = sc; }
-  });
-  return best;
-}
 
 function invLoadMerged() {
   const stored = invLoad();
@@ -1363,15 +1331,7 @@ function invLoadMerged() {
   return merged;
 }
 
-function invGetPrezzo(nomeSostanza) {
-  const q = invNominalizza(nomeSostanza);
-  const merged = invLoadMerged();
-  const found = merged.find(s => invNominalizza(s.nome).includes(q) || q.includes(invNominalizza(s.nome).split(' ')[0]));
-  if (found && found.prezzo) return { prezzo: found.prezzo, fonte: 'inventario', lotto: found.lottoInt || found.lotto || '—' };
-  const chiaveAll = Object.keys(ALLEGATO_A).find(k => k.includes(q) || q.includes(k.split(' ')[0]));
-  if (chiaveAll) return { prezzo: ALLEGATO_A[chiaveAll], fonte: 'allegatoA' };
-  return null;
-}
+// invGetPrezzo — vedi pricing.js (puro, prende inv esplicito).
 
 // ── Dropdown ricerca sostanza ──
 function invCercaNome(q) {
@@ -1714,7 +1674,7 @@ function liberaSelComp(i, nome, prezzo, fonte, lotto, h) {
   liberaRighe[i].prezzoAcq = prezzo;
   liberaRighe[i].fonte = fonte;
   liberaRighe[i].lotto = lotto || '';
-  liberaRighe[i].h = h || getHDaInventario(nome);
+  liberaRighe[i].h = h || getHDaInventario(nome, invLoadMerged());
   liberaRighe[i].densita = null;
   liberaRenderRighe();
   calcPrep();
@@ -2406,7 +2366,7 @@ function sincronizzaTariffazione() {
 
   const nomePA = document.getElementById('prep-pa-nome') ? document.getElementById('prep-pa-nome').value.trim() : '';
   if (nomePA) {
-    const trovato = invGetPrezzo(nomePA);
+    const trovato = invGetPrezzo(nomePA, invLoadMerged());
     if (trovato) {
       const paEl = document.getElementById('t-pa');
       const fonteEl = document.getElementById('t-pa-fonte');
@@ -2694,7 +2654,8 @@ function calcTariff() {
   const notte = parseFloat(document.getElementById('t-notte').value)||0;
   // suppH auto (Art. 8a): €2,50 se almeno un ingrediente ha un codice H di pericolo per la salute
   // In modalità preventivo considera anche il flag manuale hPreventivo (vedi rigaHazardous).
-  const _hRilevato = liberaRighe.some(rigaHazardous);
+  const _invCorr = invLoadMerged();
+  const _hRilevato = liberaRighe.some(r => rigaHazardous(r, _invCorr));
   const suppH = _hRilevato ? 2.50 : 0;
   const suppSt = stupp*2.50, suppDop = dop*2.50;
 
@@ -3294,7 +3255,8 @@ function aggiornaScheda() {
 
   // ═══════ calcolo tariff ═══════
   // Modalità unica libera: PA, etanolo ed extra sono in liberaRigheExtra/liberaCostoExtra
-  const _hS = liberaRighe.some(rigaHazardous);
+  const _invCorrS = invLoadMerged();
+  const _hS = liberaRighe.some(r => rigaHazardous(r, _invCorrS));
   const suppH  = _hS ? 2.50 : 0;
   const inc40  = baseB * 0.40;
   const nettoMaterie = liberaCostoExtra;
@@ -4552,7 +4514,7 @@ function aiImportaTutti(comps, tipo) {
       prezzoAcq,
       fonte,
       lotto: invFound?.lottoInt || invFound?.lotto || '',
-      h: invFound?.h || getHDaInventario(nomeFinal),
+      h: invFound?.h || getHDaInventario(nomeFinal, inv),
     };
   });
   if (typeof liberaRenderRighe === 'function') liberaRenderRighe();

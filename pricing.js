@@ -295,11 +295,59 @@ function tarCercaPA(nome) {
     .slice(0, 6);
 }
 
+// ── Lookup inventario (puri, inv passato esplicitamente) ────────────────
+
+// Miglior match per `nome` in `inv`. Prima substring (legacy, veloce), poi
+// fallback fuzzy token-based con soglia 0.5. Ritorna l'item o null.
+function invFindBest(nome, inv) {
+  const q = invNominalizza(nome);
+  if (!q) return null;
+  const strict = inv.find(s => invNominalizza(s.nome).includes(q) || q.includes(invNominalizza(s.nome)));
+  if (strict) return strict;
+  let best = null, bestScore = 0;
+  inv.forEach(s => {
+    const sc = invMatchScore(nome, s.nome);
+    if (sc > bestScore && sc >= 0.5) { best = s; bestScore = sc; }
+  });
+  return best;
+}
+
+// Codici H della sostanza `nome` dall'inventario passato. '' se non trovata.
+function getHDaInventario(nome, inv) {
+  if (!nome) return '';
+  const q = invNominalizza(nome);
+  const found = inv.find(s => invNominalizza(s.nome).includes(q) || q.includes(invNominalizza(s.nome)));
+  return found ? (found.h || '') : '';
+}
+
+// True se la riga è da supplementare con Art. 8a (€2,50). Override manuale
+// hPreventivo ha priorità su tutto (sopravvive al toggle preventivo↔definitiva).
+function rigaHazardous(r, inv) {
+  if (!r || !r.nome) return false;
+  if (r.hPreventivo === true) return true;
+  return hasHazard(r.h || getHDaInventario(r.nome, inv));
+}
+
+// Canonical price lookup. Comportamento attuale: prova prima inventario
+// (se ha prezzo > 0), poi Allegato A. Ritorna {prezzo, fonte, lotto?} o null.
+// Nota: CLAUDE.md descrive l'intent "Allegato A wins" — il codice qui mostra
+// il prezzo dell'inventario quando disponibile. Discrepanza pre-esistente
+// preservata in questo refactor; valutare separatamente se sia bug regolatorio.
+function invGetPrezzo(nomeSostanza, inv) {
+  const q = invNominalizza(nomeSostanza);
+  const found = inv.find(s => invNominalizza(s.nome).includes(q) || q.includes(invNominalizza(s.nome).split(' ')[0]));
+  if (found && found.prezzo) return { prezzo: found.prezzo, fonte: 'inventario', lotto: found.lottoInt || found.lotto || '—' };
+  const chiaveAll = Object.keys(ALLEGATO_A).find(k => k.includes(q) || q.includes(k.split(' ')[0]));
+  if (chiaveAll) return { prezzo: ALLEGATO_A[chiaveAll], fonte: 'allegatoA' };
+  return null;
+}
+
 // ── Export per browser + Node ────────────────────────────────────────────
 
 const _exports = {
   ALLEGATO_A, DENSITA, INV_HARDCODED, INV_OBBLIGATORIE,
   fmt, invNominalizza, invMatchScore, hasHazard, getDensita, tarNormalizza, tarCercaPA,
+  invFindBest, getHDaInventario, rigaHazardous, invGetPrezzo,
 };
 Object.assign(globalThis, _exports);
 if (typeof module !== 'undefined' && module.exports) module.exports = _exports;
