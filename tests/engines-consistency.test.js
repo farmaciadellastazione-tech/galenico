@@ -137,4 +137,16 @@ describe('Tariffazione ↔ Scheda: stesso prezzo (motore unico)', () => {
     expect(r.sch).toBeCloseTo(r.tar, 2);
     expect(r.comp).toBe('0');               // 2 sostanze − 2
   });
+
+  it('Cartine — 20 pz: base voce 7 sul numero reale (non su 0)', () => {
+    // liberaRighe per cartine = quantità PER SINGOLA CARTINA.
+    const r = H.run(
+      { prep:'cartine', tariff:'cartine', scheda:'cartine' },
+      [ {nome:'Paracetamolo', qty:'250', unit:'mg', isPa:true},
+        {nome:'Lattosio monoidrato', qty:'100', unit:'mg'} ],
+      { 't-fl':'0', 'cart-ncart-lib':'20' });
+    expect(r.sch).toBeCloseTo(r.tar, 2);
+    expect(r.op).toBe('1');                 // polverizzazione/setacciatura auto per cartine
+    expect(r.comp).toBe('0');               // 2 sostanze − 2
+  });
 });

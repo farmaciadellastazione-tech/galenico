@@ -3218,13 +3218,29 @@ function aggiornaScheda() {
 
   // ═══════════ CARTINE ═══════════
   } else if (tipoScheda === 'cartine') {
-    const nCart    = parseInt(document.getElementById('s-ncart').value)||0;
-    const mgPAcart = parseFloat(document.getElementById('s-mgpacart').value)||0;
-    const eccip    = document.getElementById('s-eccip').value.trim()||'Eccipiente';
-    // Massa per cartina: nessun limite fisso (le cartine non sono contenute). L'operatore inserisce il valore;
-    // se vuoto, di default = solo PA (niente eccipiente).
-    const mgCartInput = parseFloat(document.getElementById('s-mgcart').value);
-    const mgCart      = isNaN(mgCartInput) || mgCartInput <= 0 ? mgPAcart : Math.max(mgPAcart, mgCartInput);
+    // In modalità libera sincronizza dai campi Preparazione: nCart da cart-ncart-lib,
+    // dose/massa PER-CARTINA da liberaCalcTotale (liberaRighe per cartine contiene già
+    // quantità per singola cartina). Così la preview è corretta anche entrando direttamente
+    // nel tab Scheda; senza, s-ncart=0 falserebbe la base voce 7 (€22 −€1/10 sotto 120 →
+    // €10) e mostrerebbe grPA 0.
+    let nCart, mgPAcart, mgCart, eccip;
+    if (liberaRighe.length > 0) {
+      const {totG: _totGc, paG: _paGc} = liberaCalcTotale();
+      nCart    = parseInt(document.getElementById('cart-ncart-lib')?.value || '0') || 0;
+      mgPAcart = _paGc * 1000;
+      mgCart   = _totGc * 1000;
+      eccip    = document.getElementById('s-eccip').value.trim() || 'Eccipiente';
+      if (document.getElementById('s-ncart'))    document.getElementById('s-ncart').value    = nCart || '';
+      if (document.getElementById('s-mgpacart')) document.getElementById('s-mgpacart').value = mgPAcart > 0 ? mgPAcart.toFixed(2) : '';
+      if (document.getElementById('s-mgcart'))   document.getElementById('s-mgcart').value   = mgCart > 0 ? mgCart.toFixed(0) : '';
+    } else {
+      nCart    = parseInt(document.getElementById('s-ncart').value)||0;
+      mgPAcart = parseFloat(document.getElementById('s-mgpacart').value)||0;
+      eccip    = document.getElementById('s-eccip').value.trim()||'Eccipiente';
+      // Massa per cartina: nessun limite fisso (le cartine non sono contenute). Se vuoto, = solo PA.
+      const mgCartInput = parseFloat(document.getElementById('s-mgcart').value);
+      mgCart   = isNaN(mgCartInput) || mgCartInput <= 0 ? mgPAcart : Math.max(mgPAcart, mgCartInput);
+    }
     const mgEccipcart = Math.max(0, mgCart - mgPAcart);
     const grPA        = (mgPAcart * nCart)/1000;
     const grEccip     = (mgEccipcart * nCart)/1000;
@@ -3622,7 +3638,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 125;
+const APP_VERSION = 126;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
