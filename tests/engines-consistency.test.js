@@ -91,7 +91,7 @@ describe('Tariffazione ↔ Scheda: stesso prezzo (motore unico)', () => {
   let H;
   beforeAll(() => { H = buildCtx(); });
 
-  it('Soluzione — Minoxidil 5% (anchor ≈ €21,84)', () => {
+  it('Soluzione — Minoxidil 5% (anchor ≈ €25,38, con filtrazione conc>3%)', () => {
     const r = H.run(
       { prep:'soluzione', tariff:'liquida', scheda:'soluzione' },
       [ {nome:'Minoxidil', qty:'5', unit:'g', isPa:true},
@@ -101,8 +101,9 @@ describe('Tariffazione ↔ Scheda: stesso prezzo (motore unico)', () => {
       { 't-fl':'1.55', 'totale-prep':'100' });
     expect(r.tar).not.toBeNull();
     expect(r.sch).toBeCloseTo(r.tar, 2);   // i due motori coincidono
-    expect(r.tar).toBeCloseTo(21.84, 2);   // valore atteso
+    expect(r.tar).toBeCloseTo(25.38, 2);   // valore atteso (op=1 filtrazione auto, conc 5% > 3%)
     expect(r.comp).toBe('2');
+    expect(r.op).toBe('1');                // filtrazione auto-rilevata (PA cristallino / conc >3%)
   });
 
   it('Sospensione — 300 ml: scaglione volume >250 e op. omogeneizzazione', () => {
@@ -162,7 +163,7 @@ describe('Tariffazione ↔ Scheda: stesso prezzo (motore unico)', () => {
         {nome:'Lattosio monoidrato', qty:'100', unit:'mg'} ],
       { 't-fl':'0', 'cart-ncart-lib':'20' });
     expect(r.sch).toBeCloseTo(r.tar, 2);
-    expect(r.op).toBe('1');                 // polverizzazione/setacciatura auto per cartine
+    expect(r.op).toBe('2');                 // setacciatura + polverizzazione (Paracetamolo cristallino) auto
     expect(r.comp).toBe('0');               // 2 sostanze − 2
   });
 });

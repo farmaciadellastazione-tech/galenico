@@ -2342,13 +2342,13 @@ function calcPrep() {
 }
 
 // ── Op. tecnologiche aggiuntive (Art. 6/7): auto-default + override manuale ──
-// Auto-default per forma: per le CAPSULE la tabella OP_TECNOLOGICHE_AUTO vale 0, ma
-// setacciatura/polverizzazione (rilevate da calcPrep in opTecnologicheAutoVal) vanno
-// conteggiate di default — quindi prendiamo il massimo. Le altre forme restano sul
-// valore di tabella (nessun cambio di prezzo). L'utente può comunque correggere a mano.
+// Auto-default per forma = massimo tra la tabella OP_TECNOLOGICHE_AUTO (pavimento per
+// forma: emulsionamento, omogeneizzazione, ...) e ciò che calcPrep rileva dalla
+// procedura (opTecnologicheAutoVal: setacciatura/polverizzazione/filtrazione/levigazione,
+// dipende dal PA cristallino). Così l'automatico contempla le operazioni reali su TUTTE
+// le forme senza mai abbassare i default di tabella. L'utente può comunque correggere a mano.
 function getOpAutoDefault(tipo) {
-  if (tipo === 'capsule') return Math.max(getOpTecnologicheAuto(tipo), opTecnologicheAutoVal || 0);
-  return getOpTecnologicheAuto(tipo);
+  return Math.max(getOpTecnologicheAuto(tipo), opTecnologicheAutoVal || 0);
 }
 // Valore effettivo: override manuale se impostato, altrimenti auto-default.
 function getOpEffettivo(tipo) {
@@ -3668,7 +3668,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 127;
+const APP_VERSION = 128;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
