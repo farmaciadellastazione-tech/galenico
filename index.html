@@ -599,7 +599,7 @@
   <div class="card">
     <div class="card-title">Operazioni e supplementi</div>
     <div class="field-row"><span class="field-label">Componenti aggiuntivi</span><input type="number" id="t-comp" value="0" step="1" min="0" max="4" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto: n° sostanze − 2 (max 4)</span></div>
-    <div class="field-row"><span class="field-label">Op. tecnologiche aggiuntive</span><input type="number" id="t-op" value="0" step="1" min="0" max="10" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto da tipo prep. (×€2,30 cad.)</span></div>
+    <div class="field-row"><span class="field-label">Op. tecnologiche aggiuntive</span><input type="number" id="t-op" value="0" step="1" min="0" max="10" oninput="opOnManualEdit(this.value)" style="background:var(--bg);width:64px"><button type="button" onclick="opRipristinaAuto()" title="Ripristina il valore automatico" style="margin-left:6px;font-size:11px;padding:2px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer;color:var(--text-faint)">↺ auto</button><span class="field-note">modificabile — ×€2,30 cad.</span></div>
     <div class="field-row"><span class="field-label">Supplemento stupefacenti (Art. 8b)</span><input type="number" id="t-stupp" value="0" step="1" min="0" max="3" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto da formula (×€2,50 cad.)</span></div>
     <div class="field-row"><span class="field-label">Supplemento doping (Art. 8c)</span><input type="number" id="t-dop" value="0" step="1" min="0" max="1" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto da formula (×€2,50)</span></div>
     <div class="field-row"><span class="field-label">Diritto addizionale notturno</span><input type="number" id="t-notte" value="0" step="7.5" min="0" max="10" oninput="calcTariff()"><span class="field-note">€7,50 urb. / €10,00 rus.</span></div>
@@ -1439,6 +1439,9 @@ function ordinaEmail() {
 
 
 let opTecnologicheDesc = ''; // descrizione op. aggiuntiva rilevata da calcPrep
+let opTecnologicheAutoVal = 0; // n° op. auto-rilevate da calcPrep per la forma corrente
+let opManualeOverride = null;  // null = usa auto-default; numero = valore impostato a mano (vince finché non cambia forma)
+let _opLastPrep = null;        // forma per cui vale l'override, per azzerarlo al cambio forma
 let liberaGrPA = 0;
 let liberaCostoExtra = 0;
 let liberaRigheExtra = []; // [{nome, grams, prezzo, costo}] per il dettaglio tariffazione
@@ -1970,6 +1973,8 @@ function calcPrep() {
     // ── Procedura intelligente per ogni tipo ──
     let proc = [];
     let opTecnologicheExtra = 0; // operazioni aggiuntive rilevate automaticamente dalla procedura
+    // Cambiando forma di preparazione l'override manuale delle op. non ha più senso: azzeralo.
+    if (tipoPrep !== _opLastPrep) { opManualeOverride = null; _opLastPrep = tipoPrep; }
 
     // Helper: rileva caratteristiche degli ingredienti
     const _n = r => invNominalizza(r.nome);
@@ -2163,12 +2168,10 @@ function calcPrep() {
       ];
     }
 
-    // Auto-imposta op. tecnologiche aggiuntive in tariffazione (non sovrascrive se già più alto)
-    const tOpEl = document.getElementById('t-op');
-    if (tOpEl && (parseInt(tOpEl.value)||0) < opTecnologicheExtra) {
-      tOpEl.value = opTecnologicheExtra;
-      setTimeout(() => calcTariff(), 50);
-    }
+    // Memorizza le op. tecnologiche auto-rilevate da calcPrep. Il campo t-op viene poi
+    // impostato da sincronizzaTariffazione al valore EFFETTIVO (override manuale se
+    // presente, altrimenti l'auto-default). Vedi getOpEffettivo / getOpAutoDefault.
+    opTecnologicheAutoVal = opTecnologicheExtra;
     // Se nessun ingrediente valido, sostituisci formula e procedura con placeholder
     if (ingr.length === 0) {
       document.getElementById('formula-grid').innerHTML = '<div style="color:var(--text-faint);font-size:13px;padding:8px 0">Aggiungi almeno una sostanza con quantità per vedere la formula.</div>';
@@ -2338,6 +2341,33 @@ function calcPrep() {
     sincronizzaTariffazione();
 }
 
+// ── Op. tecnologiche aggiuntive (Art. 6/7): auto-default + override manuale ──
+// Auto-default per forma: per le CAPSULE la tabella OP_TECNOLOGICHE_AUTO vale 0, ma
+// setacciatura/polverizzazione (rilevate da calcPrep in opTecnologicheAutoVal) vanno
+// conteggiate di default — quindi prendiamo il massimo. Le altre forme restano sul
+// valore di tabella (nessun cambio di prezzo). L'utente può comunque correggere a mano.
+function getOpAutoDefault(tipo) {
+  if (tipo === 'capsule') return Math.max(getOpTecnologicheAuto(tipo), opTecnologicheAutoVal || 0);
+  return getOpTecnologicheAuto(tipo);
+}
+// Valore effettivo: override manuale se impostato, altrimenti auto-default.
+function getOpEffettivo(tipo) {
+  return opManualeOverride !== null ? opManualeOverride : getOpAutoDefault(tipo);
+}
+// Modifica manuale del campo t-op da parte dell'utente.
+function opOnManualEdit(v) {
+  const n = parseInt(v);
+  opManualeOverride = isNaN(n) ? 0 : Math.max(0, n);
+  const el = document.getElementById('t-op'); if (el) el.value = opManualeOverride;
+  calcTariff(); aggiornaScheda();
+}
+// Ripristina l'auto-default (dimentica l'override manuale).
+function opRipristinaAuto() {
+  opManualeOverride = null;
+  const el = document.getElementById('t-op'); if (el) el.value = getOpAutoDefault(tipoTariff);
+  calcTariff(); aggiornaScheda();
+}
+
 function sincronizzaTariffazione() {
   // Modalità unica libera (v46+): nascondi i selettori tipo/PA della Tariffazione e mostra la nota.
   ['tar-card-tipo','tariff-card-pa'].forEach(id => {
@@ -2404,9 +2434,9 @@ function sincronizzaTariffazione() {
     const _totSost = liberaRigheExtra.filter(r => !r.isCapsule).length;
     _compEl.value = Math.min(COMP_MAX, Math.max(0, _totSost - 2));
   }
-  // Op. tecnologiche aggiuntive (Art. 7) — derivate da tipoTariff (vedi OP_TECNOLOGICHE_AUTO in pricing.js).
+  // Op. tecnologiche aggiuntive (Art. 6/7) — valore effettivo (auto-default o override manuale).
   const _opEl = document.getElementById('t-op');
-  if (_opEl) _opEl.value = getOpTecnologicheAuto(tipoTariff);
+  if (_opEl) _opEl.value = getOpEffettivo(tipoTariff);
   // Supplemento stupefacenti (Art. 8b) — conta ingredienti che matchano radici STUPEFACENTI, clamp a 3.
   const _stuppEl = document.getElementById('t-stupp');
   if (_stuppEl) {
@@ -2444,9 +2474,9 @@ function setTipoTariff(t, btn) {
     cartine:     'Rif.: D.M. 22/09/2017 e s.m.i. All. B voce 7 — Cartine/bustine €22,00/120 pz (comp.extra €0,60)',
   };
   document.getElementById('tariff-ref').textContent = refMap[t] || '';
-  // Op. tecnologiche (Art. 7) dipendono dal tipoTariff: aggiorna anche qui (sincronizzaTariffazione non viene chiamata su click tab).
+  // Op. tecnologiche (Art. 6/7): valore effettivo (sincronizzaTariffazione non viene chiamata su click tab).
   const _opEl = document.getElementById('t-op');
-  if (_opEl) _opEl.value = getOpTecnologicheAuto(t);
+  if (_opEl) _opEl.value = getOpEffettivo(t);
   calcTariff();
 }
 
@@ -3293,7 +3323,7 @@ function aggiornaScheda() {
   const _tipoTariffS = _mapTipoS[tipoScheda] || 'liquida';
   // Art. 5 — regola pratica: totale sostanze meno 2 (capsule vuote = contenitore, escluse), clamp a COMP_MAX.
   const _compS    = Math.min(COMP_MAX, Math.max(0, liberaRigheExtra.filter(r => !r.isCapsule).length - 2));
-  const _opS      = getOpTecnologicheAuto(_tipoTariffS);
+  const _opS      = getOpEffettivo(_tipoTariffS);
   const _stuppS   = Math.min(3, liberaRigheExtra.filter(r => isStupefacente(r.nome)).length);
   const _dopS     = liberaRigheExtra.some(r => isDoping(r.nome)) ? 1 : 0;
   // compExtra per voce; voce 7 (capsule/cartine, assenti da ALLEGATO_B_VOCI) = €0,60.
@@ -3638,7 +3668,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 126;
+const APP_VERSION = 127;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).

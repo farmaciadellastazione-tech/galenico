@@ -83,7 +83,8 @@ function buildCtx() {
     ctx.calcPrep(); ctx.calcTariff(); ctx.aggiornaScheda();
     return { tar: prezzoPubblico(), sch: schedaTotale(), comp: byId('t-comp').value, op: byId('t-op').value };
   }
-  return { run };
+  const read = () => ({ tar: prezzoPubblico(), sch: schedaTotale(), comp: byId('t-comp').value, op: byId('t-op').value });
+  return { run, ctx, read };
 }
 
 describe('Tariffazione ↔ Scheda: stesso prezzo (motore unico)', () => {
@@ -136,6 +137,21 @@ describe('Tariffazione ↔ Scheda: stesso prezzo (motore unico)', () => {
         'n-caps':'30', 'mg-pa-cps':'10', 'caps-taglia-lib':'0', 'caps-ncaps-lib':'30' });
     expect(r.sch).toBeCloseTo(r.tar, 2);
     expect(r.comp).toBe('0');               // 2 sostanze − 2
+    expect(r.op).toBe('2');                 // setacciatura + polverizzazione (Clobazam cristallino) auto
+  });
+
+  it('Capsule — override manuale delle op. tecnologiche (campo sbloccato)', () => {
+    H.run(
+      { prep:'capsule', tariff:'capsule', scheda:'capsule' },
+      [ {nome:'Clobazam', qty:'300', unit:'mg', isPa:true},
+        {nome:'Amido di riso', qty:'5', unit:'g'} ],
+      { 't-fl':'0', 'caps-vuote-prezzo':'0.045', 'caps-vuote-nome':'Capsule gelatina dura taglia 0',
+        'n-caps':'30', 'mg-pa-cps':'10', 'caps-taglia-lib':'0', 'caps-ncaps-lib':'30' });
+    // L'utente forza 4 operazioni: deve vincere sull'auto e riflettersi su entrambe le viste.
+    H.ctx.opOnManualEdit('4');
+    const r = H.read();
+    expect(r.op).toBe('4');
+    expect(r.sch).toBeCloseTo(r.tar, 2);
   });
 
   it('Cartine — 20 pz: base voce 7 sul numero reale (non su 0)', () => {
