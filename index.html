@@ -3669,7 +3669,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 129;
+const APP_VERSION = 130;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
@@ -5617,7 +5617,20 @@ function archRiapri(id) {
   // Riapertura archivio: la validità è quella salvata, esci da modalità auto
   sMesiAuto = false;
   const sInfo = document.getElementById('s-mesi-info'); if (sInfo) { sInfo.textContent = '(da archivio)'; sInfo.style.color = 'var(--text-muted)'; }
-  document.getElementById('s-prezzo').value = s.prezzo || '';
+  // Prezzo: se abbiamo ripristinato la preparazione (prepSnap), RICALCOLA il prezzo
+  // con la logica attuale leggendo da Tariffazione — così le schede vecchie salvate con
+  // un prezzo errato (bug pre-v122) tornano col prezzo CORRETTO invece di mostrare quello
+  // stantio memorizzato (che vincerebbe come override). Senza snapshot (schede legacy non
+  // ricalcolabili) si tiene il prezzo salvato. NB: un eventuale prezzo manuale ad hoc viene
+  // così sostituito dal ricalcolo — accettabile: il valore corretto è quello tariffato.
+  if (s.prepSnap) {
+    const _totNums = document.querySelectorAll('#tariff-totale .totale-num');
+    const _ptxt = _totNums.length ? _totNums[_totNums.length-1].textContent.replace('€','').replace(',','.').trim() : '';
+    const _pnew = parseFloat(_ptxt);
+    document.getElementById('s-prezzo').value = (!isNaN(_pnew) && _pnew > 0) ? _pnew.toFixed(2) : '';
+  } else {
+    document.getElementById('s-prezzo').value = s.prezzo || '';
+  }
   if (document.getElementById('s-pa-nome'))  document.getElementById('s-pa-nome').value  = s.paNome || '';
   if (document.getElementById('s-ncaps'))    document.getElementById('s-ncaps').value    = s.ncaps || '';
   if (document.getElementById('s-mgpa'))     document.getElementById('s-mgpa').value     = s.mgpa || '';

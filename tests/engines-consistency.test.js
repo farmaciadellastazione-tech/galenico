@@ -182,6 +182,10 @@ describe('Tariffazione ↔ Scheda: stesso prezzo (motore unico)', () => {
     expect(arch.length).toBeGreaterThan(0);
     const id = arch[0].id;
 
+    // 1b. Simula una scheda VECCHIA con prezzo memorizzato ERRATO (bug pre-v122).
+    arch[0].prezzo = '99.99';
+    H.ctx.localStorage.setItem('gal_archivio_schede_v1', JSON.stringify(arch));
+
     // 2. Carica una preparazione DIVERSA (stato sporco), come capita all'utente dopo.
     H.run(
       { prep:'soluzione', tariff:'liquida', scheda:'soluzione' },
@@ -189,12 +193,17 @@ describe('Tariffazione ↔ Scheda: stesso prezzo (motore unico)', () => {
         {nome:'Etanolo 96°', qty:'50', unit:'g'} ],
       { 't-fl':'1.55', 'totale-prep':'100' });
 
-    // 3. Riapri la scheda capsule: deve ripristinare la PREPARAZIONE (non lasciare la soluzione).
+    // 3. Riapri la scheda capsule: deve ripristinare la PREPARAZIONE (non lasciare la soluzione)
+    //    e RICALCOLARE il prezzo (non tenere il 99,99 memorizzato).
     H.ctx.archRiapri(id);
     H.ctx.calcTariff();
     const r = H.read();
     expect(H.byId('caps-ncaps-lib').value).toBe('30');     // formula capsule ripristinata
     expect(H.byId('s-ncaps').value).toBe('30');
-    expect(r.sch).toBeCloseTo(orig.sch, 2);                // prezzo scheda = quello salvato
+    expect(H.byId('s-prezzo').value).not.toBe('99.99');    // il prezzo errato NON sopravvive come override
+    // Prova sostanziale: il totale della scheda è quello RICALCOLATO (≈32,03), non il 99,99
+    // memorizzato (che, se sopravvivesse come override, comparirebbe qui come totale).
+    expect(r.sch).toBeCloseTo(orig.sch, 2);
+    expect(r.sch).not.toBeCloseTo(99.99, 1);
   });
 });
