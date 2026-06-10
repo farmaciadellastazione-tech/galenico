@@ -2010,9 +2010,10 @@ function calcPrep() {
       ];
 
     } else if (tipoPrep === 'soluzione') {
-      // Filtrazione = 3ª operazione → extra se PA non si scioglie immediatamente
+      // Filtrazione: la indichiamo in procedura quando il PA è cristallino / conc elevata,
+      // ma NON la conteggiamo di default tra le op. tecnologiche (scelta utente, v129):
+      // se viene eseguita e si vuole tariffare, si alza a mano il campo Op. tecnologiche.
       const needsFiltrazione = hasCrystalline || conc > 3;
-      if (needsFiltrazione) { opTecnologicheExtra += 1; opTecnologicheDesc = 'filtrazione (Art. 6)'; }
       // Co-solventi liquidi (glicole propilenico, glicerina, PEG, ecc.): tutto ciò
       // che non è PA, etanolo o acqua va aggiunto esplicitamente nella procedura.
       const coSolventi = ingr.filter((r, i) => {
@@ -2029,7 +2030,7 @@ function calcPrep() {
           : ['Sciogliere il principio attivo in circa '+fmt(totG*0.8,0)+' ml di '+acquaNote+', agitando.']),
         ...coSolventi.map(r => 'Aggiungere <strong>'+r.qty+' '+r.unit+'</strong> di '+r.nome+' alla soluzione, mescolando.'),
         ...(hasAcqua && hasEt ? ["Aggiungere gradualmente l'acqua purificata alla soluzione, mescolando."] : []),
-        ...(needsFiltrazione ? ['Filtrare su carta da filtro o membrana. <em>(Op. tecnologica aggiuntiva — Art. 6)</em>'] : []),
+        ...(needsFiltrazione ? ['Filtrare su carta da filtro o membrana, se necessario.'] : []),
         'Trasferire in matraccio tarato. Portare a volume con '+acquaNote+' q.b. a '+totLabel+'.',
         'Verificare limpidezza. Trasferire in flacone ambrato. Chiudere ed etichettare.',
       ];
@@ -3668,7 +3669,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 128;
+const APP_VERSION = 129;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
@@ -5580,6 +5581,14 @@ function archRiapri(id) {
   const arch = archLoad();
   const s = arch.find(s => s.id === id);
   if (!s) return;
+
+  // Ripristina anche la PREPARAZIONE (formula, materie, op. tecnologiche, supplementi)
+  // dagli snapshot, se presenti: senza, la scheda riaperta ricalcolava prezzo e dati
+  // dalla preparazione ATTUALMENTE caricata, non da quella archiviata — quindi capsule
+  // (e ogni forma) tornavano col numero pezzi/prezzo sbagliati. Le schede legacy senza
+  // snapshot ricadono sul vecchio comportamento (solo metadati).
+  if (s.prepSnap)   prepRestore(s.prepSnap);
+  if (s.tariffSnap) tariffRestore(s.tariffSnap);
 
   // Sincronizza modalità preventivo con il tipo di scheda caricata
   // (così banner/numerazione/watermark sono coerenti con quanto si sta vedendo).

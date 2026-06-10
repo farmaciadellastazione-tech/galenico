@@ -69,6 +69,7 @@ function buildCtx() {
   vm.createContext(ctx);
   vm.runInContext(pricingSrc, ctx, { filename: 'pricing.js' });
   vm.runInContext(inline, ctx, { filename: 'index-inline.js' });
+  ctx.showPage = () => {}; // querySelectorAll è finto: evita il crash di showPage nei flussi archivio
 
   const parseEuros = (s) => { const out=[]; const r=/€\s*([0-9]+(?:[.,][0-9]+)?)/g; let mm; while((mm=r.exec(s))) out.push(parseFloat(mm[1].replace('.','').replace(',','.'))); return out; };
   const prezzoPubblico = () => { const h=byId('tariff-totale').innerHTML; const i=h.indexOf('Prezzo al pubblico'); const eu=parseEuros(i>=0?h.slice(i):h); return eu.length?eu[0]:null; };
@@ -84,14 +85,14 @@ function buildCtx() {
     return { tar: prezzoPubblico(), sch: schedaTotale(), comp: byId('t-comp').value, op: byId('t-op').value };
   }
   const read = () => ({ tar: prezzoPubblico(), sch: schedaTotale(), comp: byId('t-comp').value, op: byId('t-op').value });
-  return { run, ctx, read };
+  return { run, ctx, read, byId };
 }
 
 describe('Tariffazione ↔ Scheda: stesso prezzo (motore unico)', () => {
   let H;
   beforeAll(() => { H = buildCtx(); });
 
-  it('Soluzione — Minoxidil 5% (anchor ≈ €25,38, con filtrazione conc>3%)', () => {
+  it('Soluzione — Minoxidil 5% (anchor ≈ €21,84, filtrazione NON conteggiata)', () => {
     const r = H.run(
       { prep:'soluzione', tariff:'liquida', scheda:'soluzione' },
       [ {nome:'Minoxidil', qty:'5', unit:'g', isPa:true},
@@ -101,9 +102,9 @@ describe('Tariffazione ↔ Scheda: stesso prezzo (motore unico)', () => {
       { 't-fl':'1.55', 'totale-prep':'100' });
     expect(r.tar).not.toBeNull();
     expect(r.sch).toBeCloseTo(r.tar, 2);   // i due motori coincidono
-    expect(r.tar).toBeCloseTo(25.38, 2);   // valore atteso (op=1 filtrazione auto, conc 5% > 3%)
+    expect(r.tar).toBeCloseTo(21.84, 2);   // valore atteso (op=0: la filtrazione non è nel default, v129)
     expect(r.comp).toBe('2');
-    expect(r.op).toBe('1');                // filtrazione auto-rilevata (PA cristallino / conc >3%)
+    expect(r.op).toBe('0');                // soluzione: nessuna op. tecnologica di default
   });
 
   it('Sospensione — 300 ml: scaglione volume >250 e op. omogeneizzazione', () => {
@@ -165,5 +166,35 @@ describe('Tariffazione ↔ Scheda: stesso prezzo (motore unico)', () => {
     expect(r.sch).toBeCloseTo(r.tar, 2);
     expect(r.op).toBe('2');                 // setacciatura + polverizzazione (Paracetamolo cristallino) auto
     expect(r.comp).toBe('0');               // 2 sostanze − 2
+  });
+
+  it('Capsule — recupero da archivio: Riapri ripristina la preparazione', () => {
+    // 1. Prepara e salva in archivio una preparazione in capsule.
+    const orig = H.run(
+      { prep:'capsule', tariff:'capsule', scheda:'capsule' },
+      [ {nome:'Clobazam', qty:'300', unit:'mg', isPa:true},
+        {nome:'Amido di riso', qty:'5', unit:'g'} ],
+      { 't-fl':'0', 'caps-vuote-prezzo':'0.045', 'caps-vuote-nome':'Capsule gelatina dura taglia 0',
+        'n-caps':'30', 'mg-pa-cps':'10', 'caps-taglia-lib':'0', 'caps-ncaps-lib':'30',
+        's-prep':'Clobazam 10 mg/cps', 's-farm':'Test' });
+    H.ctx.salvaInArchivio();
+    const arch = JSON.parse(H.ctx.localStorage.getItem('gal_archivio_schede_v1') || '[]');
+    expect(arch.length).toBeGreaterThan(0);
+    const id = arch[0].id;
+
+    // 2. Carica una preparazione DIVERSA (stato sporco), come capita all'utente dopo.
+    H.run(
+      { prep:'soluzione', tariff:'liquida', scheda:'soluzione' },
+      [ {nome:'Acido salicilico', qty:'3', unit:'g', isPa:true},
+        {nome:'Etanolo 96°', qty:'50', unit:'g'} ],
+      { 't-fl':'1.55', 'totale-prep':'100' });
+
+    // 3. Riapri la scheda capsule: deve ripristinare la PREPARAZIONE (non lasciare la soluzione).
+    H.ctx.archRiapri(id);
+    H.ctx.calcTariff();
+    const r = H.read();
+    expect(H.byId('caps-ncaps-lib').value).toBe('30');     // formula capsule ripristinata
+    expect(H.byId('s-ncaps').value).toBe('30');
+    expect(r.sch).toBeCloseTo(orig.sch, 2);                // prezzo scheda = quello salvato
   });
 });
