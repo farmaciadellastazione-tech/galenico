@@ -3029,9 +3029,23 @@ function aggiornaScheda() {
 
   // ═══════════ SOSPENSIONE ═══════════
   } else if (tipoScheda === 'sospensione') {
-    const qt   = parseFloat(document.getElementById('s-qt').value)||0;
-    const conc = parseFloat(document.getElementById('s-conc').value)||0;
-    const grPA = qt*conc/100;
+    // In modalità libera ricava qt/conc/grPA da liberaCalcTotale e sincronizza gli input
+    // della scheda, così la preview è corretta anche entrando direttamente nel tab Scheda
+    // (come i rami soluzione/polvere). Senza questo, s-qt non sincronizzato falsa lo
+    // scaglione volume (>250 ml) della voce 3 e mostra grPA 0.
+    let qt, conc, grPA;
+    if (liberaRighe.length > 0) {
+      const {totG, paG, conc: concCalcS, volMl} = liberaCalcTotale();
+      qt = volMl > 0 ? volMl : totG;
+      conc = concCalcS;
+      grPA = paG;
+      if (document.getElementById('s-qt'))   document.getElementById('s-qt').value   = qt.toFixed(1);
+      if (document.getElementById('s-conc')) document.getElementById('s-conc').value = conc.toFixed(2);
+    } else {
+      qt   = parseFloat(document.getElementById('s-qt').value)||0;
+      conc = parseFloat(document.getElementById('s-conc').value)||0;
+      grPA = qt*conc/100;
+    }
     const nFlac= 1;
 
     formulaItems = [
@@ -3139,6 +3153,18 @@ function aggiornaScheda() {
 
   // ═══════════ CAPSULE ═══════════
   } else if (tipoScheda === 'capsule') {
+    // In modalità libera sincronizza n°/dose/taglia dai campi Preparazione (caps-ncaps-lib /
+    // mg-pa-cps / caps-taglia-lib) come fa compilaScheda, così la preview è corretta anche
+    // entrando direttamente nel tab Scheda. Senza, s-ncaps=0 falserebbe la base voce 7
+    // (€22 −€1/10 sotto 120 → scenderebbe a €10) e mostrerebbe grPA 0.
+    if (liberaRighe.length > 0) {
+      const _ncLib = document.getElementById('caps-ncaps-lib')?.value || document.getElementById('n-caps')?.value || '';
+      const _mgLib = document.getElementById('mg-pa-cps')?.value || '';
+      const _tgLib = document.getElementById('caps-taglia-lib')?.value || '0';
+      if (_ncLib && document.getElementById('s-ncaps')) document.getElementById('s-ncaps').value = _ncLib;
+      if (_mgLib && document.getElementById('s-mgpa'))   document.getElementById('s-mgpa').value  = _mgLib.replace(',', '.');
+      if (document.getElementById('s-taglia'))           document.getElementById('s-taglia').value = _tgLib;
+    }
     const nCaps   = parseInt(document.getElementById('s-ncaps').value)||0;
     const mgPAcps = parseFloat(document.getElementById('s-mgpa').value)||0;
     const taglia  = document.getElementById('s-taglia').value;
@@ -3582,7 +3608,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 123;
+const APP_VERSION = 124;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
