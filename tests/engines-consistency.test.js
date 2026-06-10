@@ -116,6 +116,17 @@ describe('Tariffazione ↔ Scheda: stesso prezzo (motore unico)', () => {
     expect(r.comp).toBe('1');               // 3 sostanze − 2
   });
 
+  it('Unguento — 100 g: scaglione peso >50 g (voce 4) e op. emulsionamento', () => {
+    const r = H.run(
+      { prep:'unguento', tariff:'semisolida', scheda:'unguento' },
+      [ {nome:'Acido salicilico', qty:'3', unit:'g', isPa:true},
+        {nome:'Vaselina filante bianca', qty:'97', unit:'g'} ],
+      { 't-fl':'1.55', 'totale-prep':'100' });
+    expect(r.sch).toBeCloseTo(r.tar, 2);
+    expect(r.op).toBe('1');                 // emulsionamento auto per semisolida
+    expect(r.comp).toBe('0');               // 2 sostanze − 2
+  });
+
   it('Capsule — 30 pz: base voce 7 sul numero reale (non su 0)', () => {
     const r = H.run(
       { prep:'capsule', tariff:'capsule', scheda:'capsule' },

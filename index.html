@@ -3073,10 +3073,24 @@ function aggiornaScheda() {
 
   // ═══════════ UNGUENTO / CREMA ═══════════
   } else if (tipoScheda === 'unguento') {
-    const qt   = parseFloat(document.getElementById('s-qt').value)||0;
-    const conc = parseFloat(document.getElementById('s-conc').value)||0;
-    const grPA = qt*conc/100;
-    const eccip= document.getElementById('s-eccip').value.trim()||'Base unguentosa';
+    // In modalità libera ricava qt/conc/grPA da liberaCalcTotale e sincronizza s-qt/s-conc,
+    // così la preview è corretta anche entrando direttamente nel tab Scheda (come i rami
+    // soluzione/polvere/sospensione). Senza, s-qt non sincronizzato falsa lo scaglione
+    // peso (>50 g) della voce 4 e mostra grPA/grBase 0.
+    let qt, conc, grPA, eccip;
+    if (liberaRighe.length > 0) {
+      const {totG, paG, conc: concCalcU, ingr: ingrU} = liberaCalcTotale();
+      qt = totG; conc = concCalcU; grPA = paG;
+      const _paIdxU = ingrU.findIndex(r => r.isPa);
+      eccip = ingrU.filter((r,i) => i !== _paIdxU).map(r => r.nome).join(' + ') || 'Base unguentosa';
+      if (document.getElementById('s-qt'))   document.getElementById('s-qt').value   = qt.toFixed(2);
+      if (document.getElementById('s-conc')) document.getElementById('s-conc').value = conc.toFixed(2);
+    } else {
+      qt   = parseFloat(document.getElementById('s-qt').value)||0;
+      conc = parseFloat(document.getElementById('s-conc').value)||0;
+      grPA = qt*conc/100;
+      eccip= document.getElementById('s-eccip').value.trim()||'Base unguentosa';
+    }
     const grBase = qt - grPA;
 
     formulaItems = [
@@ -3608,7 +3622,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 124;
+const APP_VERSION = 125;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
