@@ -2664,16 +2664,13 @@ function tarForzaManuale() {
 function calcTariff() {
   const pPA   = parseFloat(document.getElementById('t-pa').value)||0;
   const pFL   = parseFloat(document.getElementById('t-fl').value)||0;
-  // Modalità unica libera: conta le sostanze extra (escludi PA, acqua, etanolo).
-  // Art. 5: la base Allegato B include già 2 sostanze, quindi comp = max(0, count-2).
-  const _liberaCompCount = liberaGetIngr().filter((r, i) => {
-    if (i === 0) return false; // PA
-    const n = invNominalizza(r.nome);
-    if (n.includes('acqua')) return false;
-    if (n.includes('etanolo') || n.includes('alcool') || n.includes('alcol')) return false;
-    return true;
-  }).length;
-  const comp = Math.max(0, _liberaCompCount - 2);
+  // Componenti aggiuntivi (Art. 5): UNICA fonte di verità = campo t-comp, già
+  // popolato da sincronizzaTariffazione (conta tutto tranne PA e capsule vuote —
+  // etanolo/acqua/veicoli INCLUSI — clamp a COMP_MAX). NON ricalcolare qui con un
+  // filtro divergente: la versione precedente escludeva etanolo/acqua e sottraeva
+  // 2, sballando l'Art. 5 (etanolo conta come componente) e mostrando in UI un
+  // numero diverso da quello fatturato.
+  const comp = Math.min(COMP_MAX, Math.max(0, parseInt(document.getElementById('t-comp').value) || 0));
   const op    = parseInt(document.getElementById('t-op').value)||0;
   const stupp = parseInt(document.getElementById('t-stupp').value)||0;
   const dop   = parseInt(document.getElementById('t-dop').value)||0;
@@ -3224,16 +3221,38 @@ function aggiornaScheda() {
     baseB = Math.max(0,baseB); nomeVoceB = 'Cartine/bustine (voce 7)';
   }
 
-  // ═══════ calcolo tariff ═══════
-  // Modalità unica libera: PA, etanolo ed extra sono in liberaRigheExtra/liberaCostoExtra
+  // ═══════ calcolo tariff (motore unico — identico a calcTariff) ═══════
+  // Modalità unica libera: PA, etanolo ed extra sono in liberaRigheExtra/liberaCostoExtra.
+  // baseB e nomeVoceB sono già calcolati per forma sopra (con gli scaglioni All. B).
+  // Qui aggiungiamo le voci che prima mancavano nella Scheda — componenti Art. 5,
+  // operazioni tecnologiche, supplementi Art. 8b/8c/manuali — e applichiamo l'Art. 7
+  // (+40%) sull'INTERO onorario (base+comp+op), non sulla sola base. Così il totale
+  // della Scheda coincide al centesimo con quello della Tariffazione.
   const _invCorrS = invLoadMerged();
   const _hS = liberaRighe.some(r => rigaHazardous(r, _invCorrS));
-  const suppH  = _hS ? 2.50 : 0;
-  const inc40  = baseB * 0.40;
+
+  const _mapTipoS    = {soluzione:'liquida', sospensione:'sospensione', unguento:'semisolida', polvere:'polvere', capsule:'capsule', cartine:'cartine'};
+  const _tipoTariffS = _mapTipoS[tipoScheda] || 'liquida';
+  // Art. 5: tutto tranne PA e capsule vuote (etanolo/acqua/veicoli inclusi), clamp a COMP_MAX.
+  const _compS    = Math.min(COMP_MAX, liberaRigheExtra.filter(r => !r.isPa && !r.isCapsule).length);
+  const _opS      = getOpTecnologicheAuto(_tipoTariffS);
+  const _stuppS   = Math.min(3, liberaRigheExtra.filter(r => isStupefacente(r.nome)).length);
+  const _dopS     = liberaRigheExtra.some(r => isDoping(r.nome)) ? 1 : 0;
+  // compExtra per voce; voce 7 (capsule/cartine, assenti da ALLEGATO_B_VOCI) = €0,60.
+  const _compExtraS = ALLEGATO_B_VOCI[_tipoTariffS]?.compExtra ?? 0.60;
+  const addComp   = _compS * _compExtraS;
+  const addOp     = _opS * OP_TECNOLOGICA_COSTO;
+  const costoB    = baseB + addComp + addOp;
+  const inc40     = costoB * ART_7_INCREMENTO;
+
+  const _suppS    = calcSupplementi({ hazardous: _hS, stupp: _stuppS, dop: _dopS });
+  const suppH = _suppS.art8a, suppSt = _suppS.art8b, suppDop = _suppS.art8c;
+  const suppMan   = suppManTotale();
+
   const nettoMaterie = liberaCostoExtra;
-  const netto  = nettoMaterie + baseB + inc40 + suppH + costoFL_s;
-  const iva    = netto * 0.10;
-  const totale = prezzo > 0 ? prezzo : netto + iva;
+  const netto  = nettoMaterie + costoB + inc40 + suppH + suppSt + suppDop + costoFL_s + suppMan;
+  const { iva, totale: _totaleCalcS } = calcIvaTotale(netto);
+  const totale = prezzo > 0 ? prezzo : _totaleCalcS;
 
   let tariffRows = [];
   liberaRigheExtra.forEach(r => {
@@ -3243,8 +3262,13 @@ function aggiornaScheda() {
   });
   tariffRows.push(
     {n:'All. B — '+nomeVoceB, v:baseB},
+    ...(_compS>0 ? [{n:'Componenti aggiuntivi (Art. 5): '+_compS+' × '+fmtE(_compExtraS), v:addComp}] : []),
+    ...(_opS>0 ? [{n:'Op. tecnologiche aggiuntive: '+_opS+' × '+fmtE(OP_TECNOLOGICA_COSTO)+(opTecnologicheDesc?' ('+opTecnologicheDesc+')':''), v:addOp}] : []),
     {n:'Incremento 40% (Art. 7)', v:inc40},
     ...(suppH>0 ? [{n:'Suppl. sostanza pericolosa H (Art. 8a)', v:suppH}] : [{n:'Nessun H rilevato — Art. 8a non applicato', v:0}]),
+    ...(suppSt>0 ? [{n:'Suppl. stupefacenti (Art. 8b): '+_stuppS+' × '+fmtE(2.50), v:suppSt}] : []),
+    ...(suppDop>0 ? [{n:'Suppl. doping (Art. 8c)', v:suppDop}] : []),
+    ..._suppManRighe.filter(r=>r.desc&&r.importo>0).map(r=>({n:r.desc, v:r.importo})),
     {n:'Recipiente', v:costoFL_s},
   );
 
@@ -3556,7 +3580,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 121;
+const APP_VERSION = 122;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
