@@ -598,7 +598,7 @@
 
   <div class="card">
     <div class="card-title">Operazioni e supplementi</div>
-    <div class="field-row"><span class="field-label">Componenti aggiuntivi</span><input type="number" id="t-comp" value="0" step="1" min="0" max="4" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto da formula (oltre PA, max 4)</span></div>
+    <div class="field-row"><span class="field-label">Componenti aggiuntivi</span><input type="number" id="t-comp" value="0" step="1" min="0" max="4" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto: n° sostanze − 2 (max 4)</span></div>
     <div class="field-row"><span class="field-label">Op. tecnologiche aggiuntive</span><input type="number" id="t-op" value="0" step="1" min="0" max="10" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto da tipo prep. (×€2,30 cad.)</span></div>
     <div class="field-row"><span class="field-label">Supplemento stupefacenti (Art. 8b)</span><input type="number" id="t-stupp" value="0" step="1" min="0" max="3" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto da formula (×€2,50 cad.)</span></div>
     <div class="field-row"><span class="field-label">Supplemento doping (Art. 8c)</span><input type="number" id="t-dop" value="0" step="1" min="0" max="1" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto da formula (×€2,50)</span></div>
@@ -2396,11 +2396,13 @@ function sincronizzaTariffazione() {
     if (document.getElementById('t-qt'))   document.getElementById('t-qt').value   = document.getElementById('qt').value;
     if (document.getElementById('t-conc')) document.getElementById('t-conc').value = document.getElementById('conc').value;
   }
-  // Componenti aggiuntivi (Art. 5) auto-calcolati da liberaRigheExtra: esclude solo PA e capsule vuote (etanolo conta), clamp a 4.
+  // Componenti aggiuntivi (Art. 5) — regola pratica: totale sostanze meno 2, clamp a COMP_MAX.
+  // Non serve distinguere PA/solvente/eccipiente: si conta il numero di ingredienti e si
+  // sottrae 2 (le capsule vuote sono un contenitore, non una sostanza → escluse dal totale).
   const _compEl = document.getElementById('t-comp');
   if (_compEl) {
-    const _compAuto = liberaRigheExtra.filter(r => !r.isPa && !r.isCapsule).length;
-    _compEl.value = Math.min(4, _compAuto);
+    const _totSost = liberaRigheExtra.filter(r => !r.isCapsule).length;
+    _compEl.value = Math.min(COMP_MAX, Math.max(0, _totSost - 2));
   }
   // Op. tecnologiche aggiuntive (Art. 7) — derivate da tipoTariff (vedi OP_TECNOLOGICHE_AUTO in pricing.js).
   const _opEl = document.getElementById('t-op');
@@ -3233,8 +3235,8 @@ function aggiornaScheda() {
 
   const _mapTipoS    = {soluzione:'liquida', sospensione:'sospensione', unguento:'semisolida', polvere:'polvere', capsule:'capsule', cartine:'cartine'};
   const _tipoTariffS = _mapTipoS[tipoScheda] || 'liquida';
-  // Art. 5: tutto tranne PA e capsule vuote (etanolo/acqua/veicoli inclusi), clamp a COMP_MAX.
-  const _compS    = Math.min(COMP_MAX, liberaRigheExtra.filter(r => !r.isPa && !r.isCapsule).length);
+  // Art. 5 — regola pratica: totale sostanze meno 2 (capsule vuote = contenitore, escluse), clamp a COMP_MAX.
+  const _compS    = Math.min(COMP_MAX, Math.max(0, liberaRigheExtra.filter(r => !r.isCapsule).length - 2));
   const _opS      = getOpTecnologicheAuto(_tipoTariffS);
   const _stuppS   = Math.min(3, liberaRigheExtra.filter(r => isStupefacente(r.nome)).length);
   const _dopS     = liberaRigheExtra.some(r => isDoping(r.nome)) ? 1 : 0;
@@ -3580,7 +3582,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 122;
+const APP_VERSION = 123;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
