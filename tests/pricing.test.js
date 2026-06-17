@@ -46,6 +46,14 @@ describe('ALLEGATO A — D.M. 22/09/2017', () => {
     expect(ALLEGATO_A['gomenolo']).toBe(ALLEGATO_A['niaouli essenza']);
   });
 
+  it('voci aggiunte v134 (valori D.M. 13/12/2017): menta foglie, poligala, sorbitolo 70%', () => {
+    expect(ALLEGATO_A['menta foglie']).toBe(0.037);        // corretta 2018 (era 11,061 €/kg)
+    expect(ALLEGATO_A['poligala radice']).toBe(0.062);
+    expect(ALLEGATO_A['poligala estratto fluido']).toBe(0.061);
+    expect(ALLEGATO_A['sorbitolo soluzione 70%']).toBe(0.021);
+    expect(ALLEGATO_A['sorbitolo']).toBe(0.026);           // "sorbitolo puro" invariato
+  });
+
   it('chiavi sono lowercase + senza accenti (richiesto da invGetPrezzo)', () => {
     for (const k of Object.keys(ALLEGATO_A)) {
       expect(k).toBe(k.toLowerCase());
