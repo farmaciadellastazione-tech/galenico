@@ -18,12 +18,12 @@ The git default may say `main`; verify with `git status` and switch with `git ch
 
 ## Run / build / test
 
-There is no build system, no package manager, no test suite. The entire app is one static file: `index.html` (~4,150 lines, vanilla JS inlined in `<script>`, CSS in `<style>`). To run:
+The app itself is a single static file `index.html` (~6,000 lines, vanilla JS inlined in `<script>`, CSS in `<style>`) — no bundler. The pricing/inventory **pure logic is extracted into `pricing.js`** (loaded via `<script src="pricing.js">` before the inline script, exposed on `globalThis`), so it can be unit-tested in Node. To run:
 
 - Open `index.html` directly in a browser, or serve the folder over any static HTTP server.
 - Deployment is automatic via GitHub Pages from `root`. A push is live within ~1 minute.
 
-Since there are no tests or linters, **manually verify in a browser** after any non-trivial edit: click through all seven pages, run a calculation in both `perc` and `libera` modes (and a capsule prep with both), generate a Scheda, and confirm the console has no errors.
+**There IS a test suite** (Vitest): `npm test` runs `tests/pricing.test.js` (pure pricing/Allegato A+B unit tests) and `tests/engines-consistency.test.js` (loads the real `index.html` inline script in a vm with a DOM stub and checks that Tariffazione and Scheda give the same total — the "motore unico" invariant). Run it after any pricing change. Still **manually verify in a browser** after non-trivial UI edits: click through all seven pages, run a `libera`-mode calculation for each form, generate a Scheda, confirm no console errors.
 
 ## Architecture
 
@@ -32,7 +32,7 @@ Seven pages live in one DOM, each `<div class="page" id="page-{name}">`, toggled
 No framework, no component model, no store. State lives in:
 
 - **DOM input IDs** — most communication between pages happens by writing into the target page's input fields and calling that page's render function.
-- **Module-level `let`s** at the top of `<script>`: `tipoPrep`, `modoPrepara`, `liberaRighe`, `liberaRigheExtra`, `prepComps`, `aiHistory`, `tipoScheda`, `tipoTariff`, `tarPADaAllegatoA`, `opTecnologicheDesc`, `_suppManRighe`.
+- **Module-level `let`s** at the top of `<script>`: `tipoPrep`, `liberaRighe`, `liberaRigheExtra`, `aiHistory`, `tipoScheda`, `tipoTariff`, `tarPADaAllegatoA`, `opTecnologicheDesc`, `_suppManRighe`. (The pure pricing constants/helpers — `ALLEGATO_A`, `ALLEGATO_B_VOCI`, `calcAllegatoB`, `calcCompAggiuntivi`, etc. — live in `pricing.js` on `globalThis`.)
 - **localStorage** under `gal_*` keys (see Persistence below).
 
 Re-rendering is manual: after mutating state, call the relevant function — `calcPrep()`, `calcTariff()`, `aggiornaScheda()`, `invRender()`, `archivioRender()`, `etiqAggiorna()`, `ordiniRender()`. Some inputs already have `oninput=...` that chain these together.
@@ -41,11 +41,11 @@ Re-rendering is manual: after mutating state, call the relevant function — `ca
 
 `sincronizzaTariffazione()` is the explicit bridge from Preparazione to Tariffazione: it propagates the PA name and price (Allegato A / inventario lookup), the prep type (`tipoPrep → tipoTariff` via a `mapTipo` table), quantity, concentration, and toggles tariffazione UI for `libera` mode. Most preparazione inputs call it on change. If you add a new field that should affect pricing, write into both places or pipe it through here.
 
-### Two preparation modes
+### Preparation mode (libera)
 
-`modoPrepara` is `'perc'` (concentration-based, single PA + optional extras) or `'libera'` (free-form: user adds N rows of substances, each with its own name search and price). `calcPrep()` branches on this — the `libera` mode propagates the first ingredient back into `prep-pa-nome` / `t-pa-nome` so tariffazione still works, and computes cost from `liberaRigheExtra` instead of the perc-mode `extra` array. Don't unify these branches casually; they have different UI affordances and different cost roll-ups.
+There is now a SINGLE preparation mode, **"formula libera"**: the user adds N rows of substances (`liberaRighe`), each with its own name search, quantity, unit and price. The old `'perc'` (concentration-based) mode and its dead code (`modoPrepara`, `prepComps`, `setModoPrepara`, the `extra` array) were removed in the v46–v51 refactor. `calcPrep()` computes everything from `liberaRighe` / `liberaRigheExtra`; it still propagates the first/PA ingredient into `prep-pa-nome` / `t-pa-nome` so tariffazione works.
 
-`tipoPrep` is the form (`soluzione | sospensione | unguento | polvere | capsule`). `tipoTariff` is the tariffazione-side equivalent (`liquida | sospensione | semisolida | polvere | capsule`). They're mapped, not identical.
+`tipoPrep` is the form (`soluzione | tintura | sospensione | unguento | polvere | capsule | cartine`). `tipoTariff` is the tariffazione-side equivalent (`liquida | tintura | sospensione | semisolida | polvere | capsule | cartine`). They're mapped (`mapTipo`), not identical. `tintura` (Estratti/tinture, Allegato B voce 2 €8,00) behaves as a liquid solution but with its own voce.
 
 ### Pricing engine (legal)
 
@@ -86,7 +86,7 @@ Renders two Dymo labels (32×57 mm, format S0722540) and prints via the local **
 
 ## Conventions and gotchas
 
-- **`APP_VERSION`** is a manual integer (around line 3192). Bump it when you ship a user-visible change; the colored header badge is keyed off it (`VER_COLORS` cycles every 8). Treat this as the user's release marker. Confirm in the browser that the badge updated.
+- **`APP_VERSION`** is a manual integer in `index.html` (currently 137, near line 3720 — grep `const APP_VERSION`). Bump it when you ship a user-visible change; the colored header badge is keyed off it (`VER_COLORS` cycles every 8). Treat this as the user's release marker. Confirm in the browser that the badge updated.
 - **Italian decimals**: `fmt()` outputs `,` as decimal separator. `parseFloat` accepts only `.`. Inputs that round-trip through `fmt()` need conversion on read. Don't introduce `toLocaleString` without checking.
 - **Substance name matching** is fuzzy via `invNominalizza()` (lowercase + trim). Allegato A keys are lowercase. Normalize on both sides when adding lookups. `invGetPrezzo()` is the canonical lookup — it returns `{prezzo, fonte}` where `fonte` is `'allegatoA' | 'inv' | null`; respect the precedence (Allegato A wins).
 - **Densities** are a small hardcoded `DENSITA` map used to convert g↔ml and to detect liquids; etanolo is 0.807.
