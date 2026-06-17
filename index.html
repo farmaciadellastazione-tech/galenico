@@ -1960,6 +1960,19 @@ function liberaCalcTotale() {
 
 
 function calcPrep() {
+  // Capsule mono-sostanza (es. carbone, argilla, probiotici): se c'è UNA sola
+  // sostanza con quantità vuota/0, è la sostanza stessa a riempire la capsula →
+  // imposta la qty alla capacità della taglia così viene dosata e tariffata
+  // (altrimenti PA=0 e la capsula viene riempita con un "Eccipiente" fantasma).
+  if (tipoPrep === 'capsule') {
+    const _named = liberaRighe.filter(r => (r.nome || '').trim() !== '');
+    if (_named.length === 1 && (parseFloat(_named[0].qty) || 0) === 0) {
+      const _tg = parseInt(document.getElementById('caps-taglia-lib')?.value || '0') || 0;
+      const _cap = ({0:500, 1:400, 2:300, 3:210, 4:150})[_tg] || 500;
+      _named[0].qty = String(_cap);
+      _named[0].unit = 'mg';
+    }
+  }
   liberaRenderRighe();
   const {totG, paG, conc: concCalc, ingr, volMl} = liberaCalcTotale();
   const concDich = parseFloat(document.getElementById('libera-conc')?.value)||0;
@@ -2100,6 +2113,13 @@ function calcPrep() {
       if (grPATot > 0 && nCaps > 0) items.push({name:'PA totale', val:fmt(grPATot, 2), unit:'g'});
       if (prezCps > 0) items.push({name:nomeCps+' (al costo, escluse dal peso)', val:'€'+fmt(costoCps,2), unit:''});
       if (mgCps > capVol * 1.05) items.push({name:'⚠ Supera capacità taglia '+taglia, val:fmt(capVol,0), unit:'mg max'});
+      // Avviso dose mancante: una o più sostanze NOMINATE senza quantità per capsula
+      // (non verrebbero tariffate). Il caso mono-sostanza è già auto-riempito in cima a
+      // calcPrep; se TUTTE sono a 0, formula-grid mostra già il messaggio "aggiungi quantità".
+      // NB: usare liberaRighe (non ingr): liberaGetIngr filtra via le righe senza qty.
+      const _undosed = liberaRighe.filter(r => (r.nome||'').trim() !== '' && (parseFloat(r.qty)||0) === 0);
+      if (_undosed.length > 0)
+        items.push({name:'⚠ Senza quantità/capsula (non tariffate): ' + _undosed.map(r=>r.nome).join(', '), val:'dose mancante', unit:''});
       // Procedura: pesate totali (× nCaps rispetto al per-capsula inserito)
       const pesateCps = nCaps > 0
         ? ingr.map(r => {
@@ -3697,7 +3717,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 136;
+const APP_VERSION = 137;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).

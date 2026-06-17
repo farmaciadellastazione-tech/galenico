@@ -180,6 +180,19 @@ describe('Tariffazione ↔ Scheda: stesso prezzo (motore unico)', () => {
     expect(r.comp).toBe('1');               // 2 sostanze − 1 incluso (cartine = voce 6, "fino a 1 componente")
   });
 
+  it('Capsule mono-sostanza (carbone) senza dose: auto-riempie la taglia e tariffa', () => {
+    const r = H.run(
+      { prep:'capsule', tariff:'capsule', scheda:'capsule' },
+      [ {nome:'Carbone vegetale attivato', qty:'', unit:'mg', isPa:true} ],
+      { 'caps-ncaps-lib':'30', 'caps-taglia-lib':'0',
+        'caps-vuote-prezzo':'0.045', 'caps-vuote-nome':'Capsule gelatina dura taglia 0' });
+    // Una sola sostanza senza dose → riempie la capsula (taglia 0 = 500 mg), così viene tariffata.
+    expect(H.ctx.liberaRighe[0].qty).toBe('500');
+    expect(H.byId('mg-pa-cps').value).toBe('500,00');
+    expect(r.sch).toBeCloseTo(r.tar, 2);   // motore unico
+    expect(r.tar).toBeGreaterThan(0);
+  });
+
   it('Capsule — recupero da archivio: Riapri ripristina la preparazione', () => {
     // 1. Prepara e salva in archivio una preparazione in capsule.
     const orig = H.run(
