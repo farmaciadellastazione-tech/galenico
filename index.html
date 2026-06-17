@@ -641,7 +641,7 @@
       <button class="seg-btn" onclick="setTipoScheda('sospensione',this)">Sospensione</button>
     </div>
     <div class="card-title">Dati della preparazione</div>
-    <div class="field-row"><span class="field-label">N° scheda</span><input type="text" id="s-num" value="" oninput="aggiornaScheda()" style="width:120px;"></div>
+    <div class="field-row"><span class="field-label">N° scheda</span><input type="text" id="s-num" value="" oninput="aggiornaScheda()" title="Modificabile: scrivi il numero che vuoi assegnare a questa scheda (es. 2026/015). Al salvataggio la numerazione proseguirà da lì." style="width:120px;"><span id="s-num-hint" class="field-hint" style="font-size:11px;color:var(--text-faint,#999);margin-left:8px">modificabile — i successivi proseguono da qui</span></div>
     <div class="field-row"><span class="field-label">Preparazione</span><input type="text" id="s-prep" value="" oninput="aggiornaScheda()"></div>
     <!-- campi soluzione/sospensione/unguento/polvere -->
     <div id="s-row-qt-ml"><div class="field-row"><span class="field-label" id="s-lbl-qt">Quantità (ml)</span><input type="number" id="s-qt" value="" min="10" oninput="aggiornaScheda()"></div></div>
@@ -3550,6 +3550,25 @@ function peekNextNumScheda() {
   return anno + '/' + String(n).padStart(3, '0');
 }
 
+function peekNextNumPreventivo() {
+  const anno = new Date().getFullYear();
+  const key = 'gal_scheda_counter_preventivo_' + anno;
+  const n = (parseInt(localStorage.getItem(key) || '0') || 0) + 1;
+  return 'PREV-' + anno + '/' + String(n).padStart(3, '0');
+}
+
+// Estrae {anno, n} da un numero scheda digitato a mano. Accetta i formati usati
+// dall'app ("2026/015", "PREV-2026/015") e abbreviazioni ("15", "2026-15").
+// Ritorna null se non c'è alcun numero riconoscibile.
+function parseNumScheda(str) {
+  if (!str) return null;
+  const m = String(str).match(/(\d{4})\s*[\/\-]\s*(\d+)/);
+  if (m) return { anno: parseInt(m[1], 10), n: parseInt(m[2], 10) };
+  const m2 = String(str).match(/(\d+)/);
+  if (m2) return { anno: new Date().getFullYear(), n: parseInt(m2[1], 10) };
+  return null;
+}
+
 (function initNumScheda() {
   const el = document.getElementById('s-num');
   if (el) el.value = peekNextNumScheda();
@@ -3669,7 +3688,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 130;
+const APP_VERSION = 131;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
@@ -3702,14 +3721,7 @@ function togglePreventivo() {
 function refreshSchedaNumDisplay() {
   const el = document.getElementById('s-num');
   if (!el) return;
-  const anno = new Date().getFullYear();
-  if (modPreventivo) {
-    const key = 'gal_scheda_counter_preventivo_' + anno;
-    const n = (parseInt(localStorage.getItem(key) || '0')||0) + 1;
-    el.value = 'PREV-' + anno + '/' + String(n).padStart(3, '0');
-  } else {
-    el.value = peekNextNumScheda();
-  }
+  el.value = modPreventivo ? peekNextNumPreventivo() : peekNextNumScheda();
 }
 
 const VER_COLORS = [
@@ -5346,6 +5358,8 @@ function setEditingMode(id) {
   // (richiederebbe risincronizzare il counter per evitare collisioni).
   const sNum = document.getElementById('s-num');
   if (sNum) sNum.readOnly = (id != null);
+  const sNumHint = document.getElementById('s-num-hint');
+  if (sNumHint) sNumHint.style.display = (id != null) ? 'none' : '';
 }
 
 function salvaInArchivio() {
@@ -5363,8 +5377,25 @@ function salvaInArchivio() {
   }
 
   // In modifica: num e flag preventivo vengono dalla scheda originale (no counter touch).
-  // In creazione: pesca il prossimo numero dal counter giusto (incrementa).
-  const nuovoNum = orig ? orig.num : (modPreventivo ? getNextNumPreventivo() : getNextNumScheda());
+  // In creazione: se l'utente ha digitato un numero diverso da quello auto-suggerito,
+  // lo rispettiamo e riallineamo il contatore (= ultimo numero assegnato) così i
+  // successivi proseguono da lì. Altrimenti pesca il prossimo dal contatore (incrementa).
+  let nuovoNum;
+  if (orig) {
+    nuovoNum = orig.num;
+  } else {
+    const isPrev = modPreventivo || false;
+    const digitato = (document.getElementById('s-num').value || '').trim();
+    const suggerito = isPrev ? peekNextNumPreventivo() : peekNextNumScheda();
+    const p = (digitato && digitato !== suggerito) ? parseNumScheda(digitato) : null;
+    if (p) {
+      const key = (isPrev ? 'gal_scheda_counter_preventivo_' : 'gal_scheda_counter_') + p.anno;
+      localStorage.setItem(key, p.n);
+      nuovoNum = (isPrev ? 'PREV-' : '') + p.anno + '/' + String(p.n).padStart(3, '0');
+    } else {
+      nuovoNum = isPrev ? getNextNumPreventivo() : getNextNumScheda();
+    }
+  }
   document.getElementById('s-num').value = nuovoNum;
 
   const scheda = {
