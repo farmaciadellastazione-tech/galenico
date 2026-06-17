@@ -433,6 +433,26 @@ const ART_8_PER_UNIT = 2.50;
 // Art. 5 — i componenti aggiuntivi sono pagati al massimo 4.
 const COMP_MAX = 4;
 
+// Componenti "inclusi" nella voce base per forma (D.M. 22/09/2017, Cap. 8):
+// capsule e cartine = 1 componente incluso; tutte le altre forme = 2.
+// I componenti aggiuntivi (Art. 5) = n° ingredienti − inclusi, clamp [0, COMP_MAX].
+// Si contano TUTTI gli ingredienti (principio o diluente che sia); le capsule
+// vuote sono un contenitore (escluse a monte dal chiamante).
+const COMP_INCLUSI = Object.freeze({
+  liquida: 2, sospensione: 2, semisolida: 2, polvere: 2,
+  capsule: 1, cartine: 1,
+});
+
+// Soglia di componenti inclusi per la forma; default 2 se forma sconosciuta.
+function getCompInclusi(tipoTariff) {
+  return COMP_INCLUSI[tipoTariff] != null ? COMP_INCLUSI[tipoTariff] : 2;
+}
+
+// Componenti aggiuntivi (Art. 5) per una forma dato il n° di ingredienti.
+function calcCompAggiuntivi(nIngredienti, tipoTariff) {
+  return Math.min(COMP_MAX, Math.max(0, (nIngredienti || 0) - getCompInclusi(tipoTariff)));
+}
+
 // Voci Allegato B per forme liquide/semisolide/polveri (no pezzi):
 //   voce 1 — Soluzioni: base €6,65, no scaglioni volume, comp.extra €0,80.
 //   voce 3 — Emulsioni/sospensioni: €13,30/250 ml, +€0,70 ogni 100 ml extra, comp.extra €0,70.
@@ -515,6 +535,7 @@ const _exports = {
   ALLEGATO_A, DENSITA, INV_HARDCODED, INV_OBBLIGATORIE,
   STUPEFACENTI, DOPING, OP_TECNOLOGICHE_AUTO,
   ALLEGATO_B_VOCI, IVA_RATE, ART_7_INCREMENTO, ART_8_PER_UNIT, COMP_MAX, OP_TECNOLOGICA_COSTO,
+  COMP_INCLUSI, getCompInclusi, calcCompAggiuntivi,
   fmt, invNominalizza, invMatchScore, hasHazard, getDensita, tarNormalizza, tarCercaPA,
   isStupefacente, isDoping, getOpTecnologicheAuto,
   invFindBest, getHDaInventario, rigaHazardous, invGetPrezzo,

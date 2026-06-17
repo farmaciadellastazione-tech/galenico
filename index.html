@@ -598,7 +598,7 @@
 
   <div class="card">
     <div class="card-title">Operazioni e supplementi</div>
-    <div class="field-row"><span class="field-label">Componenti aggiuntivi</span><input type="number" id="t-comp" value="0" step="1" min="0" max="4" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto: n° sostanze − 2 (max 4)</span></div>
+    <div class="field-row"><span class="field-label">Componenti aggiuntivi</span><input type="number" id="t-comp" value="0" step="1" min="0" max="4" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto: n° ingredienti − inclusi (2; capsule/cartine 1) — max 4</span></div>
     <div class="field-row"><span class="field-label">Op. tecnologiche aggiuntive</span><input type="number" id="t-op" value="0" step="1" min="0" max="10" oninput="opOnManualEdit(this.value)" style="background:var(--bg);width:64px"><button type="button" onclick="opRipristinaAuto()" title="Ripristina il valore automatico" style="margin-left:6px;font-size:11px;padding:2px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer;color:var(--text-faint)">↺ auto</button><span class="field-note">modificabile — ×€2,30 cad.</span></div>
     <div class="field-row"><span class="field-label">Supplemento stupefacenti (Art. 8b)</span><input type="number" id="t-stupp" value="0" step="1" min="0" max="3" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto da formula (×€2,50 cad.)</span></div>
     <div class="field-row"><span class="field-label">Supplemento doping (Art. 8c)</span><input type="number" id="t-dop" value="0" step="1" min="0" max="1" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto da formula (×€2,50)</span></div>
@@ -2427,13 +2427,14 @@ function sincronizzaTariffazione() {
     if (document.getElementById('t-qt'))   document.getElementById('t-qt').value   = document.getElementById('qt').value;
     if (document.getElementById('t-conc')) document.getElementById('t-conc').value = document.getElementById('conc').value;
   }
-  // Componenti aggiuntivi (Art. 5) — regola pratica: totale sostanze meno 2, clamp a COMP_MAX.
-  // Non serve distinguere PA/solvente/eccipiente: si conta il numero di ingredienti e si
-  // sottrae 2 (le capsule vuote sono un contenitore, non una sostanza → escluse dal totale).
+  // Componenti aggiuntivi (Art. 5) — n° ingredienti meno i componenti inclusi nella
+  // voce base (2 per liquidi/sospensioni/semisolide/polveri, 1 per capsule/cartine).
+  // Non serve distinguere PA/solvente/eccipiente: si conta ogni ingrediente; le capsule
+  // vuote sono un contenitore, non una sostanza → escluse dal totale.
   const _compEl = document.getElementById('t-comp');
   if (_compEl) {
     const _totSost = liberaRigheExtra.filter(r => !r.isCapsule).length;
-    _compEl.value = Math.min(COMP_MAX, Math.max(0, _totSost - 2));
+    _compEl.value = calcCompAggiuntivi(_totSost, tipoTariff);
   }
   // Op. tecnologiche aggiuntive (Art. 6/7) — valore effettivo (auto-default o override manuale).
   const _opEl = document.getElementById('t-op');
@@ -3322,8 +3323,9 @@ function aggiornaScheda() {
 
   const _mapTipoS    = {soluzione:'liquida', sospensione:'sospensione', unguento:'semisolida', polvere:'polvere', capsule:'capsule', cartine:'cartine'};
   const _tipoTariffS = _mapTipoS[tipoScheda] || 'liquida';
-  // Art. 5 — regola pratica: totale sostanze meno 2 (capsule vuote = contenitore, escluse), clamp a COMP_MAX.
-  const _compS    = Math.min(COMP_MAX, Math.max(0, liberaRigheExtra.filter(r => !r.isCapsule).length - 2));
+  // Art. 5 — n° ingredienti meno i componenti inclusi nella voce base della forma
+  // (2 liquidi/sospensioni/semisolide/polveri, 1 capsule/cartine). Capsule vuote = contenitore, escluse.
+  const _compS    = calcCompAggiuntivi(liberaRigheExtra.filter(r => !r.isCapsule).length, _tipoTariffS);
   const _opS      = getOpEffettivo(_tipoTariffS);
   const _stuppS   = Math.min(3, liberaRigheExtra.filter(r => isStupefacente(r.nome)).length);
   const _dopS     = liberaRigheExtra.some(r => isDoping(r.nome)) ? 1 : 0;
@@ -3688,7 +3690,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 131;
+const APP_VERSION = 132;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).

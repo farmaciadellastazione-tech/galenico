@@ -138,7 +138,7 @@ describe('Tariffazione ↔ Scheda: stesso prezzo (motore unico)', () => {
       { 't-fl':'0', 'caps-vuote-prezzo':'0.045', 'caps-vuote-nome':'Capsule gelatina dura taglia 0',
         'n-caps':'30', 'mg-pa-cps':'10', 'caps-taglia-lib':'0', 'caps-ncaps-lib':'30' });
     expect(r.sch).toBeCloseTo(r.tar, 2);
-    expect(r.comp).toBe('0');               // 2 sostanze − 2
+    expect(r.comp).toBe('1');               // 2 sostanze − 1 incluso (capsule = voce 7, "fino a 1 componente")
     expect(r.op).toBe('2');                 // setacciatura + polverizzazione (Clobazam cristallino) auto
   });
 
@@ -165,7 +165,7 @@ describe('Tariffazione ↔ Scheda: stesso prezzo (motore unico)', () => {
       { 't-fl':'0', 'cart-ncart-lib':'20' });
     expect(r.sch).toBeCloseTo(r.tar, 2);
     expect(r.op).toBe('2');                 // setacciatura + polverizzazione (Paracetamolo cristallino) auto
-    expect(r.comp).toBe('0');               // 2 sostanze − 2
+    expect(r.comp).toBe('1');               // 2 sostanze − 1 incluso (cartine = voce 6, "fino a 1 componente")
   });
 
   it('Capsule — recupero da archivio: Riapri ripristina la preparazione', () => {

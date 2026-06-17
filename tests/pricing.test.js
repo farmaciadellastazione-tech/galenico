@@ -3,6 +3,7 @@ import {
   ALLEGATO_A, DENSITA, INV_HARDCODED, INV_OBBLIGATORIE,
   STUPEFACENTI, DOPING, OP_TECNOLOGICHE_AUTO,
   ALLEGATO_B_VOCI, IVA_RATE, ART_7_INCREMENTO, ART_8_PER_UNIT, COMP_MAX, OP_TECNOLOGICA_COSTO,
+  COMP_INCLUSI, getCompInclusi, calcCompAggiuntivi,
   fmt, invNominalizza, invMatchScore, hasHazard, getDensita, tarNormalizza, tarCercaPA,
   isStupefacente, isDoping, getOpTecnologicheAuto,
   invFindBest, getHDaInventario, rigaHazardous, invGetPrezzo,
@@ -517,6 +518,66 @@ describe('costanti pricing engine', () => {
     expect(ALLEGATO_B_VOCI.semisolida.compExtra).toBe(0.75);
     expect(ALLEGATO_B_VOCI.polvere.base).toBe(6.65);
     expect(ALLEGATO_B_VOCI.polvere.compExtra).toBe(0.75);
+  });
+});
+
+describe('componenti inclusi per forma — Tariffa nazionale Cap. 8 (verifica voce per voce)', () => {
+  // Soglia "fino a N componenti" letteralmente dalle voci della tariffa:
+  //   voce 1 liquide=2, voce 3 sospensioni=2, voce 4 semisolide=2, voce 5 polveri=2,
+  //   voce 6 cartine=1, voce 7 capsule=1.
+  it('liquida (voce 1) = 2 inclusi', () => {
+    expect(getCompInclusi('liquida')).toBe(2);
+  });
+  it('sospensione (voce 3) = 2 inclusi', () => {
+    expect(getCompInclusi('sospensione')).toBe(2);
+  });
+  it('semisolida (voce 4) = 2 inclusi', () => {
+    expect(getCompInclusi('semisolida')).toBe(2);
+  });
+  it('polvere (voce 5) = 2 inclusi', () => {
+    expect(getCompInclusi('polvere')).toBe(2);
+  });
+  it('cartine (voce 6) = 1 incluso', () => {
+    expect(getCompInclusi('cartine')).toBe(1);
+  });
+  it('capsule (voce 7) = 1 incluso', () => {
+    expect(getCompInclusi('capsule')).toBe(1);
+  });
+  it('forma sconosciuta → default 2 (rete di sicurezza, mai usata dalle 6 forme reali)', () => {
+    expect(getCompInclusi('inesistente')).toBe(2);
+    expect(getCompInclusi(undefined)).toBe(2);
+  });
+  it('COMP_INCLUSI copre tutte e 6 le forme', () => {
+    expect(Object.keys(COMP_INCLUSI).sort())
+      .toEqual(['capsule', 'cartine', 'liquida', 'polvere', 'semisolida', 'sospensione']);
+  });
+
+  describe('calcCompAggiuntivi — n° ingredienti meno inclusi, clamp [0, COMP_MAX]', () => {
+    it('soluzione 1 PA + acqua (2 ingredienti) → 0 aggiuntivi', () => {
+      expect(calcCompAggiuntivi(2, 'liquida')).toBe(0);
+    });
+    it('soluzione 1 PA + acqua + conservante (3) → 1 aggiuntivo', () => {
+      expect(calcCompAggiuntivi(3, 'liquida')).toBe(1);
+    });
+    it('capsula 1 PA + 1 diluente (2 ingredienti) → 1 aggiuntivo (soglia 1)', () => {
+      expect(calcCompAggiuntivi(2, 'capsule')).toBe(1);
+    });
+    it('capsula 1 solo ingrediente → 0 aggiuntivi', () => {
+      expect(calcCompAggiuntivi(1, 'capsule')).toBe(0);
+    });
+    it('cartina 1 PA + 1 eccipiente (2) → 1 aggiuntivo (soglia 1)', () => {
+      expect(calcCompAggiuntivi(2, 'cartine')).toBe(1);
+    });
+    it('cap a COMP_MAX=4 (capsula con 10 ingredienti → 4)', () => {
+      expect(calcCompAggiuntivi(10, 'capsule')).toBe(4);
+    });
+    it('cap a COMP_MAX=4 (soluzione con 10 ingredienti → 4)', () => {
+      expect(calcCompAggiuntivi(10, 'liquida')).toBe(4);
+    });
+    it('mai negativo (0 ingredienti)', () => {
+      expect(calcCompAggiuntivi(0, 'liquida')).toBe(0);
+      expect(calcCompAggiuntivi(0, 'capsule')).toBe(0);
+    });
   });
 });
 
