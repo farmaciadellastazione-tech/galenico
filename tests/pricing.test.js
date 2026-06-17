@@ -507,13 +507,15 @@ describe('costanti pricing engine', () => {
     expect(OP_TECNOLOGICA_COSTO).toBe(2.30);
   });
 
-  it('ALLEGATO_B_VOCI ha le 4 forme attese', () => {
-    expect(Object.keys(ALLEGATO_B_VOCI).sort()).toEqual(['liquida', 'polvere', 'semisolida', 'sospensione']);
+  it('ALLEGATO_B_VOCI ha le 5 forme senza-pezzi attese', () => {
+    expect(Object.keys(ALLEGATO_B_VOCI).sort()).toEqual(['liquida', 'polvere', 'semisolida', 'sospensione', 'tintura']);
   });
 
   it('ALLEGATO_B_VOCI valori pinned (D.M. 22/09/2017 GU 30-1-2018)', () => {
     expect(ALLEGATO_B_VOCI.liquida.base).toBe(6.65);
     expect(ALLEGATO_B_VOCI.liquida.compExtra).toBe(0.80);
+    expect(ALLEGATO_B_VOCI.tintura.base).toBe(8.00);     // voce 2 estratti/tinture
+    expect(ALLEGATO_B_VOCI.tintura.compExtra).toBe(0.80);
     expect(ALLEGATO_B_VOCI.sospensione.base).toBe(13.30);
     expect(ALLEGATO_B_VOCI.sospensione.rif).toBe(250);
     expect(ALLEGATO_B_VOCI.sospensione.stepPiu).toBe(100);
@@ -555,9 +557,16 @@ describe('componenti inclusi per forma — Tariffa nazionale Cap. 8 (verifica vo
     expect(getCompInclusi('inesistente')).toBe(2);
     expect(getCompInclusi(undefined)).toBe(2);
   });
-  it('COMP_INCLUSI copre tutte e 6 le forme', () => {
+  it('COMP_INCLUSI copre tutte le forme (incl. tintura)', () => {
     expect(Object.keys(COMP_INCLUSI).sort())
-      .toEqual(['capsule', 'cartine', 'liquida', 'polvere', 'semisolida', 'sospensione']);
+      .toEqual(['capsule', 'cartine', 'liquida', 'polvere', 'semisolida', 'sospensione', 'tintura']);
+  });
+  it('tintura (voce 2) = 2 inclusi, base €8,00, nessun tetto componenti', () => {
+    expect(getCompInclusi('tintura')).toBe(2);
+    expect(getCompMax('tintura')).toBe(Infinity);
+    const b = calcAllegatoB('tintura', 100, 1, 0);
+    expect(b.baseB).toBe(8.00);
+    expect(b.addComp).toBe(0.80);
   });
 
   describe('calcCompAggiuntivi — n° ingredienti meno inclusi, clamp [0, COMP_MAX]', () => {
@@ -1048,8 +1057,9 @@ describe('isDoping — supplemento Art. 8c automatico', () => {
 });
 
 describe('getOpTecnologicheAuto — Art. 7 derivato da tipoTariff', () => {
-  it('liquida e capsule = 0 (operazioni già coperte da Allegato B base)', () => {
+  it('liquida, tintura e capsule = 0 (operazioni già coperte da Allegato B base)', () => {
     expect(getOpTecnologicheAuto('liquida')).toBe(0);
+    expect(getOpTecnologicheAuto('tintura')).toBe(0);
     expect(getOpTecnologicheAuto('capsule')).toBe(0);
   });
 

@@ -279,6 +279,7 @@ const DOPING = Object.freeze([
 // polverizzazione/setacciatura (polvere/cartine). Liquida e capsule = 0.
 const OP_TECNOLOGICHE_AUTO = Object.freeze({
   liquida: 0,
+  tintura: 0,
   sospensione: 1,
   semisolida: 1,
   polvere: 1,
@@ -443,7 +444,7 @@ const COMP_MAX = 4;
 // Si contano TUTTI gli ingredienti (principio o diluente che sia); le capsule
 // vuote sono un contenitore (escluse a monte dal chiamante).
 const COMP_INCLUSI = Object.freeze({
-  liquida: 2, sospensione: 2, semisolida: 2, polvere: 2,
+  liquida: 2, tintura: 2, sospensione: 2, semisolida: 2, polvere: 2,
   capsule: 1, cartine: 1,
 });
 
@@ -472,6 +473,7 @@ function calcCompAggiuntivi(nIngredienti, tipoTariff) {
 //   voce 5 — Polveri: base €6,65, no scaglioni, comp.extra €0,75.
 const ALLEGATO_B_VOCI = Object.freeze({
   liquida:    { base: 6.65,  rif: null, stepPiu: null, costPiu: 0,    unitLabel: 'ml', compExtra: 0.80, voce: 'Soluzioni (voce 1)' },
+  tintura:    { base: 8.00,  rif: null, stepPiu: null, costPiu: 0,    unitLabel: 'ml', compExtra: 0.80, voce: 'Estratti liquidi e tinture (voce 2)' },
   sospensione:{ base: 13.30, rif: 250,  stepPiu: 100,  costPiu: 0.70, unitLabel: 'ml', compExtra: 0.70, voce: 'Emulsioni/sospensioni (voce 3)' },
   semisolida: { base: 13.30, rif: 50,   stepPiu: 50,   costPiu: 0.75, unitLabel: 'g',  compExtra: 0.75, voce: 'Preparazioni semisolide (voce 4)' },
   polvere:    { base: 6.65,  rif: null, stepPiu: null, costPiu: 0,    unitLabel: 'g',  compExtra: 0.75, voce: 'Polveri (voce 5)' },

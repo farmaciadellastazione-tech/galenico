@@ -371,6 +371,7 @@
       <button class="seg-btn" onclick="setTipo('cartine',this)">Cartine</button>
       <button class="seg-btn" onclick="setTipo('polvere',this)">Polvere</button>
       <button class="seg-btn" onclick="setTipo('sospensione',this)">Sospensione</button>
+      <button class="seg-btn" onclick="setTipo('tintura',this)">Tintura / Estratto</button>
     </div>
   </div>
 
@@ -512,6 +513,7 @@
       <button class="seg-btn" onclick="setTipoTariff('polvere',this)">Polvere</button>
       <button class="seg-btn" onclick="setTipoTariff('capsule',this)">Capsule</button>
       <button class="seg-btn" onclick="setTipoTariff('cartine',this)">Cartine</button>
+      <button class="seg-btn" onclick="setTipoTariff('tintura',this)">Tintura / Estratto</button>
     </div>
 
     <!-- campi per liquida -->
@@ -639,6 +641,7 @@
       <button class="seg-btn" onclick="setTipoScheda('cartine',this)">Cartine</button>
       <button class="seg-btn" onclick="setTipoScheda('polvere',this)">Polvere</button>
       <button class="seg-btn" onclick="setTipoScheda('sospensione',this)">Sospensione</button>
+      <button class="seg-btn" onclick="setTipoScheda('tintura',this)">Tintura / Estratto</button>
     </div>
     <div class="card-title">Dati della preparazione</div>
     <div class="field-row"><span class="field-label">N° scheda</span><input type="text" id="s-num" value="" oninput="aggiornaScheda()" title="Modificabile: scrivi il numero che vuoi assegnare a questa scheda (es. 2026/015). Al salvataggio la numerazione proseguirà da lì." style="width:120px;"><span id="s-num-hint" class="field-hint" style="font-size:11px;color:var(--text-faint,#999);margin-left:8px">modificabile — i successivi proseguono da qui</span></div>
@@ -1150,12 +1153,12 @@ function setTipo(t, btn) {
   // Toggle p/p · p/v: visibile solo per soluzione/sospensione (per gli altri tipi
   // la concentrazione è sempre p/p — il toggle non avrebbe effetto).
   const concModeSel = document.getElementById('libera-conc-mode');
-  if (concModeSel) concModeSel.style.display = (t === 'soluzione' || t === 'sospensione') ? '' : 'none';
+  if (concModeSel) concModeSel.style.display = (t === 'soluzione' || t === 'tintura' || t === 'sospensione') ? '' : 'none';
   // Alert uso: specifico per tipo
   const alertUsoPre = document.getElementById('alert-uso-prep-testo');
   if (alertUsoPre) {
     if (t === 'capsule' || t === 'cartine' || t === 'polvere') alertUsoPre.textContent = 'Verificare compatibilità con FU XII. Capsule/cartine/polveri per USO ORALE — etichettare con posologia e scadenza.';
-    else if (t === 'soluzione' || t === 'sospensione') alertUsoPre.textContent = 'Verificare compatibilità con FU XII. Etichettare con USO ESTERNO o ORALE secondo prescrizione. Conservare al riparo dalla luce.';
+    else if (t === 'soluzione' || t === 'tintura' || t === 'sospensione') alertUsoPre.textContent = 'Verificare compatibilità con FU XII. Etichettare con USO ESTERNO o ORALE secondo prescrizione. Conservare al riparo dalla luce.';
     else alertUsoPre.textContent = 'Verificare compatibilità con FU XII. Etichettare USO ESTERNO. Conservazione al riparo dalla luce, T° ambiente.';
   }
   // Modalità unica: nessun auto-switch.
@@ -1163,7 +1166,7 @@ function setTipo(t, btn) {
   const totUnitSel = document.getElementById('totale-prep-unit');
   const totUnitFix = document.getElementById('totale-prep-unit-fixed');
   if (totUnitSel && totUnitFix) {
-    if (t === 'soluzione') {
+    if (t === 'soluzione' || t === 'tintura') {
       totUnitSel.style.display = '';
       totUnitFix.style.display = 'none';
     } else {
@@ -1174,9 +1177,9 @@ function setTipo(t, btn) {
     }
     // Nota: per cartine il "totale" rappresenta la massa complessiva di polvere divisa
   }
-  // Grado alcolico: visibile solo per soluzione
+  // Grado alcolico: visibile per soluzione e tintura (idroalcolica)
   const rowGrado = document.getElementById('row-grado-alc');
-  if (rowGrado) rowGrado.style.display = (t === 'soluzione') ? '' : 'none';
+  if (rowGrado) rowGrado.style.display = (t === 'soluzione' || t === 'tintura') ? '' : 'none';
   // In tutti i casi: l'utente può sempre cliccare manualmente l'altro modo
   // Auto-popola capsule vuote se l'utente entra in modalità capsule e il prezzo è ancora 0
   // (es. dopo un reset). Il select disabilitato per taglia unica non scatena onchange.
@@ -1256,6 +1259,7 @@ function addMesi(s, mesi) {
 // Conservativi: ginocchio tra preparazioni acquose (poco stabili) e solide (molto stabili).
 const MAX_VALIDITA_FU = {
   soluzione: 6,    // soluzioni idroalcoliche/oleose; acquose pure andrebbero a 14gg ma usiamo il caso comune
+  tintura: 6,      // estratti liquidi e tinture (idroalcoliche): come soluzione
   sospensione: 1,  // sospensioni: 14-30gg, conservativo 1 mese
   unguento: 2,     // unguenti/creme: 30-60gg
   polvere: 6,
@@ -1553,9 +1557,9 @@ function liberaRenderRighe() {
   if (rowTot) rowTot.style.display = anyPercent ? '' : 'none';
   // Grado alcolico + Volume soluzione: visibili per soluzione (sempre)
   const rowGrado = document.getElementById('row-grado-alc');
-  if (rowGrado) rowGrado.style.display = (tipoPrep === 'soluzione') ? '' : 'none';
+  if (rowGrado) rowGrado.style.display = (tipoPrep === 'soluzione' || tipoPrep === 'tintura') ? '' : 'none';
   const rowVol = document.getElementById('row-vol-soluzione');
-  if (rowVol) rowVol.style.display = (tipoPrep === 'soluzione') ? '' : 'none';
+  if (rowVol) rowVol.style.display = (tipoPrep === 'soluzione' || tipoPrep === 'tintura') ? '' : 'none';
   const container = document.getElementById('libera-righe');
   if (!container) return;
   // Non rifare il DOM se ci sono campi con focus — aggiorna solo i valori visualizzati
@@ -1748,7 +1752,7 @@ function aggiornaTotaleDerived() {
   const derivedEl = document.getElementById('totale-prep-derived');
   const gradoEl = document.getElementById('grado-alc');
   if (!derivedEl) return;
-  if (tipoPrep !== 'soluzione') {
+  if (tipoPrep !== 'soluzione' && tipoPrep !== 'tintura') {
     derivedEl.textContent = '';
     if (gradoEl && document.activeElement !== gradoEl) gradoEl.value = '';
     return;
@@ -1929,7 +1933,7 @@ function liberaCalcTotale() {
   // localStorage): 'pp' = g PA / 100 g preparato; 'pv' = g PA / 100 ml soluzione.
   // Default 'pp'. La modalità 'pv' è disponibile solo per soluzioni/sospensioni
   // (richiede un volume calcolabile dai liquidi della formula).
-  const isLiquidForm = tipoPrep === 'soluzione' || tipoPrep === 'sospensione';
+  const isLiquidForm = tipoPrep === 'soluzione' || tipoPrep === 'tintura' || tipoPrep === 'sospensione';
   const volMl = isLiquidForm && typeof liberaSommaVolumeLiquidi === 'function'
     ? liberaSommaVolumeLiquidi() : 0;
   let conc;
@@ -2009,7 +2013,7 @@ function calcPrep() {
         'Trasferire nel recipiente. Chiudere ed etichettare con nome, concentrazione, data e scadenza.',
       ];
 
-    } else if (tipoPrep === 'soluzione') {
+    } else if (tipoPrep === 'soluzione' || tipoPrep === 'tintura') {
       // Filtrazione: la indichiamo in procedura quando il PA è cristallino / conc elevata,
       // ma NON la conteggiamo di default tra le op. tecnologiche (scelta utente, v129):
       // se viene eseguita e si vuole tariffare, si alza a mano il campo Op. tecnologiche.
@@ -2233,7 +2237,7 @@ function calcPrep() {
     // Per soluzioni/sospensioni: qt nascosta = volume in ml (così Tariffazione e Scheda
     // ricevono la quantità nella stessa unità del label "Quantità totale (ml)").
     // Per altre forme: qt = grammi totali come prima.
-    const _isLiquidForm = tipoPrep === 'soluzione' || tipoPrep === 'sospensione';
+    const _isLiquidForm = tipoPrep === 'soluzione' || tipoPrep === 'tintura' || tipoPrep === 'sospensione';
     const _qtBase = _isLiquidForm && volMl > 0 ? volMl : totG;
     if (document.getElementById('qt'))   document.getElementById('qt').value   = fmt(_qtBase * _perUnitFactor, 2);
     if (document.getElementById('conc')) document.getElementById('conc').value = fmt(conc, 2); // ora vera % p/v per soluzioni
@@ -2332,7 +2336,7 @@ function calcPrep() {
     }
 
     // Sincronizza tipoTariff con tipoPrep
-    const _mapTT = {soluzione:'liquida', sospensione:'sospensione', unguento:'semisolida', polvere:'polvere', capsule:'capsule', cartine:'cartine'};
+    const _mapTT = {soluzione:'liquida', tintura:'tintura', sospensione:'sospensione', unguento:'semisolida', polvere:'polvere', capsule:'capsule', cartine:'cartine'};
     const _tipoTariffAtteso = _mapTT[tipoPrep] || 'liquida';
     if (tipoTariff !== _tipoTariffAtteso) {
       const _tarBtns = document.querySelectorAll('#page-tariffazione .seg-btn');
@@ -2406,10 +2410,10 @@ function sincronizzaTariffazione() {
       if (document.getElementById('t-pa-nome')) document.getElementById('t-pa-nome').value = nomePA;
     }
   }
-  const mapTipo = {soluzione:'liquida', unguento:'semisolida', capsule:'capsule', cartine:'cartine', polvere:'polvere', sospensione:'sospensione'};
+  const mapTipo = {soluzione:'liquida', tintura:'tintura', unguento:'semisolida', capsule:'capsule', cartine:'cartine', polvere:'polvere', sospensione:'sospensione'};
   if (mapTipo[tipoPrep] && mapTipo[tipoPrep] !== tipoTariff) {
     const tarBtns = document.querySelectorAll('#page-tariffazione .seg-btn');
-    const mapIdx  = {liquida:0, sospensione:1, semisolida:2, polvere:3, capsule:4, cartine:5};
+    const mapIdx  = {liquida:0, sospensione:1, semisolida:2, polvere:3, capsule:4, cartine:5, tintura:6};
     setTipoTariff(mapTipo[tipoPrep], tarBtns[mapIdx[mapTipo[tipoPrep]]]);
   }
   // Ponte verso i campi della Tariffazione per i pannelli specifici (capsule, cartine)
@@ -2466,14 +2470,15 @@ function setTipoTariff(t, btn) {
   const ttCartine = document.getElementById('tt-cartine');
   if (ttCartine) ttCartine.style.display = t === 'cartine' ? '' : 'none';
   const qtLabel = document.querySelector('#tt-liquida .field-label');
-  if (qtLabel) qtLabel.textContent = (t === 'liquida' || t === 'sospensione') ? 'Quantità totale (ml)' : 'Quantità totale (g)';
+  if (qtLabel) qtLabel.textContent = (t === 'liquida' || t === 'tintura' || t === 'sospensione') ? 'Quantità totale (ml)' : 'Quantità totale (g)';
   const refMap = {
     liquida:     'Rif.: D.M. 22/09/2017 e s.m.i. All. B voce 1 — Soluzioni €6,65 (comp.extra €0,80)',
+    tintura:     'Rif.: D.M. 22/09/2017 e s.m.i. All. B voce 2 — Estratti liquidi e tinture €8,00 (comp.extra €0,80)',
     sospensione: 'Rif.: D.M. 22/09/2017 e s.m.i. All. B voce 3 — Emulsioni/sospensioni €13,30/250ml (+€0,70/100ml, comp.extra €0,70)',
     semisolida:  'Rif.: D.M. 22/09/2017 e s.m.i. All. B voce 4 — Semisolide €13,30/50g (+€0,75/50g, comp.extra €0,75)',
     polvere:     'Rif.: D.M. 22/09/2017 e s.m.i. All. B voce 5 — Polveri €6,65 (comp.extra €0,75)',
     capsule:     'Rif.: D.M. 22/09/2017 e s.m.i. All. B voce 7 — Capsule €22,00/120 pz (comp.extra €0,60)',
-    cartine:     'Rif.: D.M. 22/09/2017 e s.m.i. All. B voce 7 — Cartine/bustine €22,00/120 pz (comp.extra €0,60)',
+    cartine:     'Rif.: D.M. 22/09/2017 e s.m.i. All. B voce 6 — Cartine/cialdini €11,00/10 (+€0,25 / −€0,35 a cartina, comp.extra €0,60)',
   };
   document.getElementById('tariff-ref').textContent = refMap[t] || '';
   // Op. tecnologiche (Art. 6/7): valore effettivo (sincronizzaTariffazione non viene chiamata su click tab).
@@ -2869,7 +2874,7 @@ function setTipoScheda(t, btn) {
   document.querySelectorAll('#scheda-inputs .seg-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
 
-  const isSol  = t === 'soluzione' || t === 'sospensione';
+  const isSol  = t === 'soluzione' || t === 'tintura' || t === 'sospensione';
   const isSemi = t === 'unguento';
   const isCaps = t === 'capsule';
   const isCart = t === 'cartine';
@@ -2911,13 +2916,13 @@ function setTipoScheda(t, btn) {
   if (lblEccip[t]) document.getElementById('s-lbl-lotto-eccip').textContent = lblEccip[t];
 
   // sincronizza tipoTariff
-  const mapT = {soluzione:'liquida', sospensione:'sospensione', unguento:'semisolida', polvere:'polvere', capsule:'capsule', cartine:'cartine'};
+  const mapT = {soluzione:'liquida', tintura:'tintura', sospensione:'sospensione', unguento:'semisolida', polvere:'polvere', capsule:'capsule', cartine:'cartine'};
   if (mapT[t]) {
     tipoTariff = mapT[t];
     // aggiorna bottone attivo in tariffazione
     document.querySelectorAll('#page-tariffazione .seg-btn').forEach(b => b.classList.remove('active'));
     const tarBtns = document.querySelectorAll('#page-tariffazione .seg-btn');
-    const mapIdx  = {liquida:0, sospensione:1, semisolida:2, polvere:3, capsule:4, cartine:5};
+    const mapIdx  = {liquida:0, sospensione:1, semisolida:2, polvere:3, capsule:4, cartine:5, tintura:6};
     const idx = mapIdx[tipoTariff];
     if (tarBtns[idx]) tarBtns[idx].classList.add('active');
     // Modalità unica libera: tt-liquida sempre nascosto, pannelli specifici solo per il tipo corrispondente
@@ -2969,7 +2974,7 @@ function aggiornaScheda() {
   let costoPA = 0, costoET = 0, costoFL_s = 0, baseB = 0, nomeVoceB = '';
 
   // ═══════════ SOLUZIONE ═══════════
-  if (tipoScheda === 'soluzione') {
+  if (tipoScheda === 'soluzione' || tipoScheda === 'tintura') {
     // In modalità libera leggi direttamente da liberaRighe
     let qt, conc, percEt, grPA, mlET96s;
     if (liberaRighe.length > 0) {
@@ -3057,7 +3062,9 @@ function aggiornaScheda() {
     }
     costoPA = grPA*pPA;
     costoET = 0; // etanolo in liberaRigheExtra o nei componenti extra
-    costoFL_s = nFlac*pFL; baseB = 6.65; nomeVoceB = 'Soluzioni (voce 1)';
+    costoFL_s = nFlac*pFL;
+    if (tipoScheda === 'tintura') { baseB = 8.00; nomeVoceB = 'Estratti liquidi e tinture (voce 2)'; }
+    else { baseB = 6.65; nomeVoceB = 'Soluzioni (voce 1)'; }
 
   // ═══════════ SOSPENSIONE ═══════════
   } else if (tipoScheda === 'sospensione') {
@@ -3321,7 +3328,7 @@ function aggiornaScheda() {
   const _invCorrS = invLoadMerged();
   const _hS = liberaRighe.some(r => rigaHazardous(r, _invCorrS));
 
-  const _mapTipoS    = {soluzione:'liquida', sospensione:'sospensione', unguento:'semisolida', polvere:'polvere', capsule:'capsule', cartine:'cartine'};
+  const _mapTipoS    = {soluzione:'liquida', tintura:'tintura', sospensione:'sospensione', unguento:'semisolida', polvere:'polvere', capsule:'capsule', cartine:'cartine'};
   const _tipoTariffS = _mapTipoS[tipoScheda] || 'liquida';
   // Art. 5 — n° ingredienti meno i componenti inclusi nella voce base della forma
   // (2 liquidi/sospensioni/semisolide/polveri, 1 capsule/cartine). Capsule vuote = contenitore, escluse.
@@ -3365,7 +3372,7 @@ function aggiornaScheda() {
 
   // ═══════ HTML scheda ═══════
   const _sQtRaw = parseFloat(document.getElementById('s-qt').value)||0;
-  const _sQtUnit = (tipoScheda==='soluzione'||tipoScheda==='sospensione') ? ' ml' : ' g';
+  const _sQtUnit = (tipoScheda==='soluzione'||tipoScheda==='tintura'||tipoScheda==='sospensione') ? ' ml' : ' g';
   const qtLabel = tipoScheda==='capsule' ? (document.getElementById('s-ncaps').value||'—')+' pz'
                 : tipoScheda==='cartine' ? (document.getElementById('s-ncart').value||'—')+' pz'
                 : (_sQtRaw > 0 ? fmt(_sQtRaw, 1) : '—') + _sQtUnit;
@@ -3587,12 +3594,12 @@ function compilaScheda() {
   document.getElementById('s-num').value = peekNextNumScheda();
 
   // 2. Sincronizza tipo da Preparazione → Scheda
-  const mapTipoPrep = {soluzione:'soluzione', unguento:'unguento', capsule:'capsule', cartine:'cartine', polvere:'polvere', sospensione:'sospensione'};
+  const mapTipoPrep = {soluzione:'soluzione', tintura:'tintura', unguento:'unguento', capsule:'capsule', cartine:'cartine', polvere:'polvere', sospensione:'sospensione'};
   if (mapTipoPrep[tipoPrep]) {
     tipoScheda = mapTipoPrep[tipoPrep];
     // clicca il bottone corrispondente nella Scheda
     const sBtn = document.querySelectorAll('#scheda-inputs .seg-btn');
-    const mapIdx = {soluzione:0,unguento:1,capsule:2,cartine:3,polvere:4,sospensione:5};
+    const mapIdx = {soluzione:0,unguento:1,capsule:2,cartine:3,polvere:4,sospensione:5,tintura:6};
     setTipoScheda(tipoScheda, sBtn[mapIdx[tipoScheda]]);
   }
 
@@ -3634,7 +3641,7 @@ function compilaScheda() {
     const {totG, paG, conc: concCalcS, ingr} = liberaCalcTotale();
     const concL = concCalcS;
     const concStr = concL > 0 ? fmt(concL,1) + '% ' : '';
-    const tipoStr = tipoPrep === 'soluzione' ? 'Soluzione' : tipoPrep === 'unguento' ? 'Unguento' : tipoPrep === 'polvere' ? 'Polvere' : 'Sospensione';
+    const tipoStr = tipoPrep === 'soluzione' ? 'Soluzione' : tipoPrep === 'tintura' ? 'Tintura' : tipoPrep === 'unguento' ? 'Unguento' : tipoPrep === 'polvere' ? 'Polvere' : 'Sospensione';
     const prepNome = nomePA ? nomePA + ' ' + concStr + tipoStr : tipoStr;
     document.getElementById('s-prep').value = prepNome;
     // NB: <input type="number"> rifiuta la virgola → usare toFixed() che produce "."
@@ -3690,7 +3697,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 135;
+const APP_VERSION = 136;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
@@ -4305,7 +4312,7 @@ function etiqDaScheda() {
   const prezzo  = document.getElementById('s-prezzo').value;
 
   // unità in base al tipo
-  const unitaQt = (tipoScheda === 'soluzione' || tipoScheda === 'sospensione') ? ' ml' :
+  const unitaQt = (tipoScheda === 'soluzione' || tipoScheda === 'tintura' || tipoScheda === 'sospensione') ? ' ml' :
                   tipoScheda === 'capsule' ? ' cps' :
                   tipoScheda === 'cartine' ? ' cartine' : ' g';
 
@@ -4387,9 +4394,9 @@ function aiGetSystemPrompt() {
     'IMPORTANTE: rispondi SEMPRE con la formula completa anche se alcune sostanze non sono in inventario. ' +
     'Alla fine aggiungi: DA ORDINARE: [sostanze mancanti dall\'inventario] ' +
     'Quando proponi una formula usa SEMPRE questo formato:\n' +
-    'TIPO: [soluzione|sospensione|unguento|polvere|capsule|cartine]\n' +
+    'TIPO: [soluzione|tintura|sospensione|unguento|polvere|capsule|cartine]\n' +
     'FORMULA:\n- [sostanza]: [quantit\u00e0] [unit\u00e0]\nPROCEDURA:\n1. [passo]\nNOTE: [avvertenze]\n' +
-    'TIPO \u00e8 obbligatorio e deve essere uno dei 6 valori esatti sopra (minuscolo). Per liquidi usa ml, per solidi usa g. Elenca ogni componente su riga separata con trattino.\n' +
+    'TIPO \u00e8 obbligatorio e deve essere uno dei 7 valori esatti sopra (minuscolo). Usa "tintura" per estratti liquidi e tinture. Per liquidi usa ml, per solidi usa g. Elenca ogni componente su riga separata con trattino.\n' +
     'CAPSULE \u2014 REGOLE DI CALCOLO (RIGIDE, NON DEROGABILI):\n' +
     '  1. In questa farmacia \u00e8 disponibile SOLO la taglia 0 (cifra zero, MAI lettera O). Usa sempre "Capsule gelatina dura taglia 0" o "Capsule HPMC taglia 0".\n' +
     '  2. Se l\'utente non specifica il numero di capsule, CHIEDI prima di rispondere. Non assumere un numero a caso.\n' +
@@ -4449,7 +4456,7 @@ function aiParseFormula(text) {
   const comps = [];
   let inFormula = false;
   let tipo = null;
-  const tipoMatch = cleanText.match(/^TIPO\s*:\s*(soluzione|sospensione|unguento|polvere|capsule|cartine)\b/im);
+  const tipoMatch = cleanText.match(/^TIPO\s*:\s*(soluzione|tintura|sospensione|unguento|polvere|capsule|cartine)\b/im);
   if (tipoMatch) tipo = tipoMatch[1].toLowerCase();
   for (const rawLine of lines) {
     const line = rawLine.trim();
@@ -4544,14 +4551,14 @@ function aiImportaTutti(comps, tipo) {
   if (prepNavBtn) showPage('preparazione', prepNavBtn);
 
   // 2) Imposta tipoPrep — ordine bottoni: soluzione(0), unguento(1), capsule(2), cartine(3), polvere(4), sospensione(5)
-  const tipoOk = ['soluzione','sospensione','unguento','polvere','capsule','cartine'];
+  const tipoOk = ['soluzione','tintura','sospensione','unguento','polvere','capsule','cartine'];
   let tipoTarget = tipoOk.includes(tipo) ? tipo : null;
   if (!tipoTarget) {
     // fallback euristico se l'AI non ha dato TIPO
     const hasML = comps.some(c => c.unit === 'ml');
     tipoTarget = hasML ? 'soluzione' : 'polvere';
   }
-  const tipoIdx = {soluzione:0, unguento:1, capsule:2, cartine:3, polvere:4, sospensione:5}[tipoTarget];
+  const tipoIdx = {soluzione:0, unguento:1, capsule:2, cartine:3, polvere:4, sospensione:5, tintura:6}[tipoTarget];
   const tipoBtns = document.querySelectorAll('#tariff-card-tipo .seg .seg-btn');
   if (tipoBtns[tipoIdx]) setTipo(tipoTarget, tipoBtns[tipoIdx]);
 
@@ -5048,7 +5055,7 @@ function aiEsportaScheda() {
   const navBtns = document.querySelectorAll('.nav-btn');
   showPage('scheda', navBtns[2]);
   // Attiva il bottone tipo corretto nella Scheda
-  const tipoIdx = {soluzione:0, unguento:1, capsule:2, cartine:3, polvere:4, sospensione:5}[tipoTarget];
+  const tipoIdx = {soluzione:0, unguento:1, capsule:2, cartine:3, polvere:4, sospensione:5, tintura:6}[tipoTarget];
   const sBtns = document.querySelectorAll('#scheda-inputs .seg-btn');
   if (sBtns[tipoIdx]) setTipoScheda(tipoTarget, sBtns[tipoIdx]);
   // Popola i campi specifici per pezzo (capsule/cartine) usando dose + qt
@@ -5269,7 +5276,7 @@ function prepRestore(snap) {
 
   // Segmento Tipo Preparazione (#tariff-card-tipo è naming legacy, container dei
   // seg-btn della Preparazione — ordine: soluzione,unguento,capsule,cartine,polvere,sospensione)
-  const mapIdx = {soluzione:0, unguento:1, capsule:2, cartine:3, polvere:4, sospensione:5};
+  const mapIdx = {soluzione:0, unguento:1, capsule:2, cartine:3, polvere:4, sospensione:5, tintura:6};
   const prepBtns = document.querySelectorAll('#tariff-card-tipo .seg .seg-btn');
   const idx = mapIdx[tipoPrep] != null ? mapIdx[tipoPrep] : 0;
   if (prepBtns[idx]) setTipo(tipoPrep, prepBtns[idx]);
@@ -5577,7 +5584,7 @@ function archDuplica(id) {
 
   // 2. Riallinea tipo Scheda al tipo Preparazione (la scheda originale potrebbe
   //    avere un altro tipoScheda salvato; qui ricalchiamo il tipo di prep).
-  const mapIdx = {soluzione:0, unguento:1, capsule:2, cartine:3, polvere:4, sospensione:5};
+  const mapIdx = {soluzione:0, unguento:1, capsule:2, cartine:3, polvere:4, sospensione:5, tintura:6};
   const sBtn = document.querySelectorAll('#scheda-inputs .seg-btn');
   const sIdx = mapIdx[s.prepSnap.tipoPrep] != null ? mapIdx[s.prepSnap.tipoPrep] : 0;
   if (sBtn[sIdx]) setTipoScheda(s.prepSnap.tipoPrep, sBtn[sIdx]);
@@ -5635,7 +5642,7 @@ function archRiapri(id) {
   // ripristina tipo
   if (s.tipo) {
     const sBtn = document.querySelectorAll('#scheda-inputs .seg-btn');
-    const mapIdx = {soluzione:0,unguento:1,capsule:2,cartine:3,polvere:4,sospensione:5};
+    const mapIdx = {soluzione:0,unguento:1,capsule:2,cartine:3,polvere:4,sospensione:5,tintura:6};
     setTipoScheda(s.tipo, sBtn[mapIdx[s.tipo]||0]);
   }
 
@@ -5779,7 +5786,7 @@ const RICETTA_PROMPT = `Sei un esperto in galenica farmaceutica italiana. Estrai
 
 OUTPUT: SOLO un oggetto JSON valido, nessun commento, nessun testo prima o dopo. Struttura:
 {
-  "tipoPrep": "soluzione" | "sospensione" | "unguento" | "polvere" | "capsule" | "cartine",
+  "tipoPrep": "soluzione" | "tintura" | "sospensione" | "unguento" | "polvere" | "capsule" | "cartine",
   "nomePA": "Nome principio attivo principale",
   "concMode": "pp" | "pv",
   "concentrazione": numero in % (o null),
@@ -5898,7 +5905,7 @@ async function ricettaCallAI(content, model) {
 // paziente, concentrazione. Poi rilancia calcPrep() e chiude il dialog.
 function ricettaApplicaJson(json) {
   // 1. tipoPrep + segmento attivo
-  const validTipi = {soluzione:0, unguento:1, capsule:2, cartine:3, polvere:4, sospensione:5};
+  const validTipi = {soluzione:0, unguento:1, capsule:2, cartine:3, polvere:4, sospensione:5, tintura:6};
   if (json.tipoPrep && validTipi[json.tipoPrep] != null) {
     const btns = document.querySelectorAll('#tariff-card-tipo .seg-btn');
     const btn = btns[validTipi[json.tipoPrep]];

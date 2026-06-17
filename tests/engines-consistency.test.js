@@ -107,6 +107,18 @@ describe('Tariffazione ↔ Scheda: stesso prezzo (motore unico)', () => {
     expect(r.op).toBe('0');                // soluzione: nessuna op. tecnologica di default
   });
 
+  it('Tintura — voce 2 (€8,00): costa più della soluzione voce 1, motori coincidono', () => {
+    const ingr = [ {nome:'Calendula estratto', qty:'20', unit:'g', isPa:true},
+                   {nome:'Etanolo 96°', qty:'80', unit:'g'} ];
+    const sol = H.run({ prep:'soluzione', tariff:'liquida', scheda:'soluzione' }, ingr, { 't-fl':'0', 'totale-prep':'100' });
+    const tin = H.run({ prep:'tintura',   tariff:'tintura', scheda:'tintura'   }, ingr, { 't-fl':'0', 'totale-prep':'100' });
+    expect(tin.sch).toBeCloseTo(tin.tar, 2);   // motore unico anche per la tintura
+    expect(sol.sch).toBeCloseTo(sol.tar, 2);
+    expect(tin.comp).toBe('0');                // 2 ingredienti − 2 inclusi
+    // Δ base voce 2 (8,00) − voce 1 (6,65) = 1,35 × 1,40 (Art.7) × 1,10 (IVA) ≈ 2,08
+    expect(tin.tar - sol.tar).toBeCloseTo(1.35 * 1.40 * 1.10, 1);
+  });
+
   it('Sospensione — 300 ml: scaglione volume >250 e op. omogeneizzazione', () => {
     const r = H.run(
       { prep:'sospensione', tariff:'sospensione', scheda:'sospensione' },
