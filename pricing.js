@@ -448,9 +448,17 @@ function getCompInclusi(tipoTariff) {
   return COMP_INCLUSI[tipoTariff] != null ? COMP_INCLUSI[tipoTariff] : 2;
 }
 
+// Tetto ai componenti aggiuntivi PAGATI. Il D.M. 22/09/2017 fissa "fino a un
+// massimo di 4" SOLO per le forme a pezzi (cartine voce 6, capsule voce 7,
+// pillole/granulati voce 9, suppositori voce 11). Per liquidi/sospensioni/
+// semisolide/polveri (voci 1-5) NON c'è alcun tetto → Infinity.
+function getCompMax(tipoTariff) {
+  return (tipoTariff === 'capsule' || tipoTariff === 'cartine') ? COMP_MAX : Infinity;
+}
+
 // Componenti aggiuntivi (Art. 5) per una forma dato il n° di ingredienti.
 function calcCompAggiuntivi(nIngredienti, tipoTariff) {
-  return Math.min(COMP_MAX, Math.max(0, (nIngredienti || 0) - getCompInclusi(tipoTariff)));
+  return Math.min(getCompMax(tipoTariff), Math.max(0, (nIngredienti || 0) - getCompInclusi(tipoTariff)));
 }
 
 // Voci Allegato B per forme liquide/semisolide/polveri (no pezzi):
@@ -482,7 +490,8 @@ function calcAllegatoB(tipo, qt, comp, op) {
     const diffPiu = Math.ceil((qt - c.rif) / c.stepPiu);
     baseB += diffPiu * c.costPiu;
   }
-  const cappedComp = Math.min(Math.max(0, comp || 0), COMP_MAX);
+  // Voci 1-5: nessun tetto sui componenti (getCompMax → Infinity).
+  const cappedComp = Math.min(Math.max(0, comp || 0), getCompMax(tipo));
   const addComp = cappedComp * c.compExtra;
   const addOp = Math.max(0, op || 0) * OP_TECNOLOGICA_COSTO;
   const costoB = baseB + addComp + addOp;
@@ -512,6 +521,27 @@ function calcAllegatoBVoce7(nPezzi, comp, op) {
   return { baseB, addComp, addOp, costoB, inc40, cappedComp, diff10 };
 }
 
+// Allegato B voce 6 (cartine e cialdini) — base diversa dalle capsule:
+//   base €11,00 per 10 cartine
+//   +€0,25 per ogni cartina OLTRE le prime 10 (per unità, non per 10)
+//   −€0,35 per ogni cartina IN MENO sotto le 10
+//   comp.extra €0,60 per componente aggiuntivo (capped a 4)
+//   op €2,30
+// Ritorna {baseB, addComp, addOp, costoB, inc40, cappedComp}.
+function calcAllegatoBVoce6(nCart, comp, op) {
+  const n = Math.max(0, nCart || 0);
+  let baseB = 11.00;
+  if (n > 10) baseB += (n - 10) * 0.25;
+  else if (n < 10) baseB -= (10 - n) * 0.35;
+  baseB = Math.max(0, baseB);
+  const cappedComp = Math.min(Math.max(0, comp || 0), COMP_MAX);
+  const addComp = cappedComp * 0.60;
+  const addOp = Math.max(0, op || 0) * OP_TECNOLOGICA_COSTO;
+  const costoB = baseB + addComp + addOp;
+  const inc40 = costoB * ART_7_INCREMENTO;
+  return { baseB, addComp, addOp, costoB, inc40, cappedComp };
+}
+
 // Art. 8 supplementi: 8a (sostanza H pericolosa), 8b (per ogni stupefacente),
 // 8c (doping). Tutti €2,50 per unità di applicazione.
 function calcSupplementi({ hazardous = false, stupp = 0, dop = 0 } = {}) {
@@ -535,7 +565,7 @@ const _exports = {
   ALLEGATO_A, DENSITA, INV_HARDCODED, INV_OBBLIGATORIE,
   STUPEFACENTI, DOPING, OP_TECNOLOGICHE_AUTO,
   ALLEGATO_B_VOCI, IVA_RATE, ART_7_INCREMENTO, ART_8_PER_UNIT, COMP_MAX, OP_TECNOLOGICA_COSTO,
-  COMP_INCLUSI, getCompInclusi, calcCompAggiuntivi,
+  COMP_INCLUSI, getCompInclusi, getCompMax, calcCompAggiuntivi, calcAllegatoBVoce6,
   fmt, invNominalizza, invMatchScore, hasHazard, getDensita, tarNormalizza, tarCercaPA,
   isStupefacente, isDoping, getOpTecnologicheAuto,
   invFindBest, getHDaInventario, rigaHazardous, invGetPrezzo,

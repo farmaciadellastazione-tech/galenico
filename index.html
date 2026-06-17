@@ -598,7 +598,7 @@
 
   <div class="card">
     <div class="card-title">Operazioni e supplementi</div>
-    <div class="field-row"><span class="field-label">Componenti aggiuntivi</span><input type="number" id="t-comp" value="0" step="1" min="0" max="4" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto: n° ingredienti − inclusi (2; capsule/cartine 1) — max 4</span></div>
+    <div class="field-row"><span class="field-label">Componenti aggiuntivi</span><input type="number" id="t-comp" value="0" step="1" min="0" max="20" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto: n° ingredienti − inclusi (2; capsule/cartine 1) — tetto 4 solo capsule/cartine</span></div>
     <div class="field-row"><span class="field-label">Op. tecnologiche aggiuntive</span><input type="number" id="t-op" value="0" step="1" min="0" max="10" oninput="opOnManualEdit(this.value)" style="background:var(--bg);width:64px"><button type="button" onclick="opRipristinaAuto()" title="Ripristina il valore automatico" style="margin-left:6px;font-size:11px;padding:2px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer;color:var(--text-faint)">↺ auto</button><span class="field-note">modificabile — ×€2,30 cad.</span></div>
     <div class="field-row"><span class="field-label">Supplemento stupefacenti (Art. 8b)</span><input type="number" id="t-stupp" value="0" step="1" min="0" max="3" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto da formula (×€2,50 cad.)</span></div>
     <div class="field-row"><span class="field-label">Supplemento doping (Art. 8c)</span><input type="number" id="t-dop" value="0" step="1" min="0" max="1" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto da formula (×€2,50)</span></div>
@@ -2704,7 +2704,7 @@ function calcTariff() {
   // filtro divergente: la versione precedente escludeva etanolo/acqua e sottraeva
   // 2, sballando l'Art. 5 (etanolo conta come componente) e mostrando in UI un
   // numero diverso da quello fatturato.
-  const comp = Math.min(COMP_MAX, Math.max(0, parseInt(document.getElementById('t-comp').value) || 0));
+  const comp = Math.min(getCompMax(tipoTariff), Math.max(0, parseInt(document.getElementById('t-comp').value) || 0));
   const op    = parseInt(document.getElementById('t-op').value)||0;
   const stupp = parseInt(document.getElementById('t-stupp').value)||0;
   const dop   = parseInt(document.getElementById('t-dop').value)||0;
@@ -2722,7 +2722,7 @@ function calcTariff() {
     // ── CARTINE ── voce 7 (stesso scaglione delle capsule).
     const nCart   = parseInt(document.getElementById('t-ncart').value)||0;
     const costoFL = pFL;
-    const b = calcAllegatoBVoce7(nCart, comp, op);
+    const b = calcAllegatoBVoce6(nCart, comp, op);
 
     const righeMaterie = liberaRigheExtra
       .filter(r => !r.isCapsule)
@@ -2738,8 +2738,8 @@ function calcTariff() {
     rows = [
       {group:'Materie prime'},
       ...righeMaterie,
-      {group:'Costi di preparazione — All. B Cartine/bustine voce 7 (D.M. 22/09/2017)'},
-      {name:'Base '+nCart+' cartine (rif. 120: €22,00'+(nCart<120?' −'+fmt(b.diff10*1,2):nCart>120?' +'+fmt(b.diff10*2,2):'')+' €)', val:b.baseB},
+      {group:'Costi di preparazione — All. B Cartine/cialdini voce 6 (D.M. 22/09/2017)'},
+      {name:'Base '+nCart+' cartine (rif. 10: €11,00'+(nCart>10?' +'+fmt((nCart-10)*0.25,2):nCart<10?' −'+fmt((10-nCart)*0.35,2):'')+' €)', val:b.baseB},
       ...(comp>0?[{name:'Componenti aggiuntivi: '+comp+' × €0,60', val:b.addComp}]:[]),
       ...(op>0?[{name:'Op. tecnologiche aggiuntive: '+op+' × €2,30'+(opTecnologicheDesc?' ('+opTecnologicheDesc+')':''), val:b.addOp}]:[]),
       {name:'Incremento 40% su costi preparazione (Art. 7)', val:b.inc40},
@@ -3306,9 +3306,9 @@ function aggiornaScheda() {
       ...(grEccip > 0 ? [{nome:eccip, lotto:document.getElementById('s-lotto-eccip').value||'—'}] : []),
     ];
     costoPA = grPA*pPA; costoFL_s = pFL;
-    const diff10c = Math.ceil(Math.abs(nCart-120)/10);
-    baseB = 22.00 + (nCart>120?diff10c*2:nCart<120?-diff10c*1:0);
-    baseB = Math.max(0,baseB); nomeVoceB = 'Cartine/bustine (voce 7)';
+    // Voce 6 cartine: base €11,00/10, +€0,25 per cartina >10, −€0,35 per cartina <10.
+    baseB = 11.00 + (nCart>10 ? (nCart-10)*0.25 : nCart<10 ? -(10-nCart)*0.35 : 0);
+    baseB = Math.max(0,baseB); nomeVoceB = 'Cartine/cialdini (voce 6)';
   }
 
   // ═══════ calcolo tariff (motore unico — identico a calcTariff) ═══════
@@ -3690,7 +3690,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 132;
+const APP_VERSION = 133;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).

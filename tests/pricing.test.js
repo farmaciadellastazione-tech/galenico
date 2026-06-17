@@ -3,7 +3,7 @@ import {
   ALLEGATO_A, DENSITA, INV_HARDCODED, INV_OBBLIGATORIE,
   STUPEFACENTI, DOPING, OP_TECNOLOGICHE_AUTO,
   ALLEGATO_B_VOCI, IVA_RATE, ART_7_INCREMENTO, ART_8_PER_UNIT, COMP_MAX, OP_TECNOLOGICA_COSTO,
-  COMP_INCLUSI, getCompInclusi, calcCompAggiuntivi,
+  COMP_INCLUSI, getCompInclusi, getCompMax, calcCompAggiuntivi, calcAllegatoBVoce6,
   fmt, invNominalizza, invMatchScore, hasHazard, getDensita, tarNormalizza, tarCercaPA,
   isStupefacente, isDoping, getOpTecnologicheAuto,
   invFindBest, getHDaInventario, rigaHazardous, invGetPrezzo,
@@ -568,11 +568,21 @@ describe('componenti inclusi per forma — Tariffa nazionale Cap. 8 (verifica vo
     it('cartina 1 PA + 1 eccipiente (2) → 1 aggiuntivo (soglia 1)', () => {
       expect(calcCompAggiuntivi(2, 'cartine')).toBe(1);
     });
-    it('cap a COMP_MAX=4 (capsula con 10 ingredienti → 4)', () => {
+    it('cap a COMP_MAX=4 solo forme a pezzi (capsula con 10 ingredienti → 4)', () => {
       expect(calcCompAggiuntivi(10, 'capsule')).toBe(4);
+      expect(calcCompAggiuntivi(10, 'cartine')).toBe(4);
     });
-    it('cap a COMP_MAX=4 (soluzione con 10 ingredienti → 4)', () => {
-      expect(calcCompAggiuntivi(10, 'liquida')).toBe(4);
+    it('NESSUN cap su voci 1-5 (soluzione 10 ingredienti → 8; polvere 9 → 7)', () => {
+      expect(calcCompAggiuntivi(10, 'liquida')).toBe(8);
+      expect(calcCompAggiuntivi(9, 'polvere')).toBe(7);
+    });
+    it('getCompMax: 4 per capsule/cartine, Infinity per le altre', () => {
+      expect(getCompMax('capsule')).toBe(4);
+      expect(getCompMax('cartine')).toBe(4);
+      expect(getCompMax('liquida')).toBe(Infinity);
+      expect(getCompMax('sospensione')).toBe(Infinity);
+      expect(getCompMax('semisolida')).toBe(Infinity);
+      expect(getCompMax('polvere')).toBe(Infinity);
     });
     it('mai negativo (0 ingredienti)', () => {
       expect(calcCompAggiuntivi(0, 'liquida')).toBe(0);
@@ -655,10 +665,11 @@ describe('calcAllegatoB — voci 1/3/4/5 (no pezzi)', () => {
       expect(calcAllegatoB('polvere', 50, 1, 0).addComp).toBe(0.75);
     });
 
-    it('cap a 4 componenti: 7 componenti pagati come 4', () => {
-      // Liquida: 4 * 0,80 = 3,20 (non 5,60)
-      expect(calcAllegatoB('liquida', 100, 7, 0).addComp).toBe(4 * 0.80);
-      expect(calcAllegatoB('liquida', 100, 7, 0).cappedComp).toBe(4);
+    it('voci 1-5 NON hanno tetto componenti (D.M.: "max 4" solo forme a pezzi)', () => {
+      // Liquida con 7 componenti aggiuntivi: 7 × 0,80 = 5,60 (nessun cap a 4).
+      expect(calcAllegatoB('liquida', 100, 7, 0).addComp).toBe(7 * 0.80);
+      expect(calcAllegatoB('liquida', 100, 7, 0).cappedComp).toBe(7);
+      expect(calcAllegatoB('polvere', 50, 6, 0).cappedComp).toBe(6);
     });
 
     it('0 componenti → addComp 0', () => {
@@ -792,6 +803,44 @@ describe('calcAllegatoBVoce7 — capsule/cartine', () => {
       expect(r2(b.costoB)).toBe(24.90);
       expect(r2(b.inc40)).toBe(9.96);
     });
+  });
+});
+
+describe('calcAllegatoBVoce6 — cartine/cialdini (base €11/10)', () => {
+  const r2 = n => Math.round(n * 100) / 100;
+
+  it('10 cartine: base esatta €11,00', () => {
+    expect(calcAllegatoBVoce6(10, 0, 0).baseB).toBe(11.00);
+  });
+
+  it('oltre 10: +€0,25 per cartina (per unità, non per 10)', () => {
+    expect(r2(calcAllegatoBVoce6(11, 0, 0).baseB)).toBe(11.25);
+    expect(r2(calcAllegatoBVoce6(20, 0, 0).baseB)).toBe(13.50); // 11 + 10×0,25
+    expect(r2(calcAllegatoBVoce6(30, 0, 0).baseB)).toBe(16.00); // 11 + 20×0,25
+  });
+
+  it('sotto 10: −€0,35 per cartina', () => {
+    expect(r2(calcAllegatoBVoce6(9, 0, 0).baseB)).toBe(10.65); // 11 − 1×0,35
+    expect(r2(calcAllegatoBVoce6(5, 0, 0).baseB)).toBe(9.25);  // 11 − 5×0,35
+  });
+
+  it('base diversa dalle capsule (voce 7): 20 cartine €13,50 ≠ 20 capsule', () => {
+    expect(calcAllegatoBVoce6(20, 0, 0).baseB).not.toBe(calcAllegatoBVoce7(20, 0, 0).baseB);
+  });
+
+  it('componenti cap a 4 (forma a pezzi) e €0,60 cad.', () => {
+    expect(calcAllegatoBVoce6(10, 1, 0).addComp).toBe(0.60);
+    expect(calcAllegatoBVoce6(10, 7, 0).addComp).toBe(4 * 0.60);
+  });
+
+  it('op €2,30 e Art.7 +40% su costoB', () => {
+    const b = calcAllegatoBVoce6(10, 1, 1); // 11 + 0,60 + 2,30 = 13,90
+    expect(r2(b.costoB)).toBe(13.90);
+    expect(r2(b.inc40)).toBe(5.56);
+  });
+
+  it('non scende sotto 0 per pochissime cartine', () => {
+    expect(calcAllegatoBVoce6(0, 0, 0).baseB).toBeGreaterThanOrEqual(0);
   });
 });
 
