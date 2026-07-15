@@ -7,7 +7,7 @@ import {
   fmt, invNominalizza, invMatchScore, hasHazard, getDensita, tarNormalizza, tarCercaPA,
   isStupefacente, isDoping, getOpTecnologicheAuto,
   invFindBest, getHDaInventario, rigaHazardous, invGetPrezzo,
-  calcAllegatoB, calcAllegatoBVoce7, calcSupplementi, calcIvaTotale,
+  calcAllegatoB, calcAllegatoBVoce7, calcSupplementi, calcIvaTotale, calcCostoSpecialita,
 } from '../pricing.js';
 
 // Inventario di test minimale. Riproduce la forma degli item in INV_HARDCODED
@@ -914,6 +914,38 @@ describe('calcIvaTotale — IVA 10%', () => {
     const r = calcIvaTotale(28.30);
     expect(Math.round(r.iva * 100) / 100).toBe(2.83);
     expect(Math.round(r.totale * 100) / 100).toBe(31.13);
+  });
+});
+
+describe('calcCostoSpecialita — ridosaggio da specialità medicinale', () => {
+  it('unità necessarie = multiplo esatto di confUnita: 0 avanzate, 1 confezione', () => {
+    // Frisium 10mg, confezione da 30 cpr a €3,00. Servono 300mg (30 cpr esatte).
+    const r = calcCostoSpecialita(300, 10, 30, 3.00);
+    expect(r).toEqual({ unitaNecessarie: 30, confezioni: 1, costoTotale: 3.00, unitaFornite: 30, unitaAvanzate: 0 });
+  });
+
+  it('avanzo: servono meno unità della confezione → 1 confezione intera pagata, resto al cliente', () => {
+    // Frisium 10mg → capsule 4mg: 30 capsule finali × 4mg = 120mg totali. Confezione da 20 cpr a €2,50.
+    // unità necessarie = ceil(120/10) = 12. confezioni = ceil(12/20) = 1. avanzate = 20-12 = 8.
+    const r = calcCostoSpecialita(120, 10, 20, 2.50);
+    expect(r).toEqual({ unitaNecessarie: 12, confezioni: 1, costoTotale: 2.50, unitaFornite: 20, unitaAvanzate: 8 });
+  });
+
+  it('servono più confezioni: arrotonda per eccesso sul numero di confezioni', () => {
+    // unità necessarie = ceil(250/10) = 25, confUnita = 20 → confezioni = ceil(25/20) = 2.
+    const r = calcCostoSpecialita(250, 10, 20, 2.50);
+    expect(r.confezioni).toBe(2);
+    expect(r.costoTotale).toBe(5.00);
+    expect(r.unitaFornite).toBe(40);
+    expect(r.unitaAvanzate).toBe(15);
+  });
+
+  it('dati incompleti o non validi → null', () => {
+    expect(calcCostoSpecialita(0, 10, 30, 3.00)).toBeNull();
+    expect(calcCostoSpecialita(120, 0, 30, 3.00)).toBeNull();
+    expect(calcCostoSpecialita(120, 10, 0, 3.00)).toBeNull();
+    expect(calcCostoSpecialita(120, 10, 30, 0)).toBeNull();
+    expect(calcCostoSpecialita(120, 10, 30, -1)).toBeNull();
   });
 });
 

@@ -565,6 +565,22 @@ function calcIvaTotale(netto) {
   return { iva, totale: n + iva };
 }
 
+// Ridosaggio da specialità medicinale (es. Frisium 10mg cpr → capsule 4mg):
+// si paga la/le CONFEZIONE/I intera/e effettivamente aperta/e per ottenere le
+// unità necessarie, non le singole unità — una farmacia non può dispensare
+// solo una parte di una confezione di specialità. Le unità avanzate dalla
+// confezione aperta si consegnano al cliente insieme al preparato.
+// Ritorna null se i dati sono incompleti (dose/confezione/prezzo non > 0).
+function calcCostoSpecialita(mgTotaliServono, doseMg, confUnita, confPrezzo) {
+  if (!(mgTotaliServono > 0) || !(doseMg > 0) || !(confUnita > 0) || !(confPrezzo > 0)) return null;
+  const unitaNecessarie = Math.ceil(mgTotaliServono / doseMg);
+  const confezioni = Math.ceil(unitaNecessarie / confUnita);
+  const costoTotale = confezioni * confPrezzo;
+  const unitaFornite = confezioni * confUnita;
+  const unitaAvanzate = unitaFornite - unitaNecessarie;
+  return { unitaNecessarie, confezioni, costoTotale, unitaFornite, unitaAvanzate };
+}
+
 // ── Export per browser + Node ────────────────────────────────────────────
 
 const _exports = {
@@ -575,7 +591,7 @@ const _exports = {
   fmt, invNominalizza, invMatchScore, hasHazard, getDensita, tarNormalizza, tarCercaPA,
   isStupefacente, isDoping, getOpTecnologicheAuto,
   invFindBest, getHDaInventario, rigaHazardous, invGetPrezzo,
-  calcAllegatoB, calcAllegatoBVoce7, calcSupplementi, calcIvaTotale,
+  calcAllegatoB, calcAllegatoBVoce7, calcSupplementi, calcIvaTotale, calcCostoSpecialita,
 };
 Object.assign(globalThis, _exports);
 if (typeof module !== 'undefined' && module.exports) module.exports = _exports;

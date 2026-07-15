@@ -168,6 +168,26 @@ describe('Tariffazione ↔ Scheda: stesso prezzo (motore unico)', () => {
     expect(r.sch).toBeCloseTo(r.tar, 2);
   });
 
+  it('Capsule — ridosaggio da specialità: Frisium 10mg → capsule 4mg (paga confezioni intere, non unità)', () => {
+    // 30 capsule finali × 4mg = 120mg totali di clobazam necessari.
+    // Frisium 10mg, confezione da 20 cpr a €2,50: servono 12 cpr → 1 confezione intera
+    // (20 ≥ 12) → costo 2,50 €, 8 cpr avanzate consegnate al cliente col preparato.
+    const r = H.run(
+      { prep:'capsule', tariff:'capsule', scheda:'capsule' },
+      [ {nome:'Clobazam', qty:'4', unit:'mg', isPa:true, daSpecialita:true,
+         specNome:'Frisium 10 mg compresse', specDose:'10', specConfUnita:'20', specConfPrezzo:'2.50'},
+        {nome:'Amido di riso', qty:'5', unit:'g'} ],
+      { 't-fl':'0', 'caps-vuote-prezzo':'0.045', 'caps-vuote-nome':'Capsule gelatina dura taglia 0',
+        'n-caps':'30', 'mg-pa-cps':'4', 'caps-taglia-lib':'0', 'caps-ncaps-lib':'30' });
+    expect(r.sch).toBeCloseTo(r.tar, 2);   // motore unico
+
+    const specRow = H.ctx.liberaRigheExtra.find(x => x.daSpecialita);
+    expect(specRow).toBeTruthy();
+    expect(specRow.confezioni).toBe(1);        // 12 unità necessarie, confezione da 20 → basta 1
+    expect(specRow.unitaAvanzate).toBe(8);     // 20 − 12 = 8 unità avanzate al cliente
+    expect(specRow.costo).toBeCloseTo(2.50, 2); // 1 confezione × €2,50 (NON 12 × prezzo/unità)
+  });
+
   it('Cartine — 20 pz: base voce 7 sul numero reale (non su 0)', () => {
     // liberaRighe per cartine = quantità PER SINGOLA CARTINA.
     const r = H.run(
