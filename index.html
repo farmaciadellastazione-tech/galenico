@@ -1804,14 +1804,20 @@ function _isRigaScalabile(r) {
 }
 
 // Scala tutte le righe (escluse contenitori/pz) per riportare il volume soluzione al valore inserito.
-// Analogo a capsScaleOnNCapsChange per le capsule.
+// Analogo a capsScaleOnNCapsChange per le capsule. Se la formula non ha ancora
+// righe liquide ma "Grado alcolico" è già compilato, bootstrap diretto del
+// veicolo idroalcolico (Etanolo 96° + Acqua purificata) via liberaApplyVolGrado.
 function volSoluzioneChanged() {
   const el = document.getElementById('vol-soluzione');
   if (!el) return;
   const newVol = parseFloat(el.value)||0;
   if (newVol <= 0) return;
   const cur = liberaSommaVolumeLiquidi();
-  if (cur <= 0) return; // nessuna riga liquida da scalare
+  if (cur <= 0) {
+    const grado = parseFloat(document.getElementById('grado-alc')?.value);
+    if (!isNaN(grado) && grado > 0) liberaApplyVolGrado(newVol, grado);
+    return;
+  }
   const ratio = newVol / cur;
   if (Math.abs(ratio - 1) < 1e-4) return;
   liberaRighe.forEach(r => {
@@ -1823,71 +1829,69 @@ function volSoluzioneChanged() {
   calcPrep();
 }
 
-// L'utente modifica il grado alcolico desiderato: ricalcola la quantità di etanolo 96
-// e compensa con la riga acqua (se presente) per mantenere il volume totale.
+// Crea/aggiorna le righe "Etanolo 96°" e "Acqua purificata" per un veicolo
+// idroalcolico di volume totMl (ml) al grado (% v/v) indicato. Condivisa da
+// volSoluzioneChanged() e gradoAlcChanged(): compilare entrambe le mascherine
+// (Volume soluzione + Grado alcolico), in qualunque ordine, popola sempre i due
+// ingredienti del veicolo.
+function liberaApplyVolGrado(totMl, grado) {
+  if (!(totMl > 0) || isNaN(grado) || grado < 0) return;
+  if (grado > 96) { alert('Grado alcolico massimo 96% v/v (etanolo 96°).'); return; }
+  const newEtMl = totMl * grado / 100 / 0.96;
+  let etIdx = liberaRighe.findIndex(r => {
+    const n = invNominalizza(r.nome || '');
+    return n.includes('etanolo') || n.includes('alcool') || n.includes('alcol');
+  });
+  if (etIdx < 0) {
+    liberaRighe.push({nome:'Etanolo 96°', qty:'', unit:'ml', isPa:false, densita:null, prezzoAcq:0, fonte:null, lotto:'', h:'H225'});
+    etIdx = liberaRighe.length - 1;
+  }
+  liberaRighe[etIdx].qty = String(parseFloat(newEtMl.toFixed(2)));
+  liberaRighe[etIdx].unit = 'ml';
+  let acIdx = liberaRighe.findIndex(r => invNominalizza(r.nome || '').includes('acqua'));
+  const newAcMl = Math.max(0, totMl - newEtMl);
+  if (acIdx < 0) {
+    liberaRighe.push({nome:'Acqua purificata', qty:'', unit:'ml', isPa:false, densita:null, prezzoAcq:0, fonte:null, lotto:''});
+    acIdx = liberaRighe.length - 1;
+  }
+  liberaRighe[acIdx].qty = String(parseFloat(newAcMl.toFixed(2)));
+  liberaRighe[acIdx].unit = 'ml';
+  calcPrep();
+}
+
+// L'utente modifica il grado alcolico desiderato: ricalcola la quantità di etanolo 96°
+// e di acqua purificata (creandola se assente) per costituire il veicolo. Il volume
+// di riferimento è "Volume soluzione" se impostato, altrimenti "Totale preparazione",
+// altrimenti la somma dei liquidi già in formula.
 function gradoAlcChanged() {
   const gradoEl = document.getElementById('grado-alc');
   if (!gradoEl) return;
   const desiredGrado = parseFloat(gradoEl.value);
   if (isNaN(desiredGrado) || desiredGrado < 0) return;
   if (desiredGrado > 96) { alert('Grado alcolico massimo 96% v/v (etanolo 96°).'); return; }
-  const totEl = document.getElementById('totale-prep');
-  const tot = parseFloat(totEl?.value)||0;
-  const totUnit = document.getElementById('totale-prep-unit')?.value || 'ml';
-  // Volume in ml: esplicito (con conversione se in g) o implicito (somma liquidi)
+  const volSol = parseFloat(document.getElementById('vol-soluzione')?.value) || 0;
   let totMl;
-  if (tot > 0) {
-    if (totUnit === 'ml') totMl = tot;
-    else {
-      const dApprox = 1.0 - 0.211 * (desiredGrado / 100);
-      totMl = tot / dApprox;
-    }
+  if (volSol > 0) {
+    totMl = volSol;
   } else {
-    totMl = liberaSommaVolumeLiquidi();
-    if (totMl <= 0) {
-      alert('Aggiungi prima dei liquidi alla formula o imposta "Totale preparazione".');
-      return;
+    const totEl = document.getElementById('totale-prep');
+    const tot = parseFloat(totEl?.value)||0;
+    const totUnit = document.getElementById('totale-prep-unit')?.value || 'ml';
+    if (tot > 0) {
+      if (totUnit === 'ml') totMl = tot;
+      else {
+        const dApprox = 1.0 - 0.211 * (desiredGrado / 100);
+        totMl = tot / dApprox;
+      }
+    } else {
+      totMl = liberaSommaVolumeLiquidi();
+      if (totMl <= 0) {
+        alert('Imposta prima "Volume soluzione" (o "Totale preparazione").');
+        return;
+      }
     }
   }
-  // Ml di etanolo 96 necessari per raggiungere il grado desiderato
-  const newEtMl = totMl * desiredGrado / 100 / 0.96;
-  // Trova (o crea) la riga etanolo
-  let etIdx = liberaRighe.findIndex(r => {
-    const n = invNominalizza(r.nome || '');
-    return n.includes('etanolo') || n.includes('alcool') || n.includes('alcol');
-  });
-  if (etIdx < 0) {
-    liberaRighe.push({nome:'Etanolo 96', qty:'', unit:'ml', isPa:false, densita:null, prezzoAcq:0, fonte:null, lotto:'', h:'H225'});
-    etIdx = liberaRighe.length - 1;
-  }
-  // Ml attuali della riga etanolo
-  const rEt = liberaRighe[etIdx];
-  const qEt = parseFloat(rEt.qty)||0;
-  let oldEtMl;
-  if (rEt.unit === 'ml') oldEtMl = qEt;
-  else if (rEt.unit === 'g') oldEtMl = qEt / 0.807;
-  else if (rEt.unit === '%') oldEtMl = totMl * qEt / 100;
-  else oldEtMl = qEt;
-  const deltaMl = newEtMl - oldEtMl;
-  // Aggiorna etanolo (sempre in ml)
-  liberaRighe[etIdx].qty = String(parseFloat(newEtMl.toFixed(2)));
-  liberaRighe[etIdx].unit = 'ml';
-  // Compensa con la riga acqua, se presente
-  const acquaIdx = liberaRighe.findIndex(r => invNominalizza(r.nome || '').includes('acqua'));
-  if (acquaIdx >= 0) {
-    const rAc = liberaRighe[acquaIdx];
-    const qAc = parseFloat(rAc.qty)||0;
-    let oldAcMl;
-    if (rAc.unit === 'ml') oldAcMl = qAc;
-    else if (rAc.unit === 'g') oldAcMl = qAc; // densità 1
-    else if (rAc.unit === '%') oldAcMl = totMl * qAc / 100;
-    else oldAcMl = qAc;
-    const newAcMl = Math.max(0, oldAcMl - deltaMl);
-    liberaRighe[acquaIdx].qty = String(parseFloat(newAcMl.toFixed(2)));
-    liberaRighe[acquaIdx].unit = 'ml';
-  }
-  liberaRenderRighe();
-  calcPrep();
+  liberaApplyVolGrado(totMl, desiredGrado);
 }
 
 function liberaCalcTotale() {
@@ -3717,7 +3721,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 137;
+const APP_VERSION = 138;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
