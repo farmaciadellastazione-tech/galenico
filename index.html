@@ -3791,7 +3791,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 139;
+const APP_VERSION = 140;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
@@ -4475,6 +4475,15 @@ function stampaDymo() {
 
 const AI_KEY_LS = 'gal_groq_key';
 
+// Unico punto dove sta scritto l'ID modello Groq per capacità (testo / vision).
+// Groq dismette/rinomina modelli periodicamente ("model does not exist"): quando
+// succede, va aggiornato solo qui — sia la chat Formulario (aiChiama) sia
+// l'import ricetta via AI (ricettaCallAI/RICETTA_AI_CONFIG) leggono da qui.
+const AI_MODELS = {
+  text:   'openai/gpt-oss-120b',
+  vision: 'qwen/qwen3.6-27b',
+};
+
 function aiGetSystemPrompt() {
   const inv = typeof invLoadMerged === 'function' ? invLoadMerged() : [];
   const invTxt = inv.length > 0
@@ -4811,7 +4820,7 @@ async function aiChiama(userMsg) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-120b',
+        model: AI_MODELS.text,
         messages: [{ role: 'system', content: aiGetSystemPrompt() }].concat(aiHistory),
         temperature: 0.3,
         max_tokens: 800
@@ -5865,12 +5874,12 @@ function resetRicetta() {
 // IMPORT RICETTA via AI (foto/testo) — riempie tipoPrep + liberaRighe
 // ═══════════════════════════════════════════
 //
-// Provider configurabile: oggi Groq Llama 4 (riusa gal_groq_key); per cambiare
-// (es. Anthropic Claude, OpenAI) modifica RICETTA_AI_CONFIG sotto.
+// Provider configurabile: oggi Groq (riusa gal_groq_key); i modelli vengono da
+// AI_MODELS (vedi sezione FORMULARIO AI) — non hardcodarli di nuovo qui.
 const RICETTA_AI_CONFIG = {
   endpoint:    'https://api.groq.com/openai/v1/chat/completions',
-  modelVision: 'meta-llama/llama-4-scout-17b-16e-instruct',
-  modelText:   'meta-llama/llama-4-scout-17b-16e-instruct',
+  modelVision: AI_MODELS.vision,
+  modelText:   AI_MODELS.text,
   keyName:     'gal_groq_key',
   keyPrefix:   'gsk_',
   authHeader:  k => 'Bearer ' + k,
