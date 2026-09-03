@@ -323,6 +323,14 @@
        senza wrap con 7 pillole: stesso problema dell'header, stesso rimedio. */
     .seg { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
     .seg-btn { flex-shrink: 0; }
+    /* .field-label è flex:1 + min-width:0 (per adattarsi a larghezze diverse):
+       su una riga stretta con più elementi accanto (input + select + nota,
+       es. "Concentrazione") viene schiacciata quasi a zero e il testo,
+       non potendo andare a capo, trabocca sotto l'elemento successivo che la
+       copre. Alcune righe (Volume soluzione, Grado alcolico) avevano già
+       flex-wrap:wrap inline come rimedio; qui si applica a tutte le field-row
+       così l'etichetta resta sempre leggibile e il resto va a capo sotto. */
+    .field-row { flex-wrap: wrap; }
     /* Dialog import ricetta: fullscreen su mobile (il centering flex non funziona
        bene con le mobile browser chrome dinamiche; meglio coprire tutta la viewport). */
     #ricetta-dialog { padding: 0 !important; align-items: stretch !important; justify-content: stretch !important; }
@@ -436,7 +444,7 @@
       <span style="font-family:var(--mono);font-size:13px;color:var(--text-faint)">% v/v</span>
       <span style="font-size:11px;color:var(--text-faint);margin-left:8px">modifica per scalare etanolo (compensa con acqua)</span>
     </div>
-    <div class="field-row" id="row-libera-conc" style="margin-bottom:8px">
+    <div class="field-row" id="row-libera-conc" style="margin-bottom:8px;flex-wrap:wrap">
       <span class="field-label">Concentrazione</span>
       <input type="text" id="libera-conc" value="" readonly
         style="width:90px;background:var(--accent-light);border:1px solid var(--border);border-radius:var(--radius);padding:4px 8px;font-family:var(--mono);font-size:13px;color:var(--accent);text-align:right">
@@ -3803,7 +3811,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 143;
+const APP_VERSION = 144;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
