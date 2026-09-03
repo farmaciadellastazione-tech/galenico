@@ -3791,7 +3791,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 140;
+const APP_VERSION = 141;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
@@ -5987,12 +5987,22 @@ async function ricettaCallAI(content, model) {
         model: model,
         messages: [{ role: 'user', content: content }],
         temperature: 0.1,
-        max_tokens: 1200,
+        max_tokens: 2000,
         response_format: { type: 'json_object' },
+        // I modelli attuali (gpt-oss-120b, qwen3.6-27b) sono "reasoning": senza
+        // 'hidden' anteponevano un blocco <think>...</think> al JSON, che Groq
+        // rifiutava in JSON mode con "Failed to generate JSON" (errore visto
+        // con l'import ricetta da foto). Se un domani si cambia a un modello
+        // non-reasoning e Groq segnala il parametro come sconosciuto, va tolto.
+        reasoning_format: 'hidden',
       })
     });
     const data = await resp.json();
-    if (data.error) { ricettaStatus('⚠ Errore API: ' + data.error.message, 'err'); return; }
+    if (data.error) {
+      const dettagli = data.error.failed_generation ? ' — generato: ' + String(data.error.failed_generation).slice(0, 300) : '';
+      ricettaStatus('⚠ Errore API: ' + data.error.message + dettagli, 'err');
+      return;
+    }
     const txt = data.choices?.[0]?.message?.content || '';
     let json;
     try { json = JSON.parse(txt); }
