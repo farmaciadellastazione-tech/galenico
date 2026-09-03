@@ -311,6 +311,13 @@
     .formula-grid, .scheda-formula { grid-template-columns: 1fr 1fr; }
     .totale-box, .scheda-meta { grid-template-columns: 1fr; }
     .nav-btn { padding: 6px 8px; font-size: 12px; }
+    /* Header (logo + 7 voci nav + azioni + badge versione) è un'unica riga
+       flex senza wrap: su schermi stretti trabocca a destra e taglia fuori
+       parte dei pulsanti. Su mobile diventa scorrevole orizzontalmente invece
+       di traboccare: ogni figlio mantiene la sua dimensione (flex-shrink:0)
+       e si scorre col dito per raggiungere i pulsanti fuori viewport. */
+    header { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    header > * { flex-shrink: 0; }
     /* Dialog import ricetta: fullscreen su mobile (il centering flex non funziona
        bene con le mobile browser chrome dinamiche; meglio coprire tutta la viewport). */
     #ricetta-dialog { padding: 0 !important; align-items: stretch !important; justify-content: stretch !important; }
@@ -3791,7 +3798,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 141;
+const APP_VERSION = 142;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
