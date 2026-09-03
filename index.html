@@ -98,7 +98,7 @@
     --badge-fg: #a0998d;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: var(--sans); background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.6; min-height: 100vh; }
+  body { font-family: var(--sans); background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.6; min-height: 100vh; overflow-x: hidden; }
   header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 2rem; display: flex; align-items: center; gap: 1.5rem; height: 56px; position: sticky; top: 0; z-index: 10; }
   .logo { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--accent); letter-spacing: 0.05em; text-transform: uppercase; display:flex; align-items:center; gap:8px; }
   .logo span { color: var(--text-faint); }
@@ -318,6 +318,11 @@
        e si scorre col dito per raggiungere i pulsanti fuori viewport. */
     header { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     header > * { flex-shrink: 0; }
+    /* .seg (selettore forma farmaceutica: Soluzione/Unguento/Capsule/.../Tintura,
+       usato in Preparazione, Tariffazione e Scheda) è anch'esso una riga flex
+       senza wrap con 7 pillole: stesso problema dell'header, stesso rimedio. */
+    .seg { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+    .seg-btn { flex-shrink: 0; }
     /* Dialog import ricetta: fullscreen su mobile (il centering flex non funziona
        bene con le mobile browser chrome dinamiche; meglio coprire tutta la viewport). */
     #ricetta-dialog { padding: 0 !important; align-items: stretch !important; justify-content: stretch !important; }
@@ -3798,7 +3803,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 142;
+const APP_VERSION = 143;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
