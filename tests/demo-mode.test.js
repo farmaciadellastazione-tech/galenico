@@ -315,6 +315,16 @@ describe('Review v147–v152', () => {
   });
 });
 
+describe('Scheda: intestazione per forma', () => {
+  it('tintura: niente "undefined" nel tipo di preparato', async () => {
+    const H = await boot('');
+    H.eval(`tipoScheda = 'tintura'; aggiornaScheda();`);
+    const out = H.byId('scheda-preview').innerHTML;
+    expect(out).not.toContain('Preparato magistrale · undefined');
+    expect(out).toMatch(/Preparato magistrale · Tintura/);
+  });
+});
+
 describe('Rotellina sui campi numerici', () => {
   const campo = (type) => { const el = { type, blurred: false, blur(){ this.blurred = true; } }; return el; };
 
