@@ -940,8 +940,8 @@
         <div class="etiq-num">Etichetta 2/2 — sicurezza</div>
         <div class="etiq-box" id="etiq2">
           <img class="etiq-logo" data-logo="wide" alt="" />
-          <div class="e-farmacia">Farmacia Della Stazione</div>
-          <div class="e-indirizzo">Via Fiume 75 — La Spezia</div>
+          <div class="e-farmacia" id="ev2-farmacia">Farmacia Della Stazione</div>
+          <div class="e-indirizzo" id="ev2-indirizzo">Via Fiume 75 — La Spezia</div>
           <div class="e-nome" id="ev2-nome" style="margin-top:4px">—</div>
           <div class="e-h" id="ev2-h" style="margin-top:4px"></div>
           <div class="e-bambini" style="margin-top:4px">⚠ Tenere fuori dalla portata dei bambini.</div>
@@ -1459,8 +1459,8 @@ function ordinaEmail() {
   if (!list.length) { alert('Nessuna sostanza da ordinare.'); return; }
   const corpo = 'Spett.le Farmalabor,\n\nSi prega di quotare / spedire le seguenti sostanze:\n\n' +
     list.map(o => '- ' + o.nome + (o.minOrd ? ' — ' + o.minOrd : '') + (o.note ? ' (' + o.note + ')' : '')).join('\n') +
-    '\n\nFarmacia della Stazione\nVia Fiume 75 — La Spezia\nTel. 0187-706147\nP.I. 01317570115\nCod. QU Farma 6706\n';
-  const subject = 'Ordine sostanze galeniche — Farmacia della Stazione';
+    '\n\n' + FARMACIA.firma;
+  const subject = 'Ordine sostanze galeniche — ' + FARMACIA.nome;
   const mailto = 'mailto:ordini@farmalabor.it?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(corpo);
   window.open(mailto);
 }
@@ -3521,7 +3521,7 @@ function aggiornaScheda() {
   document.getElementById('scheda-preview').innerHTML =
     '<div class="scheda-prev-watermark">⚠ PREVENTIVO — Stampa di calcolo, non valida come scheda di preparazione</div>' +
     '<div class="scheda-header">' +
-      '<div class="scheda-farmacia"><img class="scheda-logo" src="'+LOGO_WIDE+'" alt=""><div><strong>Farmacia della Stazione</strong>Via Fiume 75 \u2014 La Spezia<br>Farmacista: '+farm+'</div></div>' +
+      '<div class="scheda-farmacia"><img class="scheda-logo" src="'+LOGO_WIDE+'" alt=""><div><strong>'+FARMACIA.nome+'</strong>'+FARMACIA.indirizzo+'<br>Farmacista: '+farm+'</div></div>' +
       '<div class="scheda-title"><h2>Scheda n. '+num+'</h2><p>Preparato magistrale \xb7 '+
         {soluzione:'Soluzione idroalcolica',sospensione:'Sospensione',unguento:'Unguento/crema',polvere:'Polvere',capsule:'Capsule',cartine:'Cartine'}[tipoScheda]+
       '</p></div>' +
@@ -3908,7 +3908,25 @@ const APP_VERSION = 146;
 
 // Modalità demo (?demo=1 nel link): versione di prova da far girare tra
 // colleghi. Niente lettura/scrittura sui Gist e dati farmacia generici.
-const DEMO_MODE = new URLSearchParams(location.search || '').has('demo');
+const DEMO_MODE = /[?&]demo(=|&|$)/.test(location.search || '');
+
+// Dati farmacia usati da Scheda, etichette Dymo ed email ordini. I testi reali
+// sono quelli storici (incluse le varianti di maiuscole/indirizzo per contesto).
+const FARMACIA = DEMO_MODE ? {
+  nome:          'Farmacia ______',
+  nomeEtichetta: 'Farmacia ______',
+  indirizzo:     'Indirizzo ______',
+  indirizzoTel:  'Indirizzo ______ — Tel. ______',
+  indirizzoDymo: 'Indirizzo ______',
+  firma:         'Farmacia ______\nIndirizzo ______\nTel. ______\nP.I. ______\n',
+} : {
+  nome:          'Farmacia della Stazione',
+  nomeEtichetta: 'Farmacia Della Stazione',
+  indirizzo:     'Via Fiume 75 — La Spezia',
+  indirizzoTel:  'Via Fiume 75 — 19122 La Spezia — Tel. 0187-706147',
+  indirizzoDymo: 'Via Fiume 75 La Spezia',
+  firma:         'Farmacia della Stazione\nVia Fiume 75 — La Spezia\nTel. 0187-706147\nP.I. 01317570115\nCod. QU Farma 6706\n',
+};
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
@@ -4563,15 +4581,15 @@ function stampaDymo() {
 
   // Testo formattato per DYMO Label (copia-incolla oppure SDK futuro)
   const testo1 =
-    'Farmacia Della Stazione\n'+
-    'Via Fiume 75 — 19122 La Spezia — Tel. 0187-706147\n'+
+    FARMACIA.nomeEtichetta+'\n'+
+    FARMACIA.indirizzoTel+'\n'+
     (paz ? 'sig. '+paz+'\n' : '')+
     nome+(qty?' '+qty:'')+'\n'+
     (data?'pr. '+data:'')+(mesi?' — vale '+mesi+' mesi':'')+'\n'+
     (!isNaN(prezzo)&&prezzo>0?'€ '+prezzo.toFixed(2)+'  ':'')+uso;
 
   const testo2 =
-    'Farmacia Della Stazione — Via Fiume 75 La Spezia\n'+
+    FARMACIA.nomeEtichetta+' — '+FARMACIA.indirizzoDymo+'\n'+
     nome+'\n'+
     (h?h+'\n':'')+
     '⚠ Tenere fuori dalla portata dei bambini.\n'+
@@ -6196,8 +6214,20 @@ function applyLogos() {
   document.querySelectorAll('img[data-logo="wide"]').forEach(img => { img.src = LOGO_WIDE; });
 }
 
+// Modalità demo: sostituisce i default HTML delle etichette con i dati generici
+// e accende la classe CSS che mostra la fascia demo e nasconde logo/token.
+function applyDemoMode() {
+  if (!DEMO_MODE) return;
+  document.body.classList.add('demo-on');
+  document.getElementById('e-farmacia').value = FARMACIA.nomeEtichetta;
+  document.getElementById('e-indirizzo').value = FARMACIA.indirizzoTel;
+  document.getElementById('ev2-farmacia').textContent = FARMACIA.nomeEtichetta;
+  document.getElementById('ev2-indirizzo').textContent = FARMACIA.indirizzo;
+}
+
 (async function bootInit() {
   applyLogos();
+  applyDemoMode();
   if (window.location.hash && window.location.hash.startsWith('#prev=')) {
     await prevCheckSharedLink();
     return; // non avviare il resto dell'app
