@@ -898,8 +898,20 @@
       <span>Da ordinare</span>
       <div style="display:flex;gap:8px">
         <button class="btn-add" style="font-size:12px;padding:4px 12px" onclick="ordinaAggiungiManuale()">+ Aggiungi</button>
-        <button class="btn-add" style="font-size:12px;padding:4px 12px;background:var(--accent-mid)" onclick="ordinaEmail()">✉ Email Farmalabor</button>
+        <button class="btn-add" id="btn-email-ordini" style="font-size:12px;padding:4px 12px;background:var(--accent-mid)" onclick="ordinaEmail()">✉ Email Farmalabor</button>
       </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;font-size:12px">
+      <span style="color:var(--text-muted)">Fornitore</span>
+      <select id="fornitore-sel" onchange="fornitoreSceltoDaMenu(this.value)" style="font-size:12px;padding:3px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text)"></select>
+      <button id="fornitore-del" onclick="fornitoreElimina(fornitoreSelezionato().email)" title="Togli questo fornitore dall'elenco" aria-label="Togli fornitore"
+        style="display:none;border:1px solid var(--border-strong);border-radius:var(--radius);background:none;cursor:pointer;font-size:11px;padding:2px 6px;color:var(--text-muted)">✕</button>
+    </div>
+    <div id="fornitore-nuovo" style="display:none;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px;font-size:12px">
+      <input type="text" id="fornitore-nome" placeholder="Nome fornitore" style="width:140px;font-size:12px;padding:3px 6px">
+      <input type="email" id="fornitore-email" placeholder="email ordini" style="width:180px;font-size:12px;padding:3px 6px">
+      <button class="btn-add" style="font-size:12px;padding:3px 10px" onclick="fornitoreSalvaDaCampi()">Salva</button>
+      <button onclick="fornitoriRender()" style="font-size:12px;padding:3px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:none;cursor:pointer;color:var(--text-muted)">Annulla</button>
     </div>
     <div id="ordini-lista" style="margin-top:8px"></div>
     <div style="font-size:11px;color:var(--text-faint);margin-top:8px">Le sostanze segnalate dall'AI come mancanti vengono aggiunte automaticamente. Puoi aggiungerne altre manualmente.</div>
@@ -1500,12 +1512,85 @@ function ordiniAggiornaNota(i, campo, val) {
 function ordinaEmail() {
   const list = ordiniLoad();
   if (!list.length) { alert('Nessuna sostanza da ordinare.'); return; }
-  const corpo = 'Spett.le Farmalabor,\n\nSi prega di quotare / spedire le seguenti sostanze:\n\n' +
+  const forn = fornitoreSelezionato();
+  const corpo = 'Spett.le ' + forn.nome + ',\n\nSi prega di quotare / spedire le seguenti sostanze:\n\n' +
     list.map(o => '- ' + o.nome + (o.minOrd ? ' — ' + o.minOrd : '') + (o.note ? ' (' + o.note + ')' : '')).join('\n') +
     '\n\n' + FARMACIA.firma;
   const subject = 'Ordine sostanze galeniche — ' + FARMACIA.nome;
-  const mailto = 'mailto:ordini@farmalabor.it?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(corpo);
+  const mailto = 'mailto:' + forn.email + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(corpo);
   window.open(mailto);
+}
+
+// ── Fornitori per l'email ordini ──
+// Farmalabor è il predefinito e non si elimina; altri fornitori (nome + email)
+// si aggiungono dal menu e restano nel browser. L'ultimo scelto resta selezionato.
+const FORNITORE_DEFAULT = Object.freeze({ nome: 'Farmalabor', email: 'ordini@farmalabor.it' });
+const FORNITORI_KEY = 'gal_fornitori';
+const FORNITORE_SEL_KEY = 'gal_fornitore_sel';
+
+function fornitoriLoad() {
+  let extra = [];
+  try { extra = JSON.parse(localStorage.getItem(FORNITORI_KEY) || '[]'); } catch(e) {}
+  return [FORNITORE_DEFAULT, ...(Array.isArray(extra) ? extra : [])];
+}
+function fornitoreSelezionato() {
+  let sel = '';
+  try { sel = localStorage.getItem(FORNITORE_SEL_KEY) || ''; } catch(e) {}
+  return fornitoriLoad().find(f => f.email === sel) || FORNITORE_DEFAULT;
+}
+function _fornitoreScegli(email) {
+  try { localStorage.setItem(FORNITORE_SEL_KEY, email); } catch(e) {}
+  fornitoriRender();
+}
+function fornitoreAggiungi(nome, email) {
+  nome = (nome || '').trim(); email = (email || '').trim().toLowerCase();
+  if (!nome) { alert('Scrivi il nome del fornitore.'); return false; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('Email del fornitore non valida.'); return false; }
+  const extra = fornitoriLoad().slice(1).filter(f => f.email !== email);
+  extra.push({ nome, email });
+  try { localStorage.setItem(FORNITORI_KEY, JSON.stringify(extra)); } catch(e) {}
+  _fornitoreScegli(email);
+  return true;
+}
+function fornitoreElimina(email) {
+  if (email === FORNITORE_DEFAULT.email) return;
+  const extra = fornitoriLoad().slice(1).filter(f => f.email !== email);
+  try { localStorage.setItem(FORNITORI_KEY, JSON.stringify(extra)); } catch(e) {}
+  // Se era il selezionato, fornitoreSelezionato() ricade su Farmalabor.
+  _fornitoreScegli(fornitoreSelezionato().email);
+}
+function fornitoreSceltoDaMenu(valore) {
+  if (valore === '__nuovo__') {
+    document.getElementById('fornitore-nuovo').style.display = 'flex';
+    const n = document.getElementById('fornitore-nome'); if (n && n.focus) n.focus();
+    return;
+  }
+  _fornitoreScegli(valore);
+}
+function fornitoreSalvaDaCampi() {
+  const nome = document.getElementById('fornitore-nome').value;
+  const email = document.getElementById('fornitore-email').value;
+  if (fornitoreAggiungi(nome, email)) {
+    document.getElementById('fornitore-nome').value = '';
+    document.getElementById('fornitore-email').value = '';
+  }
+}
+function fornitoriRender() {
+  const forn = fornitoreSelezionato();
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  const sel = document.getElementById('fornitore-sel');
+  if (sel) {
+    sel.innerHTML = fornitoriLoad().map(f =>
+      '<option value="' + esc(f.email) + '">' + esc(f.nome) + ' (' + esc(f.email) + ')</option>').join('') +
+      '<option value="__nuovo__">+ Altro fornitore…</option>';
+    sel.value = forn.email;
+  }
+  const btn = document.getElementById('btn-email-ordini');
+  if (btn) btn.textContent = '✉ Email ' + forn.nome;
+  const del = document.getElementById('fornitore-del');
+  if (del) del.style.display = forn.email === FORNITORE_DEFAULT.email ? 'none' : '';
+  const nuovo = document.getElementById('fornitore-nuovo');
+  if (nuovo) nuovo.style.display = 'none';
 }
 
 
@@ -4006,7 +4091,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 157;
+const APP_VERSION = 158;
 
 // DEMO_MODE è definito nel primo <script> dell'<head> (isola anche il localStorage).
 
@@ -6403,6 +6488,7 @@ function demoBenvenutoChiudi() {
   calcPrep();
   setTimeout(appRenderVersionBadge, 100);
   ordiniRender();
+  fornitoriRender();
   // Applica modalità preventivo persistente
   if (modPreventivo) {
     document.body.classList.add('preventivo-on');
