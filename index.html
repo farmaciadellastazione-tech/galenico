@@ -1070,7 +1070,7 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="gh-token-card">
     <div class="card-title">Token GitHub (sincronizzazione inventario)</div>
     <div class="ai-key-row">
       <input type="text" id="gh-token-input" placeholder="ghp_..." autocomplete="off" spellcheck="false">
@@ -3983,7 +3983,8 @@ const GIST_ID   = '6e97567a6b7e6408930936807c327144';
 const GIST_FILE = 'galenico_inventario.json';
 
 // ── Token GitHub ──
-function ghGetToken() { return localStorage.getItem(GH_TOKEN_KEY) || ''; }
+// In demo il token è ignorato: tutte le sync Gist (inventario/preventivi) restano spente.
+function ghGetToken() { return DEMO_MODE ? '' : (localStorage.getItem(GH_TOKEN_KEY) || ''); }
 
 function ghSalvaToken() {
   const t = document.getElementById('gh-token-input').value.trim();
@@ -5360,7 +5361,7 @@ async function prevSyncToGist() {
 // Fetch puro dal Gist (no localStorage mutation). Usabile sia dal proprietario
 // che da un visitatore esterno via link condiviso.
 async function prevFetchGist() {
-  if (!GIST_ID_PREV || GIST_ID_PREV === 'PASTE_HERE') return [];
+  if (DEMO_MODE || !GIST_ID_PREV || GIST_ID_PREV === 'PASTE_HERE') return [];
   try {
     const token = ghGetToken();
     const headers = { Accept: 'application/vnd.github.v3+json' };
@@ -5726,7 +5727,7 @@ function archivioRender(filtro) {
       '<div class="arch-data">' + (s.farm||'') + '</div>' +
       '<div class="arch-prezzo">' + prezzoFmt + '</div>' +
       '<div class="arch-btns">' +
-        (s.preventivo ? '<button onclick="prevCondividi(' + s.id + ')" title="Copia link condivisibile (read-only, accessibile da qualsiasi browser)" style="font-size:12px;padding:3px 8px;border:1px solid #2d6cdf;border-radius:4px;background:none;cursor:pointer;color:#2d6cdf;font-weight:600">🔗 Link</button>' : '') +
+        (s.preventivo && !DEMO_MODE ? '<button onclick="prevCondividi(' + s.id + ')" title="Copia link condivisibile (read-only, accessibile da qualsiasi browser)" style="font-size:12px;padding:3px 8px;border:1px solid #2d6cdf;border-radius:4px;background:none;cursor:pointer;color:#2d6cdf;font-weight:600">🔗 Link</button>' : '') +
         (s.preventivo ? '<button onclick="archApprova(' + s.id + ')" title="Approva preventivo → scheda definitiva" style="font-size:12px;padding:3px 8px;border:1px solid #c46d2c;border-radius:4px;background:#fde8d8;cursor:pointer;color:#7d3c0c;font-weight:600">✓ Approva</button>' : '') +
         (s.prepSnap && s.tariffSnap ? '<button onclick="archDuplica(' + s.id + ')" title="Duplica come nuova preparazione (ricarica formula e tariffazione, azzera paziente/lotti)" style="font-size:12px;padding:3px 8px;border:1px solid var(--accent);border-radius:4px;background:none;cursor:pointer;color:var(--accent)">📋 Duplica</button>' : '') +
         '<button onclick="archRiapri(' + s.id + ')" title="Riapri scheda" style="font-size:12px;padding:3px 8px;border:1px solid var(--border-strong);border-radius:4px;background:none;cursor:pointer;color:var(--accent)">↩</button>' +
