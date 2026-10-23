@@ -277,3 +277,54 @@ describe('I calcoli non toccano i dati salvati', () => {
     expect(protette).toEqual([]);
   });
 });
+
+// Review v164: il prezzo sbagliato arrivava anche da altre strade (righe di
+// Preparazione via invFindBest, principio attivo, importazione AI).
+describe('Strade reali del prezzo: niente prezzo di un\'altra sostanza (review v164)', () => {
+  const invVero = JSON.stringify([{ nome: 'Acido acetilsalicilico', prezzo: 0.5, unit: 'g', h: '' },
+                                  { nome: 'Acqua purificata', prezzo: 0.002, unit: 'ml', h: '' }]);
+
+  it('riga "Acido ialuronico": in Tariffazione non prende il prezzo dell\'acetilsalicilico d\'inventario', () => {
+    const H = buildCtx();
+    H.ctx.localStorage.setItem('gal_inventario_v1', invVero);
+    H.run(CREMA, [ {nome:'Acido ialuronico', qty:'1', unit:'g', isPa:true}, {nome:'Vaselina bianca', qty:'99', unit:'g'} ]);
+    const det = H.ctx.document.getElementById('tariff-detail').innerHTML.replace(/<[^>]+>/g, ' ');
+    expect(det).toMatch(/Acido Ialuronico\s+—\s+1,00\s+g\s+×\s+€\s+0,00/);
+    expect(H.ctx.document.getElementById('t-pa').value).toBe('');
+  });
+
+  it('riga "Acqua di rose": non prende il prezzo dell\'acqua purificata d\'inventario', () => {
+    const H = buildCtx();
+    H.ctx.localStorage.setItem('gal_inventario_v1', invVero);
+    H.run(SOLUZ, [ {nome:'Minoxidil', qty:'5', unit:'g', isPa:true}, {nome:'Acqua di rose', qty:'95', unit:'ml'} ]);
+    const det = H.ctx.document.getElementById('tariff-detail').innerHTML.replace(/<[^>]+>/g, ' ');
+    expect(det).toMatch(/Acqua di Rose\s+—\s+[\d,]+\s+(g|ml)\s+×\s+€\s+0,00/i);
+  });
+
+  it('importazione AI: "Acido ialuronico" non viene rinominato in acetilsalicilico', () => {
+    const H = buildCtx();
+    H.ctx.localStorage.setItem('gal_inventario_v1', invVero);
+    H.ctx.aiImportaTutti([{ nome: 'Acido ialuronico', qty: '1', unit: 'g' }, { nome: 'Vaselina bianca', qty: '99', unit: 'g' }], 'unguento');
+    expect(H.ctx.liberaRighe[0].nome).toBe('Acido ialuronico');
+    expect(H.ctx.liberaRighe[0].fonte).not.toBe('inventario');
+  });
+});
+
+// Le righe di Preparazione/Tariffazione cercavano la voce dell'Allegato A
+// SENZA il controllo del nome esatto: "Acido salicilico" veniva fatturato al
+// prezzo dell'acido acetilsalicilico, "Sodio cloruro" a quello del sodio
+// benzoato... (69 voci su 185). Ogni voce, in una riga, deve costare il SUO prezzo.
+describe('Righe: ogni voce dell\'Allegato A al proprio prezzo di legge', () => {
+  it('100 g di ciascuna delle 185 voci costano 100 × il suo prezzo', () => {
+    const H = buildCtx();
+    const sbagliate = [];
+    for (const [k, prezzo] of Object.entries(H.ctx.ALLEGATO_A)) {
+      H.run(CREMA, [ {nome: k, qty: '100', unit: 'g', isPa: true} ]);
+      const det = H.ctx.document.getElementById('tariff-detail').innerHTML.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+      const m = det.match(/Materie prime .*? × € [\d,]+\/(?:g|ml) (?:⚠ [^€]*)?€ ([\d.,]+)/);
+      const costo = m ? parseFloat(m[1].replace('.', '').replace(',', '.')) : NaN;
+      if (!(Math.abs(costo - Math.round(prezzo * 100 * 100) / 100) < 0.011)) sbagliate.push(k + ': ' + costo + ' invece di ' + (prezzo * 100).toFixed(2));
+    }
+    expect(sbagliate).toEqual([]);
+  });
+});

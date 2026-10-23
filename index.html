@@ -2529,7 +2529,7 @@ function calcPrep() {
           tarPADaAllegatoA = true;
         } else {
           // Cerca in inventario
-          const invFound = invLoadMerged().find(s => invNominalizza(s.nome).includes(qNorm) || qNorm.includes(invNominalizza(s.nome)));
+          const invFound = invTrovaPerPrezzo(qNorm, invLoadMerged());
           const prezzo = (invFound && invFound.prezzo > 0) ? invFound.prezzo : paRiga.prezzoAcq || 0;
           tPaEl.value = prezzo > 0 ? prezzo.toFixed(4) : '';
           tPaEl.readOnly = false;
@@ -2619,7 +2619,7 @@ function calcPrep() {
         prezzo = ALLEGATO_A[chiaveAll]; // All.A sempre in €/g
         isLiquido = false;
       } else {
-        const invFound = invFindBest(r.nome, invLoadMerged());
+        const invFound = invTrovaPerPrezzo(r.nome, invLoadMerged());
         if (invFound && invFound.prezzo > 0) {
           prezzo = invFound.prezzo;
           isLiquido = (invFound.unit === 'ml' || !!densita);
@@ -2964,8 +2964,10 @@ function tarRicercaPA() {
 
   if (!q || q.length < 8) { sug.innerHTML = ''; fonte.textContent = ''; return; }
 
-  // Cerca corrispondenza esatta
-  const esatta = ALLEGATO_A[q];
+  // Voce dell'Allegato A con la stessa ricerca di tutta l'app (pricing.js):
+  // esatta, parole in altro ordine, sole aggiunte innocue ("F.U.", "99%"...).
+  const chiaveEsatta = trovaVoceAllegatoA(nome);
+  const esatta = chiaveEsatta ? ALLEGATO_A[chiaveEsatta] : undefined;
   if (esatta !== undefined) {
     inputPA.value = esatta.toFixed(4);
     inputPA.readOnly = true;
@@ -4115,7 +4117,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 164;
+const APP_VERSION = 165;
 
 // DEMO_MODE è definito nel primo <script> dell'<head> (isola anche il localStorage).
 
@@ -5010,7 +5012,7 @@ function aiRenderImportCard(comps, daOrdinare, tipo) {
   if (!comps.length) return '';
   const inv = typeof invLoadMerged === 'function' ? invLoadMerged() : [];
   const rows = comps.map(c => {
-    const found = invFindBest(c.nome, inv);
+    const found = invTrovaPerPrezzo(c.nome, inv);
     const badge = found
       ? '<span style="font-size:10px;color:var(--accent);margin-left:4px">\u2713 inventario</span>'
       : '<span style="font-size:10px;color:#c05000;margin-left:4px;font-weight:600">\u26a0 da ordinare</span>';
@@ -5026,7 +5028,7 @@ function aiRenderImportCard(comps, daOrdinare, tipo) {
     : '';
   // L'AI pu\u00f2 segnalare come "da ordinare" sostanze che in realt\u00e0 sono in inventario con nome diverso.
   // Filtra applicando il match fuzzy: lascia solo quelle davvero non presenti.
-  const realDaOrdinare = (daOrdinare || []).filter(n => !invFindBest(n, inv));
+  const realDaOrdinare = (daOrdinare || []).filter(n => !invTrovaPerPrezzo(n, inv));
   let ordinareHtml = '';
   if (realDaOrdinare.length) {
     ordinareHtml = '<div style="margin-top:8px;padding:6px 8px;background:var(--warn-bg);border-radius:var(--radius);font-size:12px;color:var(--warn);border:1px solid var(--warn-border)">' +
@@ -5087,7 +5089,7 @@ function aiImportaTutti(comps, tipo) {
     // Stessa ricerca di tutto il resto dell'app (pricing.js), mai sul primo token:
     // "acido borico" matchava "acido acetilsalicilico" perché iniziano per "acido".
     const chiaveAll = trovaVoceAllegatoA(qNorm);
-    const invFound = invFindBest(c.nome, inv);
+    const invFound = invTrovaPerPrezzo(c.nome, inv);
     let nomeFinal = c.nome;
     let prezzoAcq = 0;
     let fonte = 'art5';

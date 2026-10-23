@@ -58,3 +58,57 @@ describe('invGetPrezzo senza aggancio per prima parola', () => {
     expect(invGetPrezzo('Acido salicilico', inv)).toMatchObject({ fonte: 'allegatoA', prezzo: ALLEGATO_A['acido salicilico'] });
   });
 });
+
+// Review v164: casi che la prima versione sbagliava o perdeva.
+import { tarCercaPA, invTrovaPerPrezzo } from '../pricing.js';
+
+describe('trovaVoceAllegatoA — review v164', () => {
+  it('"Acqua" (anche abbreviata) → acqua depurata, prezzo di legge', () => {
+    expect(trovaVoceAllegatoA('Acqua')).toBe('acqua depurata');
+    expect(trovaVoceAllegatoA('Acqua dep.')).toBe('acqua depurata');
+    expect(trovaVoceAllegatoA('Acqua purificata')).toBe('acqua purificata');
+    expect(trovaVoceAllegatoA('Acqua ossigenata')).toBe('acqua ossigenata');
+  });
+
+  it('parole in altro ordine: "Ossido di zinco" → zinco ossido', () => {
+    expect(trovaVoceAllegatoA('Ossido di zinco')).toBe('zinco ossido');
+    expect(trovaVoceAllegatoA('Cloruro di sodio')).toBe('sodio cloruro');
+    expect(trovaVoceAllegatoA('Bicarbonato di sodio')).toBe('sodio bicarbonato');
+  });
+
+  it('punteggiatura: "Lidocaina." → lidocaina (non lidocaina cloridrato)', () => {
+    expect(trovaVoceAllegatoA('Lidocaina.')).toBe('lidocaina');
+  });
+
+  it('parola in più che cambia sostanza: "Olio di ricino idrogenato" → nessuna voce', () => {
+    expect(trovaVoceAllegatoA('Olio di ricino idrogenato')).toBe(null);
+  });
+
+  it('aggiunte innocue: sigle, purezza, numeri', () => {
+    expect(trovaVoceAllegatoA('Acido salicilico Ph. Eur.')).toBe('acido salicilico');
+    expect(trovaVoceAllegatoA('Zinco ossido 99,5%')).toBe('zinco ossido');
+    expect(trovaVoceAllegatoA('Talco ventilato')).toBe('talco');
+  });
+});
+
+describe('tarCercaPA — suggerimenti senza prima parola (review v164)', () => {
+  it('"acido ialuronico" non propone altri acidi', () => {
+    expect(tarCercaPA('acido ialuronico')).toEqual([]);
+  });
+  it('parole in altro ordine: "ossido zinco" propone zinco ossido', () => {
+    expect(tarCercaPA('ossido zinco').map(([k]) => k)).toContain('zinco ossido');
+  });
+});
+
+describe('invTrovaPerPrezzo — inventario senza somiglianza vaga (review v164)', () => {
+  const inv = [ { nome: 'Acido acetilsalicilico', prezzo: 0.5, unit: 'g' },
+                { nome: 'Acqua purificata', prezzo: 0.002, unit: 'ml' },
+                { nome: 'Acido ialuronico', prezzo: 4.5, unit: 'g' } ];
+  it('acido ialuronico trova sé stesso, non l\'acetilsalicilico', () => {
+    expect(invTrovaPerPrezzo('Acido ialuronico', inv).nome).toBe('Acido ialuronico');
+    expect(invTrovaPerPrezzo('Acido ialuronico', inv.slice(0, 2))).toBe(null);
+  });
+  it('acqua di rose non trova l\'acqua purificata', () => {
+    expect(invTrovaPerPrezzo('Acqua di rose', inv)).toBe(null);
+  });
+});
