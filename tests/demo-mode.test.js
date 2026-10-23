@@ -125,6 +125,28 @@ describe('Modalità demo (?demo=1)', () => {
   });
 });
 
+describe('Volume soluzione', () => {
+  it('Invio applica il nuovo volume e riscala le righe (non solo uscendo dal campo)', async () => {
+    const H = await boot('?demo=1');
+    H.eval('caricaEsempioDemo()');
+    H.byId('vol-soluzione').value = '100';
+    let prevented = false;
+    H.eval('volSoluzioneKeydown')({ key: 'Enter', preventDefault(){ prevented = true; } });
+    const q = H.eval('liberaRighe').map(r => parseFloat(r.qty));
+    expect(q[0]).toBeCloseTo(4.7285, 3);   // Minoxidil scalato da 5 g (105,7 ml → 100 ml)
+    expect(q[1]).toBeCloseTo(47.2851, 3);  // Etanolo 96°
+    expect(prevented).toBe(true);
+  });
+
+  it('altri tasti non riscalano', async () => {
+    const H = await boot('?demo=1');
+    H.eval('caricaEsempioDemo()');
+    H.byId('vol-soluzione').value = '100';
+    H.eval('volSoluzioneKeydown')({ key: '0', preventDefault(){} });
+    expect(parseFloat(H.eval('liberaRighe')[0].qty)).toBe(5);
+  });
+});
+
 describe('Demo: esempio e benvenuto', () => {
   it('"Prova un esempio" compila Minoxidil 5% e Tariffazione = Scheda', async () => {
     const H = await boot('?demo=1');

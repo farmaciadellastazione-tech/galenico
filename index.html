@@ -451,7 +451,7 @@
       <span class="field-label">Volume soluzione</span>
       <input type="number" id="vol-soluzione" min="0" step="0.1" placeholder="auto"
         style="width:80px;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
-        onchange="volSoluzioneChanged()">
+        onchange="volSoluzioneChanged()" onkeydown="volSoluzioneKeydown(event)" onwheel="this.blur()">
       <span style="font-family:var(--mono);font-size:13px;color:var(--text-faint)">ml</span>
       <span style="font-size:11px;color:var(--text-faint);margin-left:8px">modifica per scalare tutte le righe proporzionalmente</span>
     </div>
@@ -1921,6 +1921,16 @@ function volSoluzioneChanged() {
   });
   liberaRenderRighe();
   calcPrep();
+}
+
+// Invio applica subito il volume (onchange scatta solo uscendo dal campo).
+// Il successivo blur trova ratio 1 e non riscala due volte. La rotellina
+// invece fa blur (onwheel nell'HTML): altrimenti cambierebbe il valore di
+// nascosto mentre si scorre la pagina.
+function volSoluzioneKeydown(ev) {
+  if (ev.key !== 'Enter') return;
+  ev.preventDefault();
+  volSoluzioneChanged();
 }
 
 // Crea/aggiorna le righe "Etanolo 96°" e "Acqua purificata" per un veicolo
@@ -3923,7 +3933,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 148;
+const APP_VERSION = 149;
 
 // Modalità demo (?demo=1 nel link): versione di prova da far girare tra
 // colleghi. Niente lettura/scrittura sui Gist e dati farmacia generici.
