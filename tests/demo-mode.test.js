@@ -231,6 +231,90 @@ describe('Grado alcolico: calcolato e bloccato se la formula ha già etanolo', (
   });
 });
 
+describe('Review v147–v152', () => {
+  it('Invio poi uscita dal campo: il change successivo non riapplica (Volume e Grado)', async () => {
+    const H = await boot('?demo=1');
+    H.eval('caricaEsempioDemo()');
+    H.byId('vol-soluzione').value = '100';
+    H.eval('volSoluzioneKeydown')({ key: 'Enter', preventDefault(){} });
+    let n = 0;
+    H.eval('campoChange')(H.byId('vol-soluzione'), () => { n++; });
+    H.eval('gradoAlcSblocca()');
+    H.byId('grado-alc').value = '50';
+    H.eval('gradoAlcKeydown')({ key: 'Enter', preventDefault(){} });
+    H.eval('campoChange')(H.byId('grado-alc'), () => { n++; });
+    expect(n).toBe(0);
+  });
+
+  it('change senza Invio precedente applica normalmente', async () => {
+    const H = await boot('?demo=1');
+    let n = 0;
+    H.eval('campoChange')(H.byId('vol-soluzione'), () => { n++; });
+    expect(n).toBe(1);
+  });
+
+  it('"Alcol benzilico" non è etanolo: campo non bloccato e riga non sovrascritta', async () => {
+    const H = await boot('?demo=1');
+    H.eval(`liberaRighe = [
+      { nome:'Alcol benzilico', qty:'1', unit:'g', isPa:false, densita:null },
+      { nome:'Acqua purificata', qty:'100', unit:'ml', isPa:false, densita:null }]; calcPrep();`);
+    expect(H.byId('grado-alc').readOnly).toBe(false);
+    H.byId('vol-soluzione').value = '100';
+    H.byId('grado-alc').value = '40';
+    H.eval('gradoAlcChanged()');
+    const righe = H.eval('liberaRighe');
+    const benz = righe.find(r => r.nome === 'Alcol benzilico');
+    expect(benz.qty).toBe('1');
+    expect(benz.unit).toBe('g');
+    expect(righe.some(r => r.nome.startsWith('Etanolo'))).toBe(true);
+  });
+
+  it('"Alcool 96°" è etanolo: campo bloccato', async () => {
+    const H = await boot('?demo=1');
+    H.eval(`liberaRighe = [
+      { nome:'Alcool 96°', qty:'50', unit:'ml', isPa:false, densita:null },
+      { nome:'Acqua purificata', qty:'50', unit:'ml', isPa:false, densita:null }]; calcPrep();`);
+    expect(H.byId('grado-alc').readOnly).toBe(true);
+  });
+
+  it('dopo ✎ uscire senza modificare riblocca il campo', async () => {
+    const H = await boot('?demo=1');
+    H.eval('caricaEsempioDemo()');
+    H.eval('gradoAlcSblocca()');
+    expect(H.byId('grado-alc').readOnly).toBe(false);
+    H.eval('gradoAlcBlur()');
+    expect(H.byId('grado-alc').readOnly).toBe(true);
+  });
+
+  it('?demo=0 non attiva la demo; ?demo e ?demo=1 sì', async () => {
+    expect((await boot('?demo=0')).eval('DEMO_MODE')).toBe(false);
+    expect((await boot('?demo')).eval('DEMO_MODE')).toBe(true);
+    expect((await boot('?x=1&demo=1')).eval('DEMO_MODE')).toBe(true);
+  });
+
+  it('campo Grado svuotato: il riferimento "a vuoto" non resta quello vecchio', async () => {
+    const H = await boot('?demo=1');
+    H.eval('caricaEsempioDemo()');                         // grado calcolato 56.2
+    H.eval('liberaRighe = []; calcPrep();');               // formula vuota: campo svuotato
+    H.eval(`liberaRighe = [{ nome:'Minoxidil', qty:'5', unit:'g', isPa:true, densita:null }]; calcPrep();`);
+    H.byId('vol-soluzione').value = '100';
+    H.byId('grado-alc').value = '56.2';
+    H.eval('gradoAlcKeydown')({ key: 'Enter', preventDefault(){} });
+    expect(H.eval('liberaRighe').some(r => r.nome.startsWith('Etanolo'))).toBe(true);
+  });
+
+  it('demo nel browser dove si usa l\'app (archivio o token presenti): avviso visibile', async () => {
+    const conArchivio = await boot('?demo=1', { ls: { gal_archivio_schede_v1: '[{"num":"2026/001"}]' } });
+    expect(conArchivio.byId('demo-avviso-browser').style.display).toBe('block');
+    const conToken = await boot('?demo=1', { token: 'ghp_finto' });
+    expect(conToken.byId('demo-avviso-browser').style.display).toBe('block');
+    const pulito = await boot('?demo=1');
+    expect(pulito.byId('demo-avviso-browser').style.display).toBe('none');
+    const prod = await boot('', { token: 'ghp_finto' });
+    expect(prod.byId('demo-avviso-browser').style.display).toBe('none');
+  });
+});
+
 describe('Rotellina sui campi numerici', () => {
   const campo = (type) => { const el = { type, blurred: false, blur(){ this.blurred = true; } }; return el; };
 
