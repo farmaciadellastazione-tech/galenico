@@ -699,6 +699,9 @@
     </div>
     <div class="field-row"><span class="field-label">Prezzo al pubblico (€)</span><input type="number" id="s-prezzo" value="" step="0.01" min="0" oninput="aggiornaScheda()"><span class="field-note">vuoto = calcolato (come Tariffazione); compila solo per forzare un prezzo</span></div>
     <div class="card-title" style="margin-top:1rem;">Lotti materie prime</div>
+    <!-- Formula libera: una riga per ingrediente (schedaLottiRender). I campi fissi sotto restano per le schede legacy. -->
+    <div id="s-lotti-libera"></div>
+    <div id="s-lotti-fissi">
     <div class="field-row">
       <span class="field-label">Lotto PA</span>
       <input type="text" id="s-lotto-as" value="" oninput="aggiornaScheda()" style="width:120px;">
@@ -719,6 +722,7 @@
       <input type="text" id="s-lotto-eccip" value="" oninput="aggiornaScheda()" style="width:120px;">
       <select id="s-lotto-eccip-sel" onchange="onLottoSelChange('s-lotto-eccip')" style="margin-left:6px;font-size:12px;max-width:220px"><option value="">— scegli lotto —</option></select>
     </div></div>
+    </div>
   </div>
 
   <button class="print-btn" onclick="window.print()">&#128438;&nbsp; Stampa / Salva PDF</button>
@@ -3050,6 +3054,7 @@ function setTipoScheda(t, btn) {
 }
 
 function aggiornaScheda() {
+  schedaLottiRender();
   const num    = document.getElementById('s-num').value||'';
   const prep   = document.getElementById('s-prep').value||'Preparazione galenica';
   const paz    = document.getElementById('s-paz').value||'\u2014';
@@ -3444,6 +3449,13 @@ function aggiornaScheda() {
     baseB = Math.max(0,baseB); nomeVoceB = 'Cartine/cialdini (voce 6)';
   }
 
+  // Formula libera: i lotti in stampa sono quelli di OGNI ingrediente (liberaRighe[i].lotto),
+  // non i campi fissi PA/etanolo/acqua/eccipiente (che perdevano il 3°/4° ingrediente).
+  const _righeLotti = _schedaLottiRighe();
+  if (_righeLotti.length) {
+    lottiItems = _righeLotti.map(({ r }) => ({ nome: _lottoNomeRiga(r), lotto: r.lotto || '—' }));
+  }
+
   // ═══════ calcolo tariff (motore unico — identico a calcTariff) ═══════
   // Modalità unica libera: PA, etanolo ed extra sono in liberaRigheExtra/liberaCostoExtra.
   // baseB e nomeVoceB sono già calcolati per forma sopra (con gli scaglioni All. B).
@@ -3622,6 +3634,71 @@ function onLottoSelChange(fieldId) {
   aggiornaScheda();
 }
 
+// ── Lotti per riga (formula libera, v146) ──
+// Una riga lotto per ogni ingrediente di liberaRighe (prima c'erano solo i campi fissi
+// PA/etanolo/acqua/eccipiente: un 4° ingrediente come il glicole non aveva un campo).
+// Il lotto vive in liberaRighe[i].lotto → stampa e archivio (prepSnap) lo seguono.
+function _schedaLottiRighe() {
+  return liberaRighe.map((r, i) => ({ r, i })).filter(x => x.r.nome && x.r.qty);
+}
+function _lottoNomeRiga(r) { return r.daSpecialita ? (r.specNome || r.nome) : r.nome; }
+let _schedaLottiSig = null;
+
+// force: ricostruisci anche se invariato; prefill: lotti vuoti ← primo lotto FEFO da inventario.
+function schedaLottiRender(force, prefill) {
+  const box   = document.getElementById('s-lotti-libera');
+  const fissi = document.getElementById('s-lotti-fissi');
+  if (!box || !fissi) return;
+  const righe = _schedaLottiRighe();
+  fissi.style.display = righe.length ? 'none' : '';
+  const sig = righe.map(x => x.i + ':' + x.r.nome + ':' + (x.r.lotto || '')).join('|');
+  if (!force && !prefill && sig === _schedaLottiSig) return;
+  // Non rubare il focus mentre l'operatore scrive (come liberaRenderRighe).
+  const act = document.activeElement;
+  if (!force && act && box.contains && box.contains(act)) return;
+  const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  box.innerHTML = righe.map(({ r, i }) =>
+    '<div class="field-row"><span class="field-label">Lotto ' + esc(titleCase(_lottoNomeRiga(r))) + '</span>' +
+    '<input type="text" id="s-lotto-r' + i + '" value="' + esc(r.lotto || '') + '" oninput="schedaLottoInput(' + i + ', this.value)" style="width:120px;">' +
+    '<select id="s-lotto-r' + i + '-sel" onchange="schedaLottoSel(' + i + ')" style="margin-left:6px;font-size:12px;max-width:220px"><option value="">— scegli lotto —</option></select></div>'
+  ).join('');
+  righe.forEach(({ r, i }) => {
+    const id = 's-lotto-r' + i;
+    const n = invNominalizza(r.nome);
+    const cand = trovaLottiCandidati([n, n.split(' ')[0]]);
+    popolaLottoSelect(id, cand); // seleziona il primo FEFO e lo scrive nell'input
+    const inp = document.getElementById(id), sel = document.getElementById(id + '-sel');
+    if (r.lotto || !prefill) {
+      // Mantieni il lotto della riga (anche vuoto): il FEFO è solo un suggerimento nel menu.
+      const k = cand.findIndex(c => c.lotto === r.lotto);
+      inp.value = r.lotto || '';
+      inp.dataset.scad = k >= 0 ? (cand[k].scad || '') : '';
+      sel.value = k >= 0 ? String(k) : '';
+    } else {
+      r.lotto = inp.value || '';
+    }
+  });
+  _schedaLottiSig = _schedaLottiRighe().map(x => x.i + ':' + x.r.nome + ':' + (x.r.lotto || '')).join('|');
+}
+
+function schedaLottoInput(i, v) {
+  if (!liberaRighe[i]) return;
+  liberaRighe[i].lotto = v;
+  const inp = document.getElementById('s-lotto-r' + i);
+  if (inp) inp.dataset.scad = '';
+  if (sMesiAuto) ricalcolaScadenzaAuto(); else aggiornaScheda();
+}
+
+function schedaLottoSel(i) {
+  const id = 's-lotto-r' + i;
+  const sel = document.getElementById(id + '-sel'), inp = document.getElementById(id);
+  if (!sel || !inp || !liberaRighe[i]) return;
+  const opt = sel.options[sel.selectedIndex];
+  if (opt && opt.dataset.lotto) { inp.value = opt.dataset.lotto; inp.dataset.scad = opt.dataset.scad || ''; }
+  liberaRighe[i].lotto = inp.value;
+  if (sMesiAuto) ricalcolaScadenzaAuto(); else aggiornaScheda();
+}
+
 // Modalità auto: true finché l'operatore non modifica manualmente s-mesi.
 let sMesiAuto = true;
 function onMesiManualEdit() {
@@ -3633,7 +3710,9 @@ function onMesiManualEdit() {
 
 function ricalcolaScadenzaAuto() {
   sMesiAuto = true;
-  const ids   = ['s-lotto-as','s-lotto-et','s-lotto-ac','s-lotto-eccip'];
+  const _righeL = _schedaLottiRighe();
+  const ids   = _righeL.length ? _righeL.map(x => 's-lotto-r' + x.i)
+                               : ['s-lotto-as','s-lotto-et','s-lotto-ac','s-lotto-eccip'];
   const scads = ids.map(id => { const el = document.getElementById(id); return el && el.dataset.scad ? el.dataset.scad : ''; });
   const noms  = ids.map(id => { const el = document.getElementById(id); return el ? el.value : ''; });
   const dataPrep = document.getElementById('s-data').value;
@@ -3802,6 +3881,8 @@ function compilaScheda() {
   popolaLottoSelect('s-lotto-et',    candET);
   popolaLottoSelect('s-lotto-ac',    candAC);
   popolaLottoSelect('s-lotto-eccip', candEC);
+  // Formula libera: una riga lotto per ingrediente, lotti vuoti ← primo FEFO.
+  schedaLottiRender(true, true);
   // Calcolo automatico della validità in base ai lotti selezionati e al tipo
   sMesiAuto = true;
   ricalcolaScadenzaAuto();
@@ -3823,7 +3904,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 145;
+const APP_VERSION = 146;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
@@ -5716,6 +5797,7 @@ function archDuplica(id) {
   // 1. Ripristina input completo
   prepRestore(s.prepSnap);
   tariffRestore(s.tariffSnap);
+  liberaRighe.forEach(r => { r.lotto = ''; }); // nuova preparazione = nuovi lotti
 
   // 2. Riallinea tipo Scheda al tipo Preparazione (la scheda originale potrebbe
   //    avere un altro tipoScheda salvato; qui ricalchiamo il tipo di prep).

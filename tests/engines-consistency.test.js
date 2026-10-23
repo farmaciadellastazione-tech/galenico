@@ -311,6 +311,33 @@ describe('Tariffazione ↔ Scheda: stesso prezzo (motore unico)', () => {
     expect(parseFloat(arch[0].prezzo)).toBeCloseTo(tar, 2);
   });
 
+  // ── v146: lotti per ogni ingrediente della formula libera ──
+  it('Lotti: ogni ingrediente (anche il 3° di un unguento) compare nella Scheda', () => {
+    H.run({ prep:'unguento', tariff:'semisolida', scheda:'unguento' },
+      [ {nome:'Acido salicilico', qty:'3', unit:'g', isPa:true, lotto:'AS-01'},
+        {nome:'Vaselina filante bianca', qty:'87', unit:'g', lotto:'VA-02'},
+        {nome:'Lanolina', qty:'10', unit:'g', lotto:'LA-03'} ],
+      { 't-fl':'1.55', 'totale-prep':'100' });
+    const html = H.byId('scheda-preview').innerHTML;
+    ['AS-01','VA-02','LA-03'].forEach(l => expect(html).toContain(l));
+  });
+
+  it('Lotti: il lotto scritto nella Scheda va sulla riga della formula (glicole)', () => {
+    H.run(SOL, MINOX, { 't-fl':'1.55', 'totale-prep':'100' });
+    H.ctx.schedaLottoInput(2, 'GL-777');     // riga 2 = Glicole propilenico
+    expect(H.ctx.liberaRighe[2].lotto).toBe('GL-777');
+    expect(H.byId('scheda-preview').innerHTML).toContain('GL-777');
+  });
+
+  it('Lotti: Duplica da archivio azzera i lotti delle righe', () => {
+    H.run(SOL, MINOX.map(r => ({...r, lotto:'L-'+r.nome})), { 't-fl':'1.55', 'totale-prep':'100', 's-prep':'Minoxidil 5%', 's-farm':'Test' });
+    H.ctx.salvaInArchivio();
+    const arch = JSON.parse(H.ctx.localStorage.getItem('gal_archivio_schede_v1') || '[]');
+    H.ctx.archDuplica(arch[0].id);
+    expect(H.ctx.liberaRighe.length).toBe(4);
+    expect(H.ctx.liberaRighe.every(r => !r.lotto)).toBe(true);
+  });
+
   it('Prezzo manuale in Scheda: resta un override esplicito', () => {
     const r = H.run(SOL, MINOX, { 't-fl':'1.55', 'totale-prep':'100', 's-prezzo':'25.00' });
     expect(r.sch).toBeCloseTo(25.00, 2);
