@@ -337,22 +337,29 @@ function hasHazard(hStr) {
   });
 }
 
-// True se il nome indica etanolo: "etanolo" a parola intera (non
-// "fenossietanolo"), "etil alcool", oppure "alcool/alcol ..." (al 96%, etilico,
-// denaturato...) TRANNE gli altri alcoli (cetilico, benzilico, stearilico...),
-// che il vecchio includes('alcol') scambiava per etanolo: densità, % etanolo,
-// procedura ("sciogliere il PA nell'etanolo") e grado alcolico sbagliati.
+// True se il nome indica etanolo. Si accettano SOLO forme sicure — "etanolo"
+// a parola intera (non "fenossietanolo"), "etil alcool", veicoli
+// "idroalcolici", e "alcool/alcol" da solo o seguito da etilico, denaturato,
+// assoluto, puro, grado ("96°", "al 96%", "70") — così ogni altro alcol
+// (cetilico, cetearilico, benzilico, propilico...) NON è etanolo, anche se non
+// è in nessun elenco. Il vecchio includes('alcol') sbagliava densità, % etanolo,
+// procedura ("sciogliere il PA nell'etanolo") e grado alcolico.
 function isEtanoloNome(nome) {
-  const t = invNominalizza(nome);
-  if (/(^|\s)etanolo/.test(t) || /^etil\s+alcoo?l/.test(t)) return true;
-  const m = t.match(/^alcoo?l\b\s*(.*)$/);
+  const t = invNominalizza(nome).replace(/[^a-z0-9%°\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (/(^|\s)etanolo/.test(t) || /^etil alcoo?l/.test(t) || /idroalcolic/.test(t)) return true;
+  const m = t.match(/^alcoo?l(?: (.*))?$/);
   if (!m) return false;
-  return !/^(cetil|cetostearil|stearil|benzil|feniletil|isopropil|polivinil|lauril|oleil|miristil|cinnamil|anisil|butil|metil)/.test(m[1]);
+  // Ogni parola dopo "alcool" dev'essere ammessa o un grado ("96", "96°", "70%"):
+  // "alcool 2 feniletilico" ha "feniletilico" → non è etanolo.
+  const AMMESSE = new Set(['etilico', 'denaturato', 'assoluto', 'puro', 'al', 'gradi', 'v', '°', '%']);
+  return (m[1] || '').split(' ').filter(Boolean)
+    .every(p => AMMESSE.has(p) || /^\d+(°|%)?$/.test(p));
 }
 
-// Chiavi di DENSITA che indicano etanolo: per queste decide isEtanoloNome,
-// non la sottostringa (altrimenti "alcool cetilico" avrebbe d=0,807).
-const _DENSITA_ETANOLO = new Set(['etanolo', 'alcol etilico', 'etanolo 96', 'alcool']);
+// Chiavi di DENSITA che indicano etanolo (ricavate, non duplicate a mano): per
+// queste decide isEtanoloNome, non la sottostringa (altrimenti "alcool
+// cetilico" avrebbe d=0,807).
+const _DENSITA_ETANOLO = new Set(Object.keys(DENSITA).filter(k => isEtanoloNome(k)));
 
 // Cerca la densità di un liquido per nome (substring match). null per solidi.
 function getDensita(nome) {

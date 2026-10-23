@@ -3222,8 +3222,6 @@ function aggiornaScheda() {
       mlET96s = percEt > 0 ? qt*percEt/96 : 0;
     }
     const nFlac  = 1;
-    const _etInvS = invLoadMerged().find(s => isEtanoloNome(s.nome));
-    const pET    = _etInvS ? (_etInvS.prezzo||0) : 0;
 
     if (liberaRighe.length > 0) {
       const {ingr: ingrL} = liberaCalcTotale();
@@ -4008,7 +4006,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 156;
+const APP_VERSION = 157;
 
 // DEMO_MODE è definito nel primo <script> dell'<head> (isola anche il localStorage).
 
@@ -5257,8 +5255,7 @@ let _aiLastImportTipo = null;
 
 // Match etanolo/acqua tra i nomi proposti dall'AI.
 function _aiIsEtanolo(nome) {
-  const n = invNominalizza(nome || '');
-  return isEtanoloNome(n);
+  return isEtanoloNome(nome || '');
 }
 function _aiIsAcqua(nome) {
   const n = invNominalizza(nome || '');

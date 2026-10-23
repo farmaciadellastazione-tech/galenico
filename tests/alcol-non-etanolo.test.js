@@ -142,3 +142,30 @@ describe('Altri alcoli non sono etanolo', () => {
     expect(ctx._aiIsEtanolo('Etanolo 96°')).toBe(true);
   });
 });
+
+// Review v156: un elenco di esclusioni non basta (ogni alcol non elencato
+// diventava etanolo). Ora si accettano SOLO le forme sicure di etanolo.
+describe('isEtanoloNome: solo forme sicure di etanolo (review v156)', () => {
+  it('alcoli non elencati, punteggiatura: NON etanolo e nessuna densità 0,807', () => {
+    const { ctx } = buildCtx();
+    for (const n of ['Alcool cetearilico', 'Alcool isostearilico', 'Alcool propilico', 'Alcool behenilico',
+                     'Alcool 2-feniletilico', 'Alcool diclorobenzilico', 'Alcool, cetilico', 'Alcool (cetilico)']) {
+      expect([n, ctx.isEtanoloNome(n)]).toEqual([n, false]);
+      expect([n, ctx.getDensita(n)]).not.toEqual([n, 0.807]);
+    }
+  });
+
+  it('forme di etanolo riconosciute (anche veicoli idroalcolici)', () => {
+    const { ctx } = buildCtx();
+    for (const n of ['Etanolo 96°', 'Alcool', 'Alcool 96°', 'Alcool al 96%', 'Alcol 70', 'Alcool etilico',
+                     'Alcool etilico denaturato', 'Alcool denaturato', 'Alcool assoluto', 'Etil alcool',
+                     'Estratto in etanolo', 'Soluzione idroalcolica 70%', 'Gel idroalcolico'])
+      expect([n, ctx.isEtanoloNome(n)]).toEqual([n, true]);
+  });
+
+  it('import AI: veicolo idroalcolico riconosciuto come etanolo', () => {
+    const { ctx } = buildCtx();
+    expect(ctx._aiIsEtanolo('Soluzione idroalcolica 70%')).toBe(true);
+    expect(ctx._aiIsEtanolo('Alcool cetearilico')).toBe(false);
+  });
+});
