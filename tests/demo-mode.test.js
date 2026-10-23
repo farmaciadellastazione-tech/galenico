@@ -285,6 +285,40 @@ describe('Riconoscimento etanolo (isEtanoloNome)', () => {
   });
 });
 
+describe('Riconoscimento etanolo: nomi comuni (review 3)', () => {
+  it('"Alcool al 96%", "Etil alcool", "Alcool denaturato" sono etanolo; isopropilico/laurilico no', async () => {
+    const H = await boot('');
+    const f = H.eval('isEtanoloNome');
+    for (const n of ['alcool al 96%', 'alcol al 70%', 'etil alcool', 'alcool denaturato', 'alcool etilico 96°'])
+      expect([n, f(n)]).toEqual([n, true]);
+    for (const n of ['alcool isopropilico', 'alcol laurilico', 'alcool stearilico', 'alcool oleilico', 'alcol polivinilico'])
+      expect([n, f(n)]).toEqual([n, false]);
+  });
+});
+
+describe('Rotellina: zoom e scorrimento orizzontale (review 3)', () => {
+  it('Ctrl+rotellina (zoom) non viene bloccata', async () => {
+    const H = await boot('');
+    const el = { type: 'number', blur(){} };
+    H.ctx.document.activeElement = el;
+    H.ctx.scrollBy = () => {};
+    const e = { target: el, ctrlKey: true, deltaX: 0, deltaY: 100, deltaMode: 0, prevented: false, preventDefault(){ this.prevented = true; } };
+    H.eval('numberWheel')(e);
+    expect(e.prevented).toBe(false);
+  });
+
+  it('scorrimento orizzontale passato alla pagina', async () => {
+    const H = await boot('');
+    const el = { type: 'number', blur(){} };
+    H.ctx.document.activeElement = el;
+    let sx = 0, sy = 0;
+    H.ctx.scrollBy = (x, y) => { sx += x; sy += y; };
+    H.eval('numberWheel')({ target: el, ctrlKey: false, deltaX: 40, deltaY: 0, deltaMode: 0, preventDefault(){} });
+    expect(sx).toBe(40);
+    expect(sy).toBe(0);
+  });
+});
+
 describe('Attivazione demo', () => {
   it('?demo=0 non attiva la demo; ?demo e ?demo=1 sì', async () => {
     expect((await boot('?demo=0')).eval('DEMO_MODE')).toBe(false);

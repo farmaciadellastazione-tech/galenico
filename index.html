@@ -23,6 +23,8 @@
   // dove si usa l'app vera (stesso sito = stesso localStorage) la demo non vede
   // né tocca archivio, numerazione schede, inventario, chiavi. Deve girare
   // prima di qualunque lettura, per questo sta in questo primo <script>.
+  // Copre getItem/setItem/removeItem, gli unici usati dall'app: NON key(),
+  // length, clear() né l'accesso localStorage.gal_x — non introdurli.
   if (DEMO_MODE) {
     try {
       const demoKey = (k) => (typeof k === 'string' && k.startsWith('gal_') && !k.startsWith('gal_demo_'))
@@ -1812,13 +1814,17 @@ function liberaGetIngr() {
 // Convenzione: "etanolo" / "alcool" è considerato 96° (0.96 v/v di etanolo puro, d=0.807).
 // Densità soluzione idroalcolica: approssimazione lineare d = 1.0 - 0.211 × (grado/100).
 //
-// True se il nome (già normalizzato) indica etanolo: "etanolo...", "alcool/alcol
-// etilico", "alcool"/"alcol" da soli o seguiti dal grado ("alcool 96°").
-// NON gli altri alcoli (cetilico, benzilico, cetostearilico...), che il vecchio
-// includes('alcol') scambiava per etanolo. Usata dal Grado alcolico.
+// True se il nome (già normalizzato) indica etanolo. NON gli altri alcoli
+// (cetilico, benzilico, cetostearilico...), che il vecchio includes('alcol')
+// scambiava per etanolo. Usata dal Grado alcolico.
 function isEtanoloNome(n) {
-  // Parole intere: "fenossietanolo" ed "etere etilico" non sono etanolo.
-  return /(^|\s)etanolo/.test(n) || /^alcoo?l\s+etilico/.test(n.trim()) || /^alcoo?l(\s*\d.*)?$/.test(n.trim());
+  // "etanolo" a parola intera (non "fenossietanolo"), "etil alcool", oppure
+  // "alcool/alcol ..." (al 96%, etilico, denaturato...) TRANNE gli altri alcoli.
+  const t = n.trim();
+  if (/(^|\s)etanolo/.test(t) || /^etil\s+alcoo?l/.test(t)) return true;
+  const m = t.match(/^alcoo?l\b\s*(.*)$/);
+  if (!m) return false;
+  return !/^(cetil|cetostearil|stearil|benzil|feniletil|isopropil|polivinil|lauril|oleil|miristil|cinnamil|anisil|butil|metil)/.test(m[1]);
 }
 function calcSoluzioneInfo(totalePrep, totalePrepUnit) {
   const ingr = liberaGetIngr();
@@ -2070,8 +2076,9 @@ function gradoAlcChanged() {
       }
     }
   }
-  // Applicato: torna un risultato calcolato. Se invece non è stato possibile
-  // (avvisi) resta sbloccato, così si può correggere il valore.
+  // Applicato: torna subito un risultato calcolato. Se non è stato possibile
+  // (avvisi) ci pensa comunque gradoAlcBlur all'uscita dal campo: si riblocca
+  // e mostra il grado reale; per riprovare si preme di nuovo ✎.
   if (liberaApplyVolGrado(totMl, desiredGrado)) {
     gradoAlcSbloccato = false;
     gradoAlcAggiornaBlocco();
@@ -4013,7 +4020,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 154;
+const APP_VERSION = 155;
 
 // DEMO_MODE è definito nel primo <script> dell'<head> (isola anche il localStorage).
 
@@ -6335,9 +6342,10 @@ function applyLogos() {
 function numberWheel(e) {
   const t = e.target;
   if (!(t && t.type === 'number' && t === document.activeElement)) return;
+  if (e.ctrlKey) return;   // Ctrl+rotellina = zoom del browser: non toccarlo
   e.preventDefault();
   const passo = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? window.innerHeight : 1;
-  window.scrollBy(0, e.deltaY * passo);
+  window.scrollBy((e.deltaX || 0) * passo, (e.deltaY || 0) * passo);
 }
 
 // Modalità demo: sostituisce i default HTML delle etichette con i dati generici
