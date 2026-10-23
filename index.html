@@ -904,14 +904,14 @@
     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;font-size:12px">
       <span style="color:var(--text-muted)">Fornitore</span>
       <select id="fornitore-sel" onchange="fornitoreSceltoDaMenu(this.value)" style="font-size:12px;padding:3px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text)"></select>
-      <button id="fornitore-del" onclick="fornitoreElimina(fornitoreSelezionato().email)" title="Togli questo fornitore dall'elenco" aria-label="Togli fornitore"
+      <button id="fornitore-del" onclick="fornitoreEliminaSelezionato()" title="Togli questo fornitore dall'elenco" aria-label="Togli fornitore"
         style="display:none;border:1px solid var(--border-strong);border-radius:var(--radius);background:none;cursor:pointer;font-size:11px;padding:2px 6px;color:var(--text-muted)">✕</button>
     </div>
     <div id="fornitore-nuovo" style="display:none;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px;font-size:12px">
-      <input type="text" id="fornitore-nome" placeholder="Nome fornitore" style="width:140px;font-size:12px;padding:3px 6px">
-      <input type="email" id="fornitore-email" placeholder="email ordini" style="width:180px;font-size:12px;padding:3px 6px">
+      <input type="text" id="fornitore-nome" placeholder="Nome fornitore" style="width:140px;font-size:12px;padding:3px 6px" onkeydown="fornitoreCampoKeydown(event)">
+      <input type="email" id="fornitore-email" placeholder="email ordini" style="width:180px;font-size:12px;padding:3px 6px" onkeydown="fornitoreCampoKeydown(event)">
       <button class="btn-add" style="font-size:12px;padding:3px 10px" onclick="fornitoreSalvaDaCampi()">Salva</button>
-      <button onclick="fornitoriRender()" style="font-size:12px;padding:3px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:none;cursor:pointer;color:var(--text-muted)">Annulla</button>
+      <button onclick="fornitoreAnnulla()" style="font-size:12px;padding:3px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:none;cursor:pointer;color:var(--text-muted)">Annulla</button>
     </div>
     <div id="ordini-lista" style="margin-top:8px"></div>
     <div style="font-size:11px;color:var(--text-faint);margin-top:8px">Le sostanze segnalate dall'AI come mancanti vengono aggiunte automaticamente. Puoi aggiungerne altre manualmente.</div>
@@ -1531,7 +1531,15 @@ const FORNITORE_SEL_KEY = 'gal_fornitore_sel';
 function fornitoriLoad() {
   let extra = [];
   try { extra = JSON.parse(localStorage.getItem(FORNITORI_KEY) || '[]'); } catch(e) {}
-  return [FORNITORE_DEFAULT, ...(Array.isArray(extra) ? extra : [])];
+  // Voci rovinate (null, stringhe, senza email) ignorate: non devono bloccare l'avvio.
+  const valide = (Array.isArray(extra) ? extra : []).filter(f =>
+    f && typeof f.nome === 'string' && typeof f.email === 'string' && f.email !== FORNITORE_DEFAULT.email);
+  return [FORNITORE_DEFAULT, ...valide];
+}
+// Salva l'elenco dei fornitori aggiunti; false (con avviso) se il browser non salva.
+function _fornitoriSalva(extra) {
+  try { localStorage.setItem(FORNITORI_KEY, JSON.stringify(extra)); return true; }
+  catch(e) { alert('Il browser non riesce a salvare i fornitori (memoria piena o bloccata).'); return false; }
 }
 function fornitoreSelezionato() {
   let sel = '';
@@ -1545,19 +1553,27 @@ function _fornitoreScegli(email) {
 function fornitoreAggiungi(nome, email) {
   nome = (nome || '').trim(); email = (email || '').trim().toLowerCase();
   if (!nome) { alert('Scrivi il nome del fornitore.'); return false; }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('Email del fornitore non valida.'); return false; }
+  // Solo caratteri sicuri in un link mailto: niente ? & # = che spezzerebbero l'email.
+  if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(email)) { alert('Email del fornitore non valida.'); return false; }
+  if (email === FORNITORE_DEFAULT.email) { alert(FORNITORE_DEFAULT.nome + ' è già nell\'elenco.'); return false; }
   const extra = fornitoriLoad().slice(1).filter(f => f.email !== email);
   extra.push({ nome, email });
-  try { localStorage.setItem(FORNITORI_KEY, JSON.stringify(extra)); } catch(e) {}
+  if (!_fornitoriSalva(extra)) return false;
   _fornitoreScegli(email);
   return true;
 }
 function fornitoreElimina(email) {
   if (email === FORNITORE_DEFAULT.email) return;
-  const extra = fornitoriLoad().slice(1).filter(f => f.email !== email);
-  try { localStorage.setItem(FORNITORI_KEY, JSON.stringify(extra)); } catch(e) {}
+  if (!_fornitoriSalva(fornitoriLoad().slice(1).filter(f => f.email !== email))) return;
   // Se era il selezionato, fornitoreSelezionato() ricade su Farmalabor.
   _fornitoreScegli(fornitoreSelezionato().email);
+}
+// Pulsante ✕: chiede conferma, come le altre eliminazioni dell'app.
+function fornitoreEliminaSelezionato() {
+  const f = fornitoreSelezionato();
+  if (f.email === FORNITORE_DEFAULT.email) return;
+  if (!confirm('Togliere ' + f.nome + ' (' + f.email + ') dai fornitori?')) return;
+  fornitoreElimina(f.email);
 }
 function fornitoreSceltoDaMenu(valore) {
   if (valore === '__nuovo__') {
@@ -1570,10 +1586,18 @@ function fornitoreSceltoDaMenu(valore) {
 function fornitoreSalvaDaCampi() {
   const nome = document.getElementById('fornitore-nome').value;
   const email = document.getElementById('fornitore-email').value;
-  if (fornitoreAggiungi(nome, email)) {
-    document.getElementById('fornitore-nome').value = '';
-    document.getElementById('fornitore-email').value = '';
-  }
+  if (fornitoreAggiungi(nome, email)) fornitoreAnnulla();
+}
+// Annulla (e dopo un salvataggio): svuota i campi e chiude il riquadro.
+function fornitoreAnnulla() {
+  document.getElementById('fornitore-nome').value = '';
+  document.getElementById('fornitore-email').value = '';
+  fornitoriRender();
+}
+function fornitoreCampoKeydown(ev) {
+  if (ev.key !== 'Enter') return;
+  ev.preventDefault();
+  fornitoreSalvaDaCampi();
 }
 function fornitoriRender() {
   const forn = fornitoreSelezionato();
@@ -4091,7 +4115,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 158;
+const APP_VERSION = 159;
 
 // DEMO_MODE è definito nel primo <script> dell'<head> (isola anche il localStorage).
 

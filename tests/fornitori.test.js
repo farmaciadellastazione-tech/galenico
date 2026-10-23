@@ -122,3 +122,56 @@ describe('Fornitore per l\'email ordini', () => {
     expect(H.byId('btn-email-ordini').textContent).toBe('✉ Email Acef');
   });
 });
+
+describe('Fornitori: review v158', () => {
+  it('email con caratteri che rompono il link (?, &, #, =) rifiutata', () => {
+    const H = buildCtx();
+    for (const e of ['ordini@acme.it?cc=x', 'ordini@acme.it#a', 'a&b@acme.it', 'ordini=x@acme.it'])
+      expect([e, H.ctx.fornitoreAggiungi('Acme', e)]).toEqual([e, false]);
+    expect(H.ctx.fornitoreAggiungi('Acme', 'ordini+gal@acme.it')).toBe(true);   // indirizzo valido normale
+  });
+
+  it('email di Farmalabor non si può aggiungere come altro fornitore (doppione)', () => {
+    const H = buildCtx();
+    expect(H.ctx.fornitoreAggiungi('Farmalabor Milano', 'ordini@farmalabor.it')).toBe(false);
+    expect(H.ctx.fornitoriLoad().length).toBe(1);
+  });
+
+  it('se il browser non salva: avviso e risultato false', () => {
+    const H = buildCtx();
+    H.ctx.localStorage.setItem = () => { throw new Error('QuotaExceeded'); };
+    expect(H.ctx.fornitoreAggiungi('Acef', 'ordini@acef.it')).toBe(false);
+    expect(H.avvisi.some(a => /salvare/i.test(a))).toBe(true);
+  });
+
+  it('voci rovinate nell\'elenco salvato vengono ignorate (niente errori)', () => {
+    const H = buildCtx({ gal_fornitori: '[null,"x",{"nome":"A"},{"nome":"Acef","email":"ordini@acef.it"}]',
+                         gal_fornitore_sel: 'ordini@acef.it' });
+    expect(H.ctx.fornitoriLoad().map(f => f.nome)).toEqual(['Farmalabor', 'Acef']);
+    expect(H.ctx.fornitoreSelezionato().nome).toBe('Acef');
+  });
+
+  it('✕ chiede conferma: se annullato il fornitore resta', () => {
+    const H = buildCtx();
+    H.ctx.fornitoreAggiungi('Acef', 'ordini@acef.it');
+    H.ctx.confirm = () => false;
+    H.ctx.fornitoreEliminaSelezionato();
+    expect(H.ctx.fornitoriLoad().map(f => f.nome)).toEqual(['Farmalabor', 'Acef']);
+    H.ctx.confirm = () => true;
+    H.ctx.fornitoreEliminaSelezionato();
+    expect(H.ctx.fornitoriLoad().map(f => f.nome)).toEqual(['Farmalabor']);
+  });
+
+  it('Annulla svuota i campi; Invio nel campo email salva', () => {
+    const H = buildCtx();
+    H.byId('fornitore-nome').value = 'Acef';
+    H.byId('fornitore-email').value = 'ordini@acef.it';
+    H.ctx.fornitoreAnnulla();
+    expect(H.byId('fornitore-nome').value).toBe('');
+    expect(H.byId('fornitore-email').value).toBe('');
+    H.byId('fornitore-nome').value = 'Acef';
+    H.byId('fornitore-email').value = 'ordini@acef.it';
+    H.ctx.fornitoreCampoKeydown({ key: 'Enter', preventDefault(){} });
+    expect(H.ctx.fornitoreSelezionato().nome).toBe('Acef');
+  });
+});

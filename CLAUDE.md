@@ -67,6 +67,8 @@ All state is in `localStorage` under `gal_*` keys:
 - `gal_scheda_counter_<anno>` — yearly counter, incremented **only on definitive save** via `salvaInArchivio()`, not on preview
 - `gal_gh_token` — GitHub PAT (gist scope)
 - `gal_groq_key` — Groq API key (must start with `gsk_`)
+- `gal_fornitori` — extra suppliers for the order email (`[{nome, email}]`); `gal_fornitore_sel` — email of the selected supplier
+- In demo mode (`?demo` / `?demo=1`) every `gal_*` key is transparently remapped to `gal_demo_*` (Storage patch in the first `<script>` of `<head>`), so the demo never sees or touches real data.
 
 Inventory mirrors to a **hardcoded GitHub Gist** (`GIST_ID = '6e97567a6b7e6408930936807c327144'`, file `galenico_inventario.json`) when a token is present. `invSave()` writes locally then PATCHes the Gist. `invSyncFromGist()` runs on init and overwrites local with remote. The list shown to users is always `invLoadMerged()` = `INV_HARDCODED` (built-in baseline) merged with localStorage by normalized name; `INV_OBBLIGATORIE` is a set that pins certain substances to the top of search results.
 
@@ -92,7 +94,7 @@ Renders two Dymo labels (32×57 mm, format S0722540) and prints via the local **
 - **Densities** are a small hardcoded `DENSITA` map used to convert g↔ml and to detect liquids; etanolo is 0.807.
 - **`showPage` is monkey-patched** near the bottom of `<script>` to also trigger `archivioRender` when entering the archive — if you wrap it again, preserve the chain.
 - **DOM-rebuild avoidance**: `liberaRenderRighe()` skips full innerHTML replacement if a child input has focus (to avoid stealing focus mid-type). Follow this pattern if you add similar dynamic rows.
-- **Farmalabor as upstream supplier**: hardcoded into the order email (`ordini@farmalabor.it`), the QR parser, and the SDS URL pattern. If the user changes supplier, those three places all need updating.
+- **Farmalabor as upstream supplier**: hardcoded into the QR parser and the SDS URL pattern. The order email uses the supplier chosen in the "Da ordinare" card: `FORNITORE_DEFAULT` (Farmalabor, `ordini@farmalabor.it`, not removable) plus user-added suppliers (`fornitoriLoad()`, `gal_fornitori`).
 
 ## Pharmacy identity (hardcoded)
 
