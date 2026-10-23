@@ -372,7 +372,7 @@
     style="margin-left:8px;font-size:14px;font-family:var(--sans);padding:4px 10px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text-muted);cursor:pointer;line-height:1">☾</button>
   <div id="app-version-badge" style="margin-left:8px;font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:99px;background:var(--badge-bg);color:var(--badge-fg);white-space:nowrap;cursor:default" title="Versione app"></div>
 </header>
-<div id="demo-banner">🧪 VERSIONE DI PROVA — i dati restano solo nel tuo browser. Calcoli conformi al D.M. 22/09/2017. Le sostanze di esempio hanno prezzi d'acquisto indicativi: per un confronto reale inserisci il tuo prezzo in Inventario.</div>
+<div id="demo-banner">🧪 VERSIONE DI PROVA — i dati restano solo nel tuo browser. Calcoli conformi al D.M. 22/09/2017. Le sostanze di esempio hanno prezzi d'acquisto indicativi: per un confronto reale inserisci il tuo prezzo in Inventario. <button onclick="caricaEsempioDemo()" style="margin-left:6px;font:inherit;font-size:11px;padding:2px 8px;border:1px solid currentColor;border-radius:var(--radius);background:none;color:inherit;cursor:pointer">▶ Prova un esempio</button></div>
 <div id="prev-banner">⚠ MODALITÀ PREVENTIVO ATTIVA — i prezzi/H mancanti sono modificabili a mano; le schede salvate saranno marcate PREVENTIVO con numerazione separata, non valide come preparazioni reali.</div>
 
 <main>
@@ -381,6 +381,19 @@
 <div class="page active" id="page-preparazione">
   <h1>Preparazione galenica</h1>
   <p class="subtitle" id="prep-subtitle">Calcolo formula e procedura</p>
+  <!-- Solo in demo (?demo=1): guida rapida per chi prova l'app la prima volta -->
+  <div class="card" id="demo-benvenuto" style="display:none;border:1px solid var(--accent);position:relative">
+    <button onclick="demoBenvenutoChiudi()" title="Chiudi" aria-label="Chiudi"
+      style="position:absolute;top:8px;right:10px;border:none;background:none;font-size:16px;color:var(--text-muted);cursor:pointer">✕</button>
+    <div class="card-title">Benvenuto nella versione di prova</div>
+    <ol style="margin:0 0 10px 1.2rem;padding:0;line-height:1.7;font-size:14px">
+      <li>Premi <strong>▶ Prova un esempio</strong>: si compila una lozione di Minoxidil 5%</li>
+      <li>Guarda <strong>Tariffazione</strong> e <strong>Scheda</strong>: prezzo secondo il D.M. 22/09/2017, scheda pronta da stampare</li>
+      <li>Poi prova una tua formula con <strong>+ Sostanza</strong></li>
+    </ol>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">L'assistente 🤖 AI e "Importa ricetta" sono facoltativi e richiedono una chiave gratuita.</div>
+    <button class="btn-add" onclick="caricaEsempioDemo()" style="font-size:14px">▶ Prova un esempio</button>
+  </div>
   <!-- Import ricetta via foto/testo (AI) — compila automaticamente i campi sotto -->
   <div class="card" id="ricetta-import-card" style="background:var(--warn-bg);border:1px solid var(--warn-border);padding:10px 12px">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -3910,7 +3923,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 147;
+const APP_VERSION = 148;
 
 // Modalità demo (?demo=1 nel link): versione di prova da far girare tra
 // colleghi. Niente lettura/scrittura sui Gist e dati farmacia generici.
@@ -6248,9 +6261,23 @@ function caricaEsempioDemo() {
   if (btn) showPage('preparazione', btn);
 }
 
+// Riquadro di benvenuto (solo demo). La chiusura è ricordata nel browser di
+// chi prova; se lo storage non è disponibile il riquadro semplicemente ricompare.
+const DEMO_BENV_KEY = 'gal_demo_benvenuto_chiuso';
+function demoBenvenutoInit() {
+  let chiuso = false;
+  try { chiuso = localStorage.getItem(DEMO_BENV_KEY) === '1'; } catch(e) {}
+  document.getElementById('demo-benvenuto').style.display = (DEMO_MODE && !chiuso) ? 'block' : 'none';
+}
+function demoBenvenutoChiudi() {
+  try { localStorage.setItem(DEMO_BENV_KEY, '1'); } catch(e) {}
+  document.getElementById('demo-benvenuto').style.display = 'none';
+}
+
 (async function bootInit() {
   applyLogos();
   applyDemoMode();
+  demoBenvenutoInit();
   if (window.location.hash && window.location.hash.startsWith('#prev=')) {
     await prevCheckSharedLink();
     return; // non avviare il resto dell'app
