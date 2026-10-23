@@ -395,18 +395,21 @@ function tarNormalizza(s) {
     .replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
 }
 
-// Suggerimenti dall'Allegato A per `nome` (max 6, i più corti prima): voci in
-// cui OGNI parola scritta è l'inizio di una parola della voce, in qualunque
-// ordine ("ossido zinco" → zinco ossido). Non più la sola prima parola, che
-// proponeva l'acido acetilsalicilico per "acido ialuronico".
-function tarCercaPA(nome) {
-  const qw = _parolePiene(_paroleNome(tarNormalizza(nome || '')));
+// Voci dell'Allegato A da SUGGERIRE per un nome (menu di Preparazione e di
+// Tariffazione): OGNI parola scritta è l'inizio di una parola della voce, in
+// qualunque ordine ("ossido zinco" → zinco ossido, "tal" → talco). Non più la
+// sola prima parola, che proponeva l'acido acetilsalicilico per "acido
+// ialuronico". Solo suggerimenti: il prezzo lo decide trovaVoceAllegatoA.
+function vociAllegatoAPerRicerca(nome) {
+  const qw = _parolePiene(_paroleNome(nome || ''));
   if (!qw.length) return [];
   return _indiceAllegatoA()
     .filter(x => qw.every(w => x.w.some(xw => xw.startsWith(w))))
-    .map(x => [x.k, ALLEGATO_A[x.k]])
-    .sort((a,b) => a[0].length - b[0].length)
-    .slice(0, 6);
+    .map(x => x.k)
+    .sort((a, b) => a.length - b.length);
+}
+function tarCercaPA(nome) {
+  return vociAllegatoAPerRicerca(tarNormalizza(nome || '')).slice(0, 6).map(k => [k, ALLEGATO_A[k]]);
 }
 
 // ── Lookup inventario (puri, inv passato esplicitamente) ────────────────
@@ -445,84 +448,102 @@ function rigaHazardous(r, inv) {
 /// ── Ricerca del prezzo (Allegato A, poi inventario) ──────────────────────
 // UNICA logica usata da tutte le strade del prezzo (righe di Preparazione,
 // principio attivo, Tariffazione, Scheda, importazione AI). Niente più
-// confronto sulla sola PRIMA PAROLA: dava ad "acido ialuronico" il prezzo di
-// legge dell'acido acetilsalicilico, a "olio di jojoba" quello dell'olio di
-// arachidi, ad "acqua di rose" quello dell'acqua depurata (campo bloccato).
+// confronto sulla sola PRIMA PAROLA (né su un inizio di parola): dava ad
+// "acido ialuronico" il prezzo di legge dell'acido acetilsalicilico, a "olio di
+// jojoba" quello dell'olio di arachidi, ad "acqua di rose" quello dell'acqua
+// depurata, a "timo" quello del timolo (campo bloccato).
 
-// Nome → parole: minuscolo, senza accenti; i punti si tolgono ("F.U." → "fu",
-// "Lidocaina." → "lidocaina"), il resto della punteggiatura diventa spazio.
+// Nome → parole: minuscolo, senza accenti; decimali uniti ("99,5" → "995"), i
+// punti tolti ("F.U." → "fu", "Lidocaina." → "lidocaina"), il resto della
+// punteggiatura diventa spazio; "ac" (abbreviazione) → "acido".
 function _paroleNome(s) {
-  return invNominalizza(s).replace(/\./g, '').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  return invNominalizza(s).replace(/(\d)[.,](\d)/g, '$1$2').replace(/\./g, '')
+    .replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
+    .split(' ').map(w => w === 'ac' ? 'acido' : w).join(' ');
 }
 // Parole che non cambiano la sostanza: articoli/preposizioni (ignorate anche
 // nell'ordine: "ossido di zinco" = "zinco ossido")...
 const _PAROLE_VUOTE = new Set(['di', 'del', 'della', 'dello', 'dei', 'degli', 'delle', 'd']);
-// ...e aggiunte "innocue" dopo il nome della voce: sigle di farmacopea, purezza,
-// forma fisica, unità, fornitori. Ogni ALTRA parola in più vuol dire sostanza
-// diversa ("olio di ricino idrogenato" ≠ "olio di ricino").
+// ...e aggiunte "innocue": sigle di farmacopea, purezza, forma fisica, colore,
+// fornitori. Ogni ALTRA parola in più vuol dire sostanza diversa ("olio di
+// ricino idrogenato" ≠ "olio di ricino", "limone essenza" ≠ "limone").
 const _PAROLE_INNOCUE = new Set(['fu', 'ph', 'eur', 'usp', 'bp', 'qb', 'puro', 'pura', 'puri', 'purissimo',
   'purissima', 'ventilato', 'ventilata', 'micronizzato', 'micronizzata', 'polvere', 'cristalli',
   'cristallino', 'cristallina', 'farmaceutico', 'farmaceutica', 'grado', 'qualita', 'uso',
-  'bianco', 'bianca', 'g', 'kg', 'mg', 'ml', 'l', 'farmalabor', 'acef', 'fagron']);
+  'bianco', 'bianca', 'naturale', 'anidro', 'anidra', 'farmalabor', 'acef', 'fagron']);
+const _UNITA = new Set(['g', 'kg', 'mg', 'ml', 'l']);
+// Nomi di sale: "atropina" in ricetta è l'atropina solfato. Ammessi solo quando
+// la voce è più lunga del nome scritto e il prezzo è univoco ("chinina" no:
+// cloridrato e solfato hanno prezzi diversi).
+const _SALI = new Set(['solfato', 'cloridrato', 'bromidrato', 'nitrato', 'fosfato', 'acetato', 'citrato',
+  'tartrato', 'maleato', 'sodico', 'sodica', 'potassico', 'potassica', 'idrocloruro', 'bromuro', 'cloruro']);
 function _parolePiene(p) { return p.split(' ').filter(w => w && !_PAROLE_VUOTE.has(w)); }
-function _innocua(w) { return _PAROLE_INNOCUE.has(w) || /^\d+%?$/.test(w); }
 function _sottoinsieme(a, b) { const sb = new Set(b); return a.every(w => sb.has(w)); }
+// True se le parole in più sono tutte innocue. Un numero lo è solo se è una
+// quantità con unità ("500 g") o una purezza ≥ 90 ("99", "99,5%" → "995");
+// una concentrazione ("0,9%", "5%", "70%") indica un'altra forma.
+function _soloAggiunteInnocue(extra) {
+  for (let i = 0; i < extra.length; i++) {
+    const w = extra[i];
+    if (_PAROLE_INNOCUE.has(w) || _UNITA.has(w)) continue;
+    if (/^\d+$/.test(w)) {
+      if (_UNITA.has(extra[i + 1])) { i++; continue; }
+      if (parseInt(w, 10) >= 90) continue;
+    }
+    return false;
+  }
+  return true;
+}
+function _vocePerNome(nome) {
+  const p = _paroleNome(nome), w = _parolePiene(p);
+  return { p, w, firma: [...w].sort().join(' ') };
+}
 
-let _ALL_A_INDICE = null;   // calcolato una volta: [{k, p, w, firma}]
+let _ALL_A_INDICE = null;   // calcolato una volta: [{k, p, w, firma, prezzo}]
 function _indiceAllegatoA() {
-  if (!_ALL_A_INDICE) _ALL_A_INDICE = Object.keys(ALLEGATO_A).map(k => {
-    const p = _paroleNome(k), w = _parolePiene(p);
-    return { k, p, w, firma: [...w].sort().join(' ') };
-  });
+  if (!_ALL_A_INDICE) _ALL_A_INDICE = Object.keys(ALLEGATO_A).map(k => ({ k, prezzo: ALLEGATO_A[k], ..._vocePerNome(k) }));
   return _ALL_A_INDICE;
 }
 
-// Voce dell'Allegato A per un nome, o null. In ordine:
-//   1. nome esatto (anche con punteggiatura diversa: "Lidocaina." → lidocaina);
-//   2. stesse parole in altro ordine ("Ossido di zinco" → zinco ossido);
-//   3. voce + sole aggiunte innocue ("Acido salicilico F.U." → acido salicilico,
-//      "Talco ventilato" → talco) — la voce più lunga;
-//   4. acqua semplice (isAcquaNome) → acqua depurata;
-//   5. nome contenuto in voci con un unico prezzo ("Mentolo" → mentolo naturale;
-//      "Acido" da solo → nessuna).
+// Ricerca comune a voci dell'Allegato A e d'inventario. `voci` = [{p, w, firma, prezzo}].
+// In ordine: nome esatto (anche con punteggiatura diversa); stesse parole in
+// altro ordine; voce + sole aggiunte innocue nel nome (la più lunga); nome +
+// sole aggiunte innocue nella voce, se la voce INIZIA col nome e il prezzo è
+// univoco ("mentolo" → mentolo naturale; "olio" → nessuna).
+function _trovaVoce(nome, voci) {
+  const q = _vocePerNome(nome);
+  if (!q.w.length) return null;
+  const e = voci.find(x => x.p === q.p) || voci.find(x => x.firma === q.firma);
+  if (e) return e;
+  const conAggiunte = voci.filter(x => _sottoinsieme(x.w, q.w) && _soloAggiunteInnocue(q.w.filter(w => !x.w.includes(w))));
+  if (conAggiunte.length) return conAggiunte.sort((a, b) => b.w.length - a.w.length || b.p.length - a.p.length)[0];
+  const piuLunghe = voci.filter(x => x.w.length > q.w.length && q.w.every((w, i) => x.w[i] === w)
+    && _soloAggiunteInnocue(x.w.slice(q.w.length).filter(w => !_SALI.has(w))));
+  if (piuLunghe.length && new Set(piuLunghe.map(x => x.prezzo)).size === 1)
+    return piuLunghe.sort((a, b) => a.p.length - b.p.length)[0];
+  return null;
+}
+
+// Voce dell'Allegato A per un nome, o null: la ricerca comune, più "acqua
+// semplice" (isAcquaNome) → acqua depurata.
 function trovaVoceAllegatoA(nome) {
   const q = invNominalizza(nome);
   if (!q) return null;
   if (ALLEGATO_A[q] !== undefined) return q;
-  const qp = _paroleNome(q), qw = _parolePiene(qp);
-  if (!qw.length) return null;
-  const firma = [...qw].sort().join(' ');
-  const idx = _indiceAllegatoA();
-  let e = idx.find(x => x.p === qp) || idx.find(x => x.firma === firma);
+  const e = _trovaVoce(q, _indiceAllegatoA());
   if (e) return e.k;
-  const conAggiunte = idx.filter(x => _sottoinsieme(x.w, qw) && qw.filter(w => !x.w.includes(w)).every(_innocua));
-  if (conAggiunte.length) return conAggiunte.sort((a, b) => b.w.length - a.w.length || b.k.length - a.k.length)[0].k;
   if (isAcquaNome(q) && ALLEGATO_A['acqua depurata'] !== undefined) return 'acqua depurata';
-  const contengono = idx.filter(x => qw.every(w => x.w.some(xw => xw === w || xw.startsWith(w))));
-  if (contengono.length && new Set(contengono.map(x => ALLEGATO_A[x.k])).size === 1)
-    return contengono.sort((a, b) => a.k.length - b.k.length)[0].k;
   return null;
 }
 
-// Voce d'inventario per il PREZZO di un nome, o null. Solo parole intere, mai
-// somiglianza vaga (invFindBest resta per lotti/frasi H): nome esatto, stesse
-// parole, voce d'inventario contenuta nel nome ("Acido ialuronico basso PM" →
-// "Acido ialuronico", la più lunga), nome contenuto nella voce ("etanolo" →
-// "Etanolo 96°", la più corta). "Acqua di rose" ≠ "Acqua purificata".
+// Voce d'inventario per il PREZZO di un nome, o null: la stessa ricerca, mai
+// somiglianza vaga (invFindBest resta per lotti/frasi H). "Acqua di rose" ≠
+// "Acqua"; "Etanolo" → "Etanolo 96°"; "Olio" → nessuna se gli oli sono diversi.
 function invTrovaPerPrezzo(nome, inv) {
-  const qp = _paroleNome(nome || ''), qw = _parolePiene(qp);
-  if (!qw.length || !Array.isArray(inv)) return null;
-  const firma = [...qw].sort().join(' ');
-  const voci = inv.filter(s => s && s.nome).map(s => {
-    const p = _paroleNome(s.nome), w = _parolePiene(p);
-    return { s, p, w, firma: [...w].sort().join(' ') };
-  }).filter(x => x.w.length);
-  const e = voci.find(x => x.p === qp) || voci.find(x => x.firma === firma);
-  if (e) return e.s;
-  const dentroNome = voci.filter(x => _sottoinsieme(x.w, qw)).sort((a, b) => b.w.length - a.w.length);
-  if (dentroNome.length) return dentroNome[0].s;
-  const nomeDentro = voci.filter(x => _sottoinsieme(qw, x.w)).sort((a, b) => a.w.length - b.w.length);
-  return nomeDentro.length ? nomeDentro[0].s : null;
+  if (!nome || !Array.isArray(inv)) return null;
+  const voci = inv.filter(s => s && s.nome).map(s => ({ s, prezzo: s.prezzo, ..._vocePerNome(s.nome) })).filter(x => x.w.length);
+  const e = _trovaVoce(nome, voci);
+  return e ? e.s : null;
 }
 
 // Prezzo canonico. Precedenza: Allegato A vince sempre (prezzi obbligatori per
@@ -702,7 +723,7 @@ const _exports = {
   COMP_INCLUSI, getCompInclusi, getCompMax, calcCompAggiuntivi, calcAllegatoBVoce6,
   fmt, invNominalizza, invMatchScore, hasHazard, getDensita, isEtanoloNome, isAcquaNome, tarNormalizza, tarCercaPA,
   isStupefacente, isDoping, getOpTecnologicheAuto,
-  invFindBest, getHDaInventario, rigaHazardous, invGetPrezzo, trovaVoceAllegatoA, invTrovaPerPrezzo,
+  invFindBest, getHDaInventario, rigaHazardous, invGetPrezzo, trovaVoceAllegatoA, invTrovaPerPrezzo, vociAllegatoAPerRicerca,
   calcAllegatoB, calcAllegatoBVoce7, calcSupplementi, calcIvaTotale, calcCostoSpecialita,
 };
 Object.assign(globalThis, _exports);

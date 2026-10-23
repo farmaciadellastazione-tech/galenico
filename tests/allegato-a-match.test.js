@@ -47,10 +47,11 @@ describe('invGetPrezzo senza aggancio per prima parola', () => {
     expect(invGetPrezzo('Acqua di rose', inv)).toBe(null);
   });
 
-  it('inventario: il prezzo arriva se il nome è quello dell\'inventario (anche con aggiunte)', () => {
+  it('inventario: il prezzo arriva se il nome è quello dell\'inventario', () => {
     const inv = [{ nome: 'Acido ialuronico', prezzo: 4.5, unit: 'g', lotto: 'L1' }];
     expect(invGetPrezzo('Acido ialuronico', inv)).toMatchObject({ prezzo: 4.5, fonte: 'inventario' });
-    expect(invGetPrezzo('Acido ialuronico basso PM', inv)).toMatchObject({ prezzo: 4.5, fonte: 'inventario' });
+    // 'basso PM' può essere un prodotto diverso (prezzo diverso): niente prezzo altrui (riscritto in v166, review v165)
+    expect(invGetPrezzo('Acido ialuronico basso PM', inv)).toBe(null);
   });
 
   it('Allegato A resta prioritario sull\'inventario', () => {
@@ -110,5 +111,49 @@ describe('invTrovaPerPrezzo — inventario senza somiglianza vaga (review v164)'
   });
   it('acqua di rose non trova l\'acqua purificata', () => {
     expect(invTrovaPerPrezzo('Acqua di rose', inv)).toBe(null);
+  });
+});
+
+// Review v165.
+import { invGetPrezzo as _ig } from '../pricing.js';
+describe('trovaVoceAllegatoA — review v165', () => {
+  it('nomi corti non diventano un\'altra sostanza (parole intere, voce che inizia col nome)', () => {
+    for (const n of ['Timo', 'Cacao', 'Gel', 'Caff', 'Limone'])
+      expect([n, trovaVoceAllegatoA(n)]).toEqual([n, null]);
+    expect(trovaVoceAllegatoA('Mentolo')).toBe('mentolo naturale');      // restano
+    expect(trovaVoceAllegatoA('Lanolina')).toBe('lanolina anidra');
+  });
+
+  it('numeri: purezza o quantità innocue, concentrazioni no', () => {
+    expect(trovaVoceAllegatoA('Zinco ossido 99,5%')).toBe('zinco ossido');
+    expect(trovaVoceAllegatoA('Talco 500 g')).toBe('talco');
+    expect(trovaVoceAllegatoA('Sorbitolo 70%')).toBe(null);
+    expect(trovaVoceAllegatoA('Sodio cloruro 0,9%')).toBe(null);
+    expect(trovaVoceAllegatoA('Fenolo 5%')).toBe(null);
+  });
+
+  it('"Ac." si legge "acido"', () => {
+    expect(trovaVoceAllegatoA('Ac. salicilico')).toBe('acido salicilico');
+  });
+});
+
+describe('invTrovaPerPrezzo — review v165', () => {
+  it('voce d\'inventario contenuta nel nome: solo aggiunte innocue', () => {
+    expect(invTrovaPerPrezzo('Acqua di rose', [{ nome: 'Acqua', prezzo: 0.002 }])).toBe(null);
+    expect(invTrovaPerPrezzo('Olio di ricino idrogenato', [{ nome: 'Olio di ricino', prezzo: 0.02 }])).toBe(null);
+    expect(invTrovaPerPrezzo('Minoxidil F.U.', [{ nome: 'Minoxidil', prezzo: 0.39 }]).nome).toBe('Minoxidil');
+  });
+
+  it('nome generico contenuto in più voci con prezzi diversi: nessuna', () => {
+    const inv = [{ nome: 'Olio di jojoba', prezzo: 0.1 }, { nome: 'Olio di argan', prezzo: 0.2 }];
+    expect(invTrovaPerPrezzo('Olio', inv)).toBe(null);
+    expect(invTrovaPerPrezzo('Etanolo', [{ nome: 'Etanolo 96°', prezzo: 0.015 }]).nome).toBe('Etanolo 96°');
+  });
+});
+
+describe('tarCercaPA / vociAllegatoAPerRicerca — review v165', () => {
+  it('suggerimenti a parole intere o inizio parola, da 3 lettere', () => {
+    expect(tarCercaPA('tal').map(([k]) => k)).toContain('talco');
+    expect(tarCercaPA('ossido di zinco').map(([k]) => k)).toContain('zinco ossido');
   });
 });
