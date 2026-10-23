@@ -697,7 +697,7 @@
       <button type="button" onclick="ricalcolaScadenzaAuto()" style="margin-left:6px;font-size:11px;padding:3px 8px;border:1px solid var(--accent);background:var(--accent-light);color:var(--accent);border-radius:var(--radius);cursor:pointer">↻ Auto da lotti</button>
       <span id="s-mesi-info" class="field-note" style="margin-left:6px;font-size:11px"></span>
     </div>
-    <div class="field-row"><span class="field-label">Prezzo al pubblico (€)</span><input type="number" id="s-prezzo" value="" step="0.01" min="0" oninput="aggiornaScheda()"><span class="field-note">da Tariffazione</span></div>
+    <div class="field-row"><span class="field-label">Prezzo al pubblico (€)</span><input type="number" id="s-prezzo" value="" step="0.01" min="0" oninput="aggiornaScheda()"><span class="field-note">vuoto = calcolato (come Tariffazione); compila solo per forzare un prezzo</span></div>
     <div class="card-title" style="margin-top:1rem;">Lotti materie prime</div>
     <div class="field-row">
       <span class="field-label">Lotto PA</span>
@@ -2971,6 +2971,15 @@ function calcTariff() {
 }
 
 let tipoScheda = 'soluzione';
+let _schedaTotale = 0; // ultimo prezzo al pubblico mostrato dalla Scheda (override manuale o calcolato)
+
+// Prezzo finale della Scheda come stringa "0.00" (per archivio/etichette): override manuale
+// s-prezzo se presente, altrimenti il totale calcolato da aggiornaScheda().
+function schedaPrezzoFinale() {
+  const man = parseFloat(document.getElementById('s-prezzo').value)||0;
+  const p = man > 0 ? man : _schedaTotale;
+  return p > 0 ? p.toFixed(2) : '';
+}
 
 function setTipoScheda(t, btn) {
   tipoScheda = t;
@@ -3461,11 +3470,14 @@ function aggiornaScheda() {
   const _suppS    = calcSupplementi({ hazardous: _hS, stupp: _stuppS, dop: _dopS });
   const suppH = _suppS.art8a, suppSt = _suppS.art8b, suppDop = _suppS.art8c;
   const suppMan   = suppManTotale();
+  const notte     = parseFloat(document.getElementById('t-notte').value)||0;
 
   const nettoMaterie = liberaCostoExtra;
-  const netto  = nettoMaterie + costoB + inc40 + suppH + suppSt + suppDop + costoFL_s + suppMan;
+  const netto  = nettoMaterie + costoB + inc40 + suppH + suppSt + suppDop + costoFL_s + notte + suppMan;
   const { iva, totale: _totaleCalcS } = calcIvaTotale(netto);
+  // s-prezzo = SOLO override manuale esplicito (vuoto = totale calcolato, sempre aggiornato).
   const totale = prezzo > 0 ? prezzo : _totaleCalcS;
+  _schedaTotale = totale;
 
   let tariffRows = [];
   liberaRigheExtra.forEach(r => {
@@ -3480,6 +3492,7 @@ function aggiornaScheda() {
     ...(suppH>0 ? [{n:'Suppl. sostanza pericolosa H (Art. 8a)', v:suppH}] : [{n:'Nessun H rilevato — Art. 8a non applicato', v:0}]),
     ...(suppSt>0 ? [{n:'Suppl. stupefacenti (Art. 8b): '+_stuppS+' × '+fmtE(2.50), v:suppSt}] : []),
     ...(suppDop>0 ? [{n:'Suppl. doping (Art. 8c)', v:suppDop}] : []),
+    ...(notte>0 ? [{n:'Diritto addizionale notturno (Art. 9)', v:notte}] : []),
     ..._suppManRighe.filter(r=>r.desc&&r.importo>0).map(r=>({n:r.desc, v:r.importo})),
     {n:'Recipiente', v:costoFL_s},
   );
@@ -3768,13 +3781,10 @@ function compilaScheda() {
     if (document.getElementById('s-et')) document.getElementById('s-et').value = etRiga ? etRiga.qty : '0';
   }
 
-  // 4. Prezzo da Tariffazione — legge l'ultimo elemento .totale-num (prezzo al pubblico)
-  const totNums = document.querySelectorAll('#tariff-totale .totale-num');
-  if (totNums.length > 0) {
-    const prezzoTxt = totNums[totNums.length-1].textContent.replace('€','').replace(',','.').trim();
-    const prezzo = parseFloat(prezzoTxt);
-    if (!isNaN(prezzo) && prezzo > 0) document.getElementById('s-prezzo').value = prezzo.toFixed(2);
-  }
+  // 4. Prezzo: NON copiare il totale della Tariffazione in s-prezzo — lì diventerebbe un
+  //    override manuale "congelato" e la Scheda non seguirebbe più le modifiche successive
+  //    (bug v144: Tariffazione €21,97 vs Scheda €23,05). Vuoto = totale calcolato dal motore unico.
+  document.getElementById('s-prezzo').value = '';
 
   // 5. Lotti da Inventario (merged: hardcoded + localStorage + Gist)
   //    Per ogni materia prima popolo il <select> con i candidati FEFO e seleziono il primo.
@@ -3811,7 +3821,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 144;
+const APP_VERSION = 145;
 
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
@@ -4423,7 +4433,7 @@ function etiqDaScheda() {
   const paz     = document.getElementById('s-paz').value;
   const dataVal = document.getElementById('s-data').value;
   const mesi    = document.getElementById('s-mesi').value;
-  const prezzo  = document.getElementById('s-prezzo').value;
+  const prezzo  = schedaPrezzoFinale();
 
   // unità in base al tipo
   const unitaQt = (tipoScheda === 'soluzione' || tipoScheda === 'tintura' || tipoScheda === 'sospensione') ? ' ml' :
@@ -5542,7 +5552,7 @@ function salvaInArchivio() {
     farm:   document.getElementById('s-farm').value,
     data:   document.getElementById('s-data').value,
     mesi:   document.getElementById('s-mesi').value,
-    prezzo: document.getElementById('s-prezzo').value,
+    prezzo: schedaPrezzoFinale(),
     ncaps:  document.getElementById('s-ncaps') ? document.getElementById('s-ncaps').value : '',
     mgpa:   document.getElementById('s-mgpa') ? document.getElementById('s-mgpa').value : '',
     taglia: document.getElementById('s-taglia') ? document.getElementById('s-taglia').value : '',
@@ -5786,11 +5796,10 @@ function archRiapri(id) {
   // stantio memorizzato (che vincerebbe come override). Senza snapshot (schede legacy non
   // ricalcolabili) si tiene il prezzo salvato. NB: un eventuale prezzo manuale ad hoc viene
   // così sostituito dal ricalcolo — accettabile: il valore corretto è quello tariffato.
+  // s-prezzo resta vuoto (non una copia del totale), altrimenti diventerebbe un override
+  // congelato che ignora le modifiche fatte dopo la riapertura.
   if (s.prepSnap) {
-    const _totNums = document.querySelectorAll('#tariff-totale .totale-num');
-    const _ptxt = _totNums.length ? _totNums[_totNums.length-1].textContent.replace('€','').replace(',','.').trim() : '';
-    const _pnew = parseFloat(_ptxt);
-    document.getElementById('s-prezzo').value = (!isNaN(_pnew) && _pnew > 0) ? _pnew.toFixed(2) : '';
+    document.getElementById('s-prezzo').value = '';
   } else {
     document.getElementById('s-prezzo').value = s.prezzo || '';
   }

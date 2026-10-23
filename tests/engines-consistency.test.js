@@ -251,4 +251,58 @@ describe('Tariffazione ↔ Scheda: stesso prezzo (motore unico)', () => {
     expect(r.sch).toBeCloseTo(orig.sch, 2);
     expect(r.sch).not.toBeCloseTo(99.99, 1);
   });
+
+  // ── v145: prezzo della Scheda non deve restare "congelato" ──
+  const MINOX = [ {nome:'Minoxidil', qty:'5', unit:'g', isPa:true},
+                  {nome:'Etanolo 96°', qty:'50', unit:'g'},
+                  {nome:'Glicole propilenico', qty:'35', unit:'g'},
+                  {nome:'Acqua purificata', qty:'10', unit:'g'} ];
+  const SOL = { prep:'soluzione', tariff:'liquida', scheda:'soluzione' };
+  // Nel browser compilaScheda/archRiapri leggono il totale da #tariff-totale .totale-num:
+  // lo stub DOM restituisce [], quindi simuliamo quella query con il prezzo reale.
+  function withTotaleNums(fn) {
+    const doc = H.ctx.document, orig = doc.querySelectorAll;
+    doc.querySelectorAll = (sel) => sel === '#tariff-totale .totale-num'
+      ? [{ textContent: '€ ' + String(H.read().tar).replace('.', ',') }] : orig.call(doc, sel);
+    try { return fn(); } finally { doc.querySelectorAll = orig; }
+  }
+
+  it('Diritto notturno (Art. 9): incluso anche nel totale della Scheda', () => {
+    const r = H.run(SOL, MINOX, { 't-fl':'1.55', 'totale-prep':'100', 't-notte':'7.5' });
+    expect(r.tar).toBeCloseTo(21.84 + 7.5 * 1.10, 2);
+    expect(r.sch).toBeCloseTo(r.tar, 2);
+  });
+
+  it('Compila scheda → modifica in Tariffazione: la Scheda segue il nuovo totale', () => {
+    H.run(SOL, MINOX, { 't-fl':'1.55', 'totale-prep':'100' });
+    withTotaleNums(() => H.ctx.compilaScheda());
+    H.byId('t-fl').value = '3.00';           // es. cambio flacone dopo aver compilato
+    H.ctx.calcTariff(); H.ctx.aggiornaScheda();
+    const r = H.read();
+    expect(r.tar).toBeCloseTo(21.84 + 1.45 * 1.10, 2);
+    expect(r.sch).toBeCloseTo(r.tar, 2);
+  });
+
+  it('Riapri da archivio → modifica: la Scheda segue il nuovo totale', () => {
+    H.run(SOL, MINOX, { 't-fl':'1.55', 'totale-prep':'100', 's-prep':'Minoxidil 5%', 's-farm':'Test' });
+    H.ctx.salvaInArchivio();
+    const arch = JSON.parse(H.ctx.localStorage.getItem('gal_archivio_schede_v1') || '[]');
+    withTotaleNums(() => H.ctx.archRiapri(arch[0].id));
+    H.byId('t-fl').value = '3.00';
+    H.ctx.calcTariff(); H.ctx.aggiornaScheda();
+    const r = H.read();
+    expect(r.sch).toBeCloseTo(r.tar, 2);
+  });
+
+  it('Salva in archivio senza prezzo manuale: memorizza il totale calcolato', () => {
+    const r = H.run(SOL, MINOX, { 't-fl':'1.55', 'totale-prep':'100', 's-prep':'Minoxidil 5%', 's-farm':'Test' });
+    H.ctx.salvaInArchivio();
+    const arch = JSON.parse(H.ctx.localStorage.getItem('gal_archivio_schede_v1') || '[]');
+    expect(parseFloat(arch[0].prezzo)).toBeCloseTo(r.sch, 2);
+  });
+
+  it('Prezzo manuale in Scheda: resta un override esplicito', () => {
+    const r = H.run(SOL, MINOX, { 't-fl':'1.55', 'totale-prep':'100', 's-prezzo':'25.00' });
+    expect(r.sch).toBeCloseTo(25.00, 2);
+  });
 });
