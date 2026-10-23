@@ -459,7 +459,7 @@
       <span class="field-label">Grado alcolico</span>
       <input type="number" id="grado-alc" min="0" max="96" step="0.1" placeholder="0"
         style="width:80px;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
-        onchange="gradoAlcChanged()">
+        onchange="gradoAlcChanged()" onkeydown="gradoAlcKeydown(event)">
       <span style="font-family:var(--mono);font-size:13px;color:var(--text-faint)">% v/v</span>
       <span style="font-size:11px;color:var(--text-faint);margin-left:8px">modifica per scalare etanolo (compensa con acqua)</span>
     </div>
@@ -1932,6 +1932,13 @@ function volSoluzioneKeydown(ev) {
   volSoluzioneChanged();
 }
 
+// Invio sul Grado alcolico: applica subito, come per il Volume soluzione.
+function gradoAlcKeydown(ev) {
+  if (ev.key !== 'Enter') return;
+  ev.preventDefault();
+  gradoAlcChanged();
+}
+
 // Crea/aggiorna le righe "Etanolo 96°" e "Acqua purificata" per un veicolo
 // idroalcolico di volume totMl (ml) al grado (% v/v) indicato. Condivisa da
 // volSoluzioneChanged() e gradoAlcChanged(): compilare entrambe le mascherine
@@ -1945,6 +1952,21 @@ function liberaApplyVolGrado(totMl, grado) {
     const n = invNominalizza(r.nome || '');
     return n.includes('etanolo') || n.includes('alcool') || n.includes('alcol');
   });
+  // L'acqua completa il volume insieme agli ALTRI liquidi già in formula
+  // (glicole, glicerina...): vanno sottratti, altrimenti il volume finale
+  // supera totMl e il grado reale risulta più basso di quello chiesto.
+  const _volMl = (r) => {
+    if (!r) return 0;
+    const q = parseFloat(r.qty)||0, d = getDensita(r.nome);
+    return r.unit === 'ml' ? q : (r.unit === 'g' && d ? q / d : 0);
+  };
+  const acIdx0 = liberaRighe.findIndex(r => invNominalizza(r.nome || '').includes('acqua'));
+  const altriMl = Math.max(0, liberaSommaVolumeLiquidi() - _volMl(liberaRighe[etIdx]) - _volMl(liberaRighe[acIdx0]));
+  if (newEtMl + altriMl > totMl + 1e-6) {
+    const maxGrado = Math.max(0, (totMl - altriMl) * 0.96 / totMl * 100);
+    alert('Con questi ingredienti, in ' + fmt(totMl, 1) + ' ml il grado alcolico massimo è ' + fmt(Math.floor(maxGrado * 10) / 10, 1) + '% v/v.');
+    return;
+  }
   if (etIdx < 0) {
     liberaRighe.push({nome:'Etanolo 96°', qty:'', unit:'ml', isPa:false, densita:null, prezzoAcq:0, fonte:null, lotto:'', h:'H225'});
     etIdx = liberaRighe.length - 1;
@@ -1952,7 +1974,7 @@ function liberaApplyVolGrado(totMl, grado) {
   liberaRighe[etIdx].qty = String(parseFloat(newEtMl.toFixed(2)));
   liberaRighe[etIdx].unit = 'ml';
   let acIdx = liberaRighe.findIndex(r => invNominalizza(r.nome || '').includes('acqua'));
-  const newAcMl = Math.max(0, totMl - newEtMl);
+  const newAcMl = Math.max(0, totMl - newEtMl - altriMl);
   if (acIdx < 0) {
     liberaRighe.push({nome:'Acqua purificata', qty:'', unit:'ml', isPa:false, densita:null, prezzoAcq:0, fonte:null, lotto:''});
     acIdx = liberaRighe.length - 1;
@@ -3932,7 +3954,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 150;
+const APP_VERSION = 151;
 
 // Modalità demo (?demo=1 nel link): versione di prova da far girare tra
 // colleghi. Niente lettura/scrittura sui Gist e dati farmacia generici.

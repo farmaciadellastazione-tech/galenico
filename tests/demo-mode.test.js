@@ -147,6 +147,53 @@ describe('Volume soluzione', () => {
   });
 });
 
+describe('Grado alcolico', () => {
+  // Esempio Minoxidil portato a 100 ml: il veicolo contiene anche Glicole (~32 ml),
+  // che il calcolo dell'acqua deve lasciare al suo posto.
+  async function esempio100() {
+    const H = await boot('?demo=1');
+    H.eval('caricaEsempioDemo()');
+    H.byId('vol-soluzione').value = '100';
+    H.eval('volSoluzioneChanged()');
+    return H;
+  }
+  const stato = (H) => H.eval(`(() => {
+    const vol = liberaSommaVolumeLiquidi();
+    return { vol, grado: calcSoluzioneInfo(vol, 'ml').grado,
+             glicole: parseFloat(liberaRighe.find(r => r.nome.startsWith('Glicole')).qty) };
+  })()`);
+
+  it('grado 50 con glicole in formula: volume resta 100 ml e il grado è davvero 50', async () => {
+    const H = await esempio100();
+    H.byId('grado-alc').value = '50';
+    H.eval('gradoAlcChanged()');
+    const s = stato(H);
+    expect(s.vol).toBeCloseTo(100, 1);
+    expect(s.grado).toBeCloseTo(50, 1);
+    expect(s.glicole).toBeCloseTo(33.0995, 3);   // glicole non toccato
+  });
+
+  it('grado impossibile (non c\'è spazio per etanolo + altri liquidi): formula invariata', async () => {
+    const H = await esempio100();
+    const prima = JSON.stringify(H.eval('liberaRighe'));
+    let avviso = '';
+    H.ctx.alert = (m) => { avviso = m; };
+    H.byId('grado-alc').value = '90';
+    H.eval('gradoAlcChanged()');
+    expect(JSON.stringify(H.eval('liberaRighe'))).toBe(prima);
+    expect(avviso).toMatch(/massimo/i);
+  });
+
+  it('Invio sul campo Grado applica il valore', async () => {
+    const H = await esempio100();
+    H.byId('grado-alc').value = '50';
+    let prevented = false;
+    H.eval('gradoAlcKeydown')({ key: 'Enter', preventDefault(){ prevented = true; } });
+    expect(stato(H).grado).toBeCloseTo(50, 1);
+    expect(prevented).toBe(true);
+  });
+});
+
 describe('Rotellina sui campi numerici', () => {
   const campo = (type) => { const el = { type, blurred: false, blur(){ this.blurred = true; } }; return el; };
 
