@@ -357,16 +357,16 @@ function isEtanoloNome(nome) {
 }
 
 // True se il nome indica acqua "semplice", usabile come acqua di riempimento
-// (q.b.) e come solvente nella procedura: "acqua" da sola o con soli
-// qualificativi di purezza (purificata, depurata, distillata, sterile, per
-// preparazioni iniettabili...). Acqua di rose / hamamelis / termale / di calce /
-// ossigenata sono ingredienti veri: il vecchio includes('acqua') li sovrascriveva
-// impostando il grado alcolico e li toglieva dalla procedura.
-const _ACQUA_QUALIFICATIVI = new Set(['purificata', 'depurata', 'distillata', 'bidistillata',
-  'demineralizzata', 'deionizzata', 'sterile', 'per', 'preparazioni', 'iniettabili', 'ppi', 'fu']);
+// (q.b.) e come solvente nella procedura. È acqua tutto ciò che inizia con
+// "acqua" (purificata, dep., F.U., q.b., p.p.i., marca...: i modi di scriverla
+// sono troppi per un elenco chiuso) TRANNE le acque-ingrediente riconoscibili:
+// "acqua di/d' …" (rose, hamamelis, calce, distillata di rose...), ossigenata,
+// termale, aromatica. Il vecchio includes('acqua') le sovrascriveva impostando
+// il grado alcolico e le toglieva dalla procedura.
 function isAcquaNome(nome) {
   const parole = invNominalizza(nome).replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
-  return parole[0] === 'acqua' && parole.slice(1).every(p => _ACQUA_QUALIFICATIVI.has(p));
+  if (parole[0] !== 'acqua') return false;
+  return !parole.slice(1).some(p => ['di', 'd', 'ossigenata', 'termale', 'aromatica'].includes(p));
 }
 
 // Chiavi di DENSITA che indicano etanolo (ricavate, non duplicate a mano): per

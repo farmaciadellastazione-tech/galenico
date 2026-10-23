@@ -225,3 +225,32 @@ describe('Acque aromatiche e acqua ossigenata non sono acqua di riempimento', ()
     expect(ctx._aiIsAcqua('Acqua purificata')).toBe(true);
   });
 });
+
+// Review v162: per l'acqua i nomi "semplici" sono moltissimi (abbreviazioni,
+// F.U., q.b., quantità, marca): è acqua tutto ciò che inizia con "acqua"
+// TRANNE le acque-ingrediente riconoscibili.
+describe('isAcquaNome: nomi abbreviati e con sigle (review v162)', () => {
+  it('acqua semplice scritta in tanti modi', () => {
+    const { ctx } = buildCtx();
+    for (const n of ['Acqua depurata F.U.', 'Acqua dep.', 'Acqua dist.', 'Acqua purificata q.b.',
+                     'Acqua purificata 1 L', 'acqua p.p.i.', 'Acqua purificata Ph. Eur.', 'Acqua depurata (Farmalabor)'])
+      expect([n, ctx.isAcquaNome(n)]).toEqual([n, true]);
+    for (const n of ["Acqua d'arancio", 'Acqua distillata di rose', 'Acqua aromatica di menta', 'Acqua termale'])
+      expect([n, ctx.isAcquaNome(n)]).toEqual([n, false]);
+  });
+
+  it('grado alcolico con "Acqua depurata F.U.": niente falso avviso né doppia riga d\'acqua', () => {
+    const H = buildCtx();
+    let avviso = '';
+    H.ctx.alert = (m) => { avviso = m; };
+    H.run(SOLUZ, [ {nome:'Minoxidil', qty:'5', unit:'g', isPa:true},
+                   {nome:'Etanolo 96°', qty:'30', unit:'ml'},
+                   {nome:'Acqua depurata F.U.', qty:'70', unit:'ml'} ]);
+    H.ctx.document.getElementById('vol-soluzione').value = '100';
+    H.ctx.document.getElementById('grado-alc').value = '50';
+    H.ctx.gradoAlcChanged();
+    expect(avviso).toBe('');
+    expect(H.ctx.liberaRighe.filter(r => /acqua/i.test(r.nome)).length).toBe(1);
+    expect(H.ctx.liberaSommaVolumeLiquidi()).toBeCloseTo(100, 1);
+  });
+});

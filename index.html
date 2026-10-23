@@ -4115,7 +4115,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 162;
+const APP_VERSION = 163;
 
 // DEMO_MODE è definito nel primo <script> dell'<head> (isola anche il localStorage).
 
@@ -5416,8 +5416,7 @@ function _aiIsEtanolo(nome) {
   return isEtanoloNome(nome || '');
 }
 function _aiIsAcqua(nome) {
-  const n = invNominalizza(nome || '');
-  return isAcquaNome(n);
+  return isAcquaNome(nome || '');
 }
 
 // Converte una riga di comps in ml (usa densità per le g, ignora pz/%).
