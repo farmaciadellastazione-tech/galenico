@@ -451,7 +451,7 @@
       <span class="field-label">Volume soluzione</span>
       <input type="number" id="vol-soluzione" min="0" step="0.1" placeholder="auto"
         style="width:80px;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
-        onchange="volSoluzioneChanged()" onkeydown="volSoluzioneKeydown(event)" onwheel="this.blur()">
+        onchange="volSoluzioneChanged()" onkeydown="volSoluzioneKeydown(event)">
       <span style="font-family:var(--mono);font-size:13px;color:var(--text-faint)">ml</span>
       <span style="font-size:11px;color:var(--text-faint);margin-left:8px">modifica per scalare tutte le righe proporzionalmente</span>
     </div>
@@ -1924,9 +1924,8 @@ function volSoluzioneChanged() {
 }
 
 // Invio applica subito il volume (onchange scatta solo uscendo dal campo).
-// Il successivo blur trova ratio 1 e non riscala due volte. La rotellina
-// invece fa blur (onwheel nell'HTML): altrimenti cambierebbe il valore di
-// nascosto mentre si scorre la pagina.
+// Il successivo blur trova ratio 1 e non riscala due volte. (Rotellina:
+// gestita per tutti i campi numerici da numberWheelBlur.)
 function volSoluzioneKeydown(ev) {
   if (ev.key !== 'Enter') return;
   ev.preventDefault();
@@ -3933,7 +3932,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 149;
+const APP_VERSION = 150;
 
 // Modalità demo (?demo=1 nel link): versione di prova da far girare tra
 // colleghi. Niente lettura/scrittura sui Gist e dati farmacia generici.
@@ -6243,6 +6242,15 @@ function applyLogos() {
   document.querySelectorAll('img[data-logo="wide"]').forEach(img => { img.src = LOGO_WIDE; });
 }
 
+// Rotellina su un campo numerico con focus: il browser cambierebbe il valore
+// di nascosto mentre si scorre la pagina. Lasciamo il campo, così la pagina
+// scorre e il numero resta quello scritto. Registrato su document al boot,
+// copre anche le righe create dinamicamente.
+function numberWheelBlur(e) {
+  const t = e.target;
+  if (t && t.type === 'number' && t === document.activeElement) t.blur();
+}
+
 // Modalità demo: sostituisce i default HTML delle etichette con i dati generici
 // e accende la classe CSS che mostra la fascia demo e nasconde logo/token.
 function applyDemoMode() {
@@ -6286,6 +6294,7 @@ function demoBenvenutoChiudi() {
 
 (async function bootInit() {
   applyLogos();
+  document.addEventListener('wheel', numberWheelBlur, { passive: true });
   applyDemoMode();
   demoBenvenutoInit();
   if (window.location.hash && window.location.hash.startsWith('#prev=')) {

@@ -147,6 +147,28 @@ describe('Volume soluzione', () => {
   });
 });
 
+describe('Rotellina sui campi numerici', () => {
+  const campo = (type) => { const el = { type, blurred: false, blur(){ this.blurred = true; } }; return el; };
+
+  it('campo numerico con focus: la rotellina lo lascia (non cambia il valore)', async () => {
+    const H = await boot('');
+    const el = campo('number');
+    H.ctx.document.activeElement = el;
+    H.eval('numberWheelBlur')({ target: el });
+    expect(el.blurred).toBe(true);
+  });
+
+  it('campo senza focus o non numerico: nessun effetto', async () => {
+    const H = await boot('');
+    const num = campo('number'), txt = campo('text');
+    H.ctx.document.activeElement = txt;
+    H.eval('numberWheelBlur')({ target: num });
+    H.eval('numberWheelBlur')({ target: txt });
+    expect(num.blurred).toBe(false);
+    expect(txt.blurred).toBe(false);
+  });
+});
+
 describe('Demo: esempio e benvenuto', () => {
   it('"Prova un esempio" compila Minoxidil 5% e Tariffazione = Scheda', async () => {
     const H = await boot('?demo=1');
