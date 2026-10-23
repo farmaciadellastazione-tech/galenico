@@ -125,25 +125,35 @@ describe('Modalità demo (?demo=1)', () => {
   });
 });
 
-describe('Volume soluzione', () => {
-  it('Invio applica il nuovo volume e riscala le righe (non solo uscendo dal campo)', async () => {
+// Invio sui campi Volume/Grado: fa uscire dal campo (blur), così il ricalcolo
+// passa SOLO da onchange, come con un clic altrove. Nessuna doppia applicazione
+// e nessun ricalcolo se il valore non è cambiato (il browser non lancia change).
+describe('Invio esce dal campo', () => {
+  it('Invio fa blur del campo (il ricalcolo lo fa onchange)', async () => {
     const H = await boot('?demo=1');
-    H.eval('caricaEsempioDemo()');
-    H.byId('vol-soluzione').value = '100';
-    let prevented = false;
-    H.eval('volSoluzioneKeydown')({ key: 'Enter', preventDefault(){ prevented = true; } });
-    const q = H.eval('liberaRighe').map(r => parseFloat(r.qty));
-    expect(q[0]).toBeCloseTo(4.7285, 3);   // Minoxidil scalato da 5 g (105,7 ml → 100 ml)
-    expect(q[1]).toBeCloseTo(47.2851, 3);  // Etanolo 96°
+    let blurred = false, prevented = false;
+    H.eval('invioEsce')({ key: 'Enter', preventDefault(){ prevented = true; }, target: { blur(){ blurred = true; } } });
+    expect(blurred).toBe(true);
     expect(prevented).toBe(true);
   });
 
-  it('altri tasti non riscalano', async () => {
+  it('altri tasti: nessun effetto', async () => {
+    const H = await boot('?demo=1');
+    let blurred = false;
+    H.eval('invioEsce')({ key: '0', preventDefault(){}, target: { blur(){ blurred = true; } } });
+    expect(blurred).toBe(false);
+  });
+});
+
+describe('Volume soluzione', () => {
+  it('nuovo volume (onchange) riscala tutte le righe', async () => {
     const H = await boot('?demo=1');
     H.eval('caricaEsempioDemo()');
     H.byId('vol-soluzione').value = '100';
-    H.eval('volSoluzioneKeydown')({ key: '0', preventDefault(){} });
-    expect(parseFloat(H.eval('liberaRighe')[0].qty)).toBe(5);
+    H.eval('volSoluzioneChanged()');
+    const q = H.eval('liberaRighe').map(r => parseFloat(r.qty));
+    expect(q[0]).toBeCloseTo(4.7285, 3);   // Minoxidil scalato da 5 g (105,7 ml → 100 ml)
+    expect(q[1]).toBeCloseTo(47.2851, 3);  // Etanolo 96°
   });
 });
 
@@ -183,15 +193,6 @@ describe('Grado alcolico', () => {
     expect(JSON.stringify(H.eval('liberaRighe'))).toBe(prima);
     expect(avviso).toMatch(/massimo/i);
   });
-
-  it('Invio sul campo Grado applica il valore', async () => {
-    const H = await esempio100();
-    H.byId('grado-alc').value = '50';
-    let prevented = false;
-    H.eval('gradoAlcKeydown')({ key: 'Enter', preventDefault(){ prevented = true; } });
-    expect(stato(H).grado).toBeCloseTo(50, 1);
-    expect(prevented).toBe(true);
-  });
 });
 
 describe('Grado alcolico: calcolato e bloccato se la formula ha già etanolo', () => {
@@ -206,13 +207,6 @@ describe('Grado alcolico: calcolato e bloccato se la formula ha già etanolo', (
     expect(H.byId('grado-alc').readOnly).toBe(true);
   });
 
-  it('Invio su campo bloccato non modifica la formula', async () => {
-    const H = await esempio();
-    const prima = JSON.stringify(H.eval('liberaRighe'));
-    H.eval('gradoAlcKeydown')({ key: 'Enter', preventDefault(){} });
-    expect(JSON.stringify(H.eval('liberaRighe'))).toBe(prima);
-  });
-
   it('✎ sblocca; dopo l\'applicazione il campo si riblocca', async () => {
     const H = await esempio();
     H.eval('gradoAlcSblocca()');
@@ -224,6 +218,17 @@ describe('Grado alcolico: calcolato e bloccato se la formula ha già etanolo', (
     expect(H.byId('grado-alc').readOnly).toBe(true);
   });
 
+  it('dopo ✎ uscire dal campo (anche dopo un grado impossibile) riblocca e mostra il grado calcolato', async () => {
+    const H = await esempio();
+    H.ctx.alert = () => {};
+    H.eval('gradoAlcSblocca()');
+    H.byId('grado-alc').value = '95';
+    H.eval('gradoAlcChanged()');                     // impossibile: resta sbloccato
+    H.eval('gradoAlcBlur()');
+    expect(H.byId('grado-alc').readOnly).toBe(true);
+    expect(H.byId('grado-alc').value).toBe('56.2');
+  });
+
   it('formula senza etanolo: campo modificabile (veicolo da costruire)', async () => {
     const H = await boot('?demo=1');
     H.eval(`liberaRighe = [{ nome:'Acqua purificata', qty:'100', unit:'ml', isPa:false, densita:null }]; calcPrep();`);
@@ -231,26 +236,14 @@ describe('Grado alcolico: calcolato e bloccato se la formula ha già etanolo', (
   });
 });
 
-describe('Review v147–v152', () => {
-  it('Invio poi uscita dal campo: il change successivo non riapplica (Volume e Grado)', async () => {
-    const H = await boot('?demo=1');
-    H.eval('caricaEsempioDemo()');
-    H.byId('vol-soluzione').value = '100';
-    H.eval('volSoluzioneKeydown')({ key: 'Enter', preventDefault(){} });
-    let n = 0;
-    H.eval('campoChange')(H.byId('vol-soluzione'), () => { n++; });
-    H.eval('gradoAlcSblocca()');
-    H.byId('grado-alc').value = '50';
-    H.eval('gradoAlcKeydown')({ key: 'Enter', preventDefault(){} });
-    H.eval('campoChange')(H.byId('grado-alc'), () => { n++; });
-    expect(n).toBe(0);
-  });
-
-  it('change senza Invio precedente applica normalmente', async () => {
-    const H = await boot('?demo=1');
-    let n = 0;
-    H.eval('campoChange')(H.byId('vol-soluzione'), () => { n++; });
-    expect(n).toBe(1);
+describe('Riconoscimento etanolo (isEtanoloNome)', () => {
+  it('etanolo sì, altri alcoli e derivati no', async () => {
+    const H = await boot('');
+    const f = H.eval('isEtanoloNome');
+    for (const n of ['etanolo 96°', 'etanolo', 'alcool 96°', 'alcol 70', 'alcool', 'alcol etilico', 'alcool etilico denaturato'])
+      expect([n, f(n)]).toEqual([n, true]);
+    for (const n of ['fenossietanolo', 'etere etilico', 'alcol benzilico', 'alcol cetilico', 'alcool cetostearilico', 'alcool feniletilico'])
+      expect([n, f(n)]).toEqual([n, false]);
   });
 
   it('"Alcol benzilico" non è etanolo: campo non bloccato e riga non sovrascritta', async () => {
@@ -269,6 +262,20 @@ describe('Review v147–v152', () => {
     expect(righe.some(r => r.nome.startsWith('Etanolo'))).toBe(true);
   });
 
+  it('"Fenossietanolo" non è etanolo: riga non sovrascritta', async () => {
+    const H = await boot('?demo=1');
+    H.eval(`liberaRighe = [
+      { nome:'Fenossietanolo', qty:'1', unit:'g', isPa:false, densita:null },
+      { nome:'Acqua purificata', qty:'100', unit:'ml', isPa:false, densita:null }]; calcPrep();`);
+    expect(H.byId('grado-alc').readOnly).toBe(false);
+    H.byId('vol-soluzione').value = '100';
+    H.byId('grado-alc').value = '30';
+    H.eval('gradoAlcChanged()');
+    const fen = H.eval('liberaRighe').find(r => r.nome === 'Fenossietanolo');
+    expect(fen.qty).toBe('1');
+    expect(fen.unit).toBe('g');
+  });
+
   it('"Alcool 96°" è etanolo: campo bloccato', async () => {
     const H = await boot('?demo=1');
     H.eval(`liberaRighe = [
@@ -276,42 +283,72 @@ describe('Review v147–v152', () => {
       { nome:'Acqua purificata', qty:'50', unit:'ml', isPa:false, densita:null }]; calcPrep();`);
     expect(H.byId('grado-alc').readOnly).toBe(true);
   });
+});
 
-  it('dopo ✎ uscire senza modificare riblocca il campo', async () => {
-    const H = await boot('?demo=1');
-    H.eval('caricaEsempioDemo()');
-    H.eval('gradoAlcSblocca()');
-    expect(H.byId('grado-alc').readOnly).toBe(false);
-    H.eval('gradoAlcBlur()');
-    expect(H.byId('grado-alc').readOnly).toBe(true);
-  });
-
+describe('Attivazione demo', () => {
   it('?demo=0 non attiva la demo; ?demo e ?demo=1 sì', async () => {
     expect((await boot('?demo=0')).eval('DEMO_MODE')).toBe(false);
     expect((await boot('?demo')).eval('DEMO_MODE')).toBe(true);
     expect((await boot('?x=1&demo=1')).eval('DEMO_MODE')).toBe(true);
   });
+});
 
-  it('campo Grado svuotato: il riferimento "a vuoto" non resta quello vecchio', async () => {
-    const H = await boot('?demo=1');
-    H.eval('caricaEsempioDemo()');                         // grado calcolato 56.2
-    H.eval('liberaRighe = []; calcPrep();');               // formula vuota: campo svuotato
-    H.eval(`liberaRighe = [{ nome:'Minoxidil', qty:'5', unit:'g', isPa:true, densita:null }]; calcPrep();`);
-    H.byId('vol-soluzione').value = '100';
-    H.byId('grado-alc').value = '56.2';
-    H.eval('gradoAlcKeydown')({ key: 'Enter', preventDefault(){} });
-    expect(H.eval('liberaRighe').some(r => r.nome.startsWith('Etanolo'))).toBe(true);
+// La demo può essere aperta nel browser dove si usa l'app vera (stesso sito,
+// stesso localStorage): in demo tutte le chiavi gal_* diventano gal_demo_*.
+describe('Demo isolata dai dati veri', () => {
+  const veri = { gal_archivio_schede_v1: '[{"num":"2026/007","paz":"Rossi"}]', gal_scheda_counter_2026: '7',
+                 gal_inventario_v1: '[{"nome":"Sostanza vera"}]' };
+
+  it('in demo archivio e contatore veri non si vedono', async () => {
+    const H = await boot('?demo=1', { ls: veri });
+    expect(H.eval('archLoad()').length).toBe(0);
+    expect(H.ctx.localStorage.getItem('gal_scheda_counter_2026')).toBe(null);
   });
 
-  it('demo nel browser dove si usa l\'app (archivio o token presenti): avviso visibile', async () => {
-    const conArchivio = await boot('?demo=1', { ls: { gal_archivio_schede_v1: '[{"num":"2026/001"}]' } });
-    expect(conArchivio.byId('demo-avviso-browser').style.display).toBe('block');
-    const conToken = await boot('?demo=1', { token: 'ghp_finto' });
-    expect(conToken.byId('demo-avviso-browser').style.display).toBe('block');
-    const pulito = await boot('?demo=1');
-    expect(pulito.byId('demo-avviso-browser').style.display).toBe('none');
-    const prod = await boot('', { token: 'ghp_finto' });
-    expect(prod.byId('demo-avviso-browser').style.display).toBe('none');
+  it('in demo le scritture vanno su gal_demo_* e i dati veri restano intatti', async () => {
+    const H = await boot('?demo=1', { ls: veri });
+    H.ctx.localStorage.setItem('gal_scheda_counter_2026', '99');
+    expect(H.lsMap.get('gal_scheda_counter_2026')).toBe('7');
+    expect(H.lsMap.get('gal_demo_scheda_counter_2026')).toBe('99');
+  });
+
+  it('in produzione nessun cambiamento', async () => {
+    const H = await boot('', { ls: veri });
+    expect(H.eval('archLoad()').length).toBe(1);
+    H.ctx.localStorage.setItem('gal_scheda_counter_2026', '8');
+    expect(H.lsMap.get('gal_scheda_counter_2026')).toBe('8');
+  });
+});
+
+describe('Prova un esempio: conferma e ricetta pulita', () => {
+  it('formula in corso + annulla: niente cambia', async () => {
+    const H = await boot('?demo=1');
+    H.eval(`liberaRighe = [{ nome:'Acido salicilico', qty:'2', unit:'g', isPa:true, densita:null }];`);
+    H.ctx.confirm = () => false;
+    H.eval('caricaEsempioDemo()');
+    expect(H.eval('liberaRighe').map(r => r.nome)).toEqual(['Acido salicilico']);
+  });
+
+  it('formula in corso + conferma: residui azzerati (supplementi, prezzo manuale)', async () => {
+    const H = await boot('?demo=1');
+    H.eval(`liberaRighe = [{ nome:'Acido salicilico', qty:'2', unit:'g', isPa:true, densita:null }];
+            _suppManRighe = [{ desc:'extra', importo: 5 }];`);
+    H.byId('s-prezzo').value = '99';
+    let chiesto = false;
+    H.ctx.confirm = () => { chiesto = true; return true; };
+    H.eval('caricaEsempioDemo()');
+    expect(chiesto).toBe(true);
+    expect(H.eval('liberaRighe').map(r => r.nome)[0]).toBe('Minoxidil');
+    expect(H.eval('_suppManRighe').length).toBe(0);
+    expect(H.byId('s-prezzo').value).toBe('');
+  });
+
+  it('formula vuota: nessuna domanda', async () => {
+    const H = await boot('?demo=1');
+    let chiesto = false;
+    H.ctx.confirm = () => { chiesto = true; return true; };
+    H.eval('caricaEsempioDemo()');
+    expect(chiesto).toBe(false);
   });
 });
 
@@ -325,25 +362,35 @@ describe('Scheda: intestazione per forma', () => {
   });
 });
 
+// Rotellina su un campo numerico con focus: il valore non deve cambiare e il
+// campo NON deve essere lasciato (blur applicherebbe un valore scritto a metà);
+// la pagina scorre comunque.
 describe('Rotellina sui campi numerici', () => {
-  const campo = (type) => { const el = { type, blurred: false, blur(){ this.blurred = true; } }; return el; };
+  const campo = (type) => ({ type, blurred: false, blur(){ this.blurred = true; } });
+  const evento = (target) => ({ target, deltaY: 120, deltaMode: 0, prevented: false, preventDefault(){ this.prevented = true; } });
 
-  it('campo numerico con focus: la rotellina lo lascia (non cambia il valore)', async () => {
+  it('campo numerico con focus: valore bloccato, campo non lasciato, pagina scorre', async () => {
     const H = await boot('');
+    let scroll = 0;
+    H.ctx.scrollBy = (x, y) => { scroll += y; };
     const el = campo('number');
     H.ctx.document.activeElement = el;
-    H.eval('numberWheelBlur')({ target: el });
-    expect(el.blurred).toBe(true);
+    const e = evento(el);
+    H.eval('numberWheel')(e);
+    expect(e.prevented).toBe(true);
+    expect(el.blurred).toBe(false);
+    expect(scroll).toBe(120);
   });
 
   it('campo senza focus o non numerico: nessun effetto', async () => {
     const H = await boot('');
+    H.ctx.scrollBy = () => { throw new Error('non deve scorrere a mano'); };
     const num = campo('number'), txt = campo('text');
     H.ctx.document.activeElement = txt;
-    H.eval('numberWheelBlur')({ target: num });
-    H.eval('numberWheelBlur')({ target: txt });
-    expect(num.blurred).toBe(false);
-    expect(txt.blurred).toBe(false);
+    const e1 = evento(num), e2 = evento(txt);
+    H.eval('numberWheel')(e1);
+    H.eval('numberWheel')(e2);
+    expect(e1.prevented || e2.prevented).toBe(false);
   });
 });
 

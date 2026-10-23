@@ -15,6 +15,26 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script>
+  // Modalità demo (?demo o ?demo=1 nel link): versione di prova da far girare
+  // tra colleghi. Niente Gist e dati farmacia generici (vedi FARMACIA).
+  const DEMO_MODE = /[?&]demo(=1)?(&|$)/.test(location.search || '');
+
+  // In demo i dati vanno sotto gal_demo_* invece di gal_*: aperta nel browser
+  // dove si usa l'app vera (stesso sito = stesso localStorage) la demo non vede
+  // né tocca archivio, numerazione schede, inventario, chiavi. Deve girare
+  // prima di qualunque lettura, per questo sta in questo primo <script>.
+  if (DEMO_MODE) {
+    try {
+      const demoKey = (k) => (typeof k === 'string' && k.startsWith('gal_') && !k.startsWith('gal_demo_'))
+        ? 'gal_demo_' + k.slice(4) : k;
+      const target = (typeof Storage !== 'undefined') ? Storage.prototype : localStorage;
+      const get = target.getItem, set = target.setItem, rem = target.removeItem;
+      target.getItem    = function(k)    { return get.call(this, demoKey(k)); };
+      target.setItem    = function(k, v) { return set.call(this, demoKey(k), v); };
+      target.removeItem = function(k)    { return rem.call(this, demoKey(k)); };
+    } catch(e) {}
+  }
+
   // Applica subito il tema salvato per evitare flash di tema sbagliato
   try {
     const t = localStorage.getItem('gal_theme');
@@ -373,7 +393,6 @@
   <div id="app-version-badge" style="margin-left:8px;font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:99px;background:var(--badge-bg);color:var(--badge-fg);white-space:nowrap;cursor:default" title="Versione app"></div>
 </header>
 <div id="demo-banner">🧪 VERSIONE DI PROVA — i dati restano solo nel tuo browser. Calcoli conformi al D.M. 22/09/2017. Le sostanze di esempio hanno prezzi d'acquisto indicativi: per un confronto reale inserisci il tuo prezzo in Inventario. <button onclick="caricaEsempioDemo()" style="margin-left:6px;font:inherit;font-size:11px;padding:2px 8px;border:1px solid currentColor;border-radius:var(--radius);background:none;color:inherit;cursor:pointer">▶ Prova un esempio</button></div>
-<div id="demo-avviso-browser" style="display:none;background:var(--danger-bg);color:var(--danger);border-bottom:1px solid var(--danger-border);padding:6px 16px;font-size:13px;text-align:center" class="no-print">⚠ Stai aprendo la demo nel browser dove usi l'app: qui vede i tuoi dati veri (archivio, numerazione schede). Aprila in una finestra in incognito.</div>
 <div id="prev-banner">⚠ MODALITÀ PREVENTIVO ATTIVA — i prezzi/H mancanti sono modificabili a mano; le schede salvate saranno marcate PREVENTIVO con numerazione separata, non valide come preparazioni reali.</div>
 
 <main>
@@ -452,7 +471,7 @@
       <span class="field-label">Volume soluzione</span>
       <input type="number" id="vol-soluzione" min="0" step="0.1" placeholder="auto"
         style="width:80px;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
-        onchange="campoChange(this, volSoluzioneChanged)" onkeydown="volSoluzioneKeydown(event)">
+        onchange="volSoluzioneChanged()" onkeydown="invioEsce(event)">
       <span style="font-family:var(--mono);font-size:13px;color:var(--text-faint)">ml</span>
       <span style="font-size:11px;color:var(--text-faint);margin-left:8px">modifica per scalare tutte le righe proporzionalmente</span>
     </div>
@@ -460,7 +479,7 @@
       <span class="field-label">Grado alcolico</span>
       <input type="number" id="grado-alc" min="0" max="96" step="0.1" placeholder="0"
         style="width:80px;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
-        onchange="campoChange(this, gradoAlcChanged)" onkeydown="gradoAlcKeydown(event)" onblur="gradoAlcBlur()">
+        onchange="gradoAlcChanged()" onkeydown="invioEsce(event)" onblur="gradoAlcBlur()">
       <span style="font-family:var(--mono);font-size:13px;color:var(--text-faint)">% v/v</span>
       <button id="grado-alc-edit" onclick="gradoAlcSblocca()" title="Imposta il grado: ricalcola etanolo e acqua" aria-label="Modifica grado alcolico"
         style="display:none;margin-left:6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:none;cursor:pointer;font-size:12px;padding:2px 6px;color:var(--text-muted)">✎</button>
@@ -1798,7 +1817,8 @@ function liberaGetIngr() {
 // NON gli altri alcoli (cetilico, benzilico, cetostearilico...), che il vecchio
 // includes('alcol') scambiava per etanolo. Usata dal Grado alcolico.
 function isEtanoloNome(n) {
-  return n.includes('etanolo') || /(^|\s)etilico/.test(n) || /^alcoo?l(\s*\d.*)?$/.test(n.trim());
+  // Parole intere: "fenossietanolo" ed "etere etilico" non sono etanolo.
+  return /(^|\s)etanolo/.test(n) || /^alcoo?l\s+etilico/.test(n.trim()) || /^alcoo?l(\s*\d.*)?$/.test(n.trim());
 }
 function calcSoluzioneInfo(totalePrep, totalePrepUnit) {
   const ingr = liberaGetIngr();
@@ -1838,17 +1858,19 @@ function calcSoluzioneInfo(totalePrep, totalePrepUnit) {
 // Volume totale implicito = somma dei ml-equivalenti delle sole righe liquide.
 // I solidi senza densità (es. acido acetilsalicilico in g) sono ignorati: si dissolvono
 // nel solvente senza aumentare significativamente il volume.
+// Volume in ml di una riga: ml diretti, g convertiti con la densità nota;
+// altrimenti 0 (solidi senza densità, % non risolvibili senza totale esplicito).
+function volMlRiga(r) {
+  if (!r) return 0;
+  const q = parseFloat(r.qty)||0;
+  const densita = getDensita(r.nome);
+  if (r.unit === 'ml') return q;
+  if (r.unit === 'g' && densita) return q / densita;
+  return 0;
+}
+
 function liberaSommaVolumeLiquidi() {
-  const ingr = liberaGetIngr();
-  let sumMl = 0;
-  ingr.forEach(r => {
-    const q = parseFloat(r.qty)||0;
-    const densita = getDensita(r.nome);
-    if (r.unit === 'ml') sumMl += q;
-    else if (r.unit === 'g' && densita) sumMl += q / densita;
-    // % saltate: non risolvibili senza totale esplicito
-  });
-  return sumMl;
+  return liberaGetIngr().reduce((sumMl, r) => sumMl + volMlRiga(r), 0);
 }
 
 // Grado alcolico: se la formula contiene già etanolo il grado è un RISULTATO
@@ -1885,7 +1907,7 @@ function aggiornaTotaleDerived() {
   if (!derivedEl) return;
   if (tipoPrep !== 'soluzione' && tipoPrep !== 'tintura') {
     derivedEl.textContent = '';
-    if (gradoEl && document.activeElement !== gradoEl) { gradoEl.value = ''; gradoEl.dataset.calc = ''; }
+    if (gradoEl && document.activeElement !== gradoEl) gradoEl.value = '';
     return;
   }
   const tot = parseFloat(totEl?.value)||0;
@@ -1899,7 +1921,7 @@ function aggiornaTotaleDerived() {
   }
   if (effectiveTot <= 0) {
     derivedEl.textContent = '';
-    if (gradoEl && document.activeElement !== gradoEl) { gradoEl.value = ''; gradoEl.dataset.calc = ''; }
+    if (gradoEl && document.activeElement !== gradoEl) gradoEl.value = '';
     return;
   }
   const info = calcSoluzioneInfo(effectiveTot, effectiveUnit);
@@ -1916,7 +1938,6 @@ function aggiornaTotaleDerived() {
   // Campo grado: sempre popolato quando soluzione + formula computabile
   if (gradoEl && document.activeElement !== gradoEl) {
     gradoEl.value = info.grado > 0 ? fmt(info.grado, 1).replace(',','.') : '';
-    gradoEl.dataset.calc = gradoEl.value; // vedi gradoAlcKeydown
   }
   // Volume soluzione: auto-fill con somma liquidi quando non in focus
   const volEl = document.getElementById('vol-soluzione');
@@ -1961,49 +1982,23 @@ function volSoluzioneChanged() {
   calcPrep();
 }
 
-// Invio applica subito il volume (onchange scatta solo uscendo dal campo).
-// Il successivo blur trova ratio 1 e non riscala due volte. (Rotellina:
-// gestita per tutti i campi numerici da numberWheelBlur.)
-function volSoluzioneKeydown(ev) {
+// Invio su Volume soluzione / Grado alcolico: esce dal campo. Il ricalcolo
+// passa così SOLO da onchange, come con un clic altrove: una sola
+// applicazione, e nessuna se il valore non è cambiato (il browser non lancia
+// change), quindi un Invio "a vuoto" non riscrive la formula.
+function invioEsce(ev) {
   if (ev.key !== 'Enter') return;
   ev.preventDefault();
-  volSoluzioneChanged();
-  campoSegnaApplicato(document.getElementById('vol-soluzione'));
+  if (ev.target && ev.target.blur) ev.target.blur();
 }
 
-// Invio applica subito, ma il browser lancia comunque "change" all'uscita dal
-// campo: senza questo segno il valore verrebbe applicato due volte (e un
-// eventuale avviso mostrato due volte).
-function campoSegnaApplicato(el) {
-  if (el) el.dataset.applicato = el.value;
-}
-function campoChange(el, fn) {
-  const giaApplicato = el.dataset.applicato !== undefined && el.dataset.applicato === el.value;
-  delete el.dataset.applicato;
-  if (!giaApplicato) fn();
-}
-
-// Invio sul Grado alcolico: applica subito, come per il Volume soluzione.
-function gradoAlcKeydown(ev) {
-  if (ev.key !== 'Enter') return;
-  ev.preventDefault();
-  // Invio "a vuoto" (valore ancora quello calcolato dalla formula) non deve
-  // riscrivere etanolo/acqua arrotondando al grado mostrato.
-  const el = document.getElementById('grado-alc');
-  if (el && el.dataset.calc !== undefined && el.value === el.dataset.calc) return;
-  gradoAlcChanged();
-  campoSegnaApplicato(el);
-}
-
-// Uscita dal campo dopo ✎ senza aver cambiato il valore: torna bloccato.
-// (Se il valore è cambiato, "change" scatta prima del blur e lo applica.)
+// Uscita dal Grado alcolico: torna sempre bloccato (se la formula ha etanolo)
+// e mostra il grado calcolato. "change" scatta prima del blur, quindi un
+// valore nuovo è già stato applicato; se era impossibile, l'avviso è già
+// comparso e qui il campo torna al valore reale della formula.
 function gradoAlcBlur() {
-  const el = document.getElementById('grado-alc');
-  if (!el || !gradoAlcSbloccato) return;
-  if (el.value === (el.dataset.calc || '')) {
-    gradoAlcSbloccato = false;
-    gradoAlcAggiornaBlocco();
-  }
+  gradoAlcSbloccato = false;
+  aggiornaTotaleDerived();
 }
 
 // Crea/aggiorna le righe "Etanolo 96°" e "Acqua purificata" per un veicolo
@@ -2019,13 +2014,8 @@ function liberaApplyVolGrado(totMl, grado) {
   // L'acqua completa il volume insieme agli ALTRI liquidi già in formula
   // (glicole, glicerina...): vanno sottratti, altrimenti il volume finale
   // supera totMl e il grado reale risulta più basso di quello chiesto.
-  const _volMl = (r) => {
-    if (!r) return 0;
-    const q = parseFloat(r.qty)||0, d = getDensita(r.nome);
-    return r.unit === 'ml' ? q : (r.unit === 'g' && d ? q / d : 0);
-  };
-  const acIdx0 = liberaRighe.findIndex(r => invNominalizza(r.nome || '').includes('acqua'));
-  const altriMl = Math.max(0, liberaSommaVolumeLiquidi() - _volMl(liberaRighe[etIdx]) - _volMl(liberaRighe[acIdx0]));
+  let acIdx = liberaRighe.findIndex(r => invNominalizza(r.nome || '').includes('acqua'));
+  const altriMl = Math.max(0, liberaSommaVolumeLiquidi() - volMlRiga(liberaRighe[etIdx]) - volMlRiga(liberaRighe[acIdx]));
   if (newEtMl + altriMl > totMl + 1e-6) {
     const maxGrado = Math.max(0, (totMl - altriMl) * 0.96 / totMl * 100);
     alert('Con questi ingredienti, in ' + fmt(totMl, 1) + ' ml il grado alcolico massimo è ' + fmt(Math.floor(maxGrado * 10) / 10, 1) + '% v/v.');
@@ -2037,7 +2027,6 @@ function liberaApplyVolGrado(totMl, grado) {
   }
   liberaRighe[etIdx].qty = String(parseFloat(newEtMl.toFixed(2)));
   liberaRighe[etIdx].unit = 'ml';
-  let acIdx = liberaRighe.findIndex(r => invNominalizza(r.nome || '').includes('acqua'));
   const newAcMl = Math.max(0, totMl - newEtMl - altriMl);
   if (acIdx < 0) {
     liberaRighe.push({nome:'Acqua purificata', qty:'', unit:'ml', isPa:false, densita:null, prezzoAcq:0, fonte:null, lotto:''});
@@ -4024,11 +4013,9 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 153;
+const APP_VERSION = 154;
 
-// Modalità demo (?demo=1 nel link): versione di prova da far girare tra
-// colleghi. Niente lettura/scrittura sui Gist e dati farmacia generici.
-const DEMO_MODE = /[?&]demo(=1)?(&|$)/.test(location.search || '');
+// DEMO_MODE è definito nel primo <script> dell'<head> (isola anche il localStorage).
 
 // Dati farmacia usati da Scheda, etichette Dymo ed email ordini. I testi reali
 // sono quelli storici (incluse le varianti di maiuscole/indirizzo per contesto).
@@ -6053,6 +6040,11 @@ function archRiapri(id) {
 // Non tocca inventario, archivio schede, ordini, chiavi GitHub/Groq, cronologia AI.
 function resetRicetta() {
   if (!confirm('Azzerare la ricetta corrente?\n\nVerranno cancellati i dati di Preparazione, Tariffazione e Scheda.\nInventario, archivio e ordini non saranno toccati.')) return;
+  azzeraRicetta();
+}
+
+// Azzeramento senza domanda: usato da "Nuova ricetta" e da "Prova un esempio".
+function azzeraRicetta() {
 
   // ── state moduli ──
   tipoPrep = 'soluzione';
@@ -6336,12 +6328,16 @@ function applyLogos() {
 }
 
 // Rotellina su un campo numerico con focus: il browser cambierebbe il valore
-// di nascosto mentre si scorre la pagina. Lasciamo il campo, così la pagina
-// scorre e il numero resta quello scritto. Registrato su document al boot,
-// copre anche le righe create dinamicamente.
-function numberWheelBlur(e) {
+// di nascosto mentre si scorre la pagina. Blocchiamo il cambio e scorriamo la
+// pagina a mano. NON si lascia il campo: il blur applicherebbe (onchange) un
+// valore scritto a metà. Registrato su document al boot (non passive, serve
+// preventDefault), copre anche le righe create dinamicamente.
+function numberWheel(e) {
   const t = e.target;
-  if (t && t.type === 'number' && t === document.activeElement) t.blur();
+  if (!(t && t.type === 'number' && t === document.activeElement)) return;
+  e.preventDefault();
+  const passo = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? window.innerHeight : 1;
+  window.scrollBy(0, e.deltaY * passo);
 }
 
 // Modalità demo: sostituisce i default HTML delle etichette con i dati generici
@@ -6356,8 +6352,13 @@ function applyDemoMode() {
 }
 
 // Demo: compila una lozione Minoxidil 5% (stessa formula del test "motore
-// unico") riusando il percorso di "Importa ricetta".
+// unico") riusando il percorso di "Importa ricetta". Parte da una ricetta
+// pulita (niente totali, prezzo manuale o supplementi della formula prima) e,
+// se c'è già una formula, chiede prima di sostituirla.
 function caricaEsempioDemo() {
+  if (liberaRighe.some(r => (r.nome || '').trim()) &&
+      !confirm('Sostituire la formula in corso con l\'esempio Minoxidil 5%?')) return;
+  azzeraRicetta();
   ricettaApplicaJson({
     tipoPrep: 'soluzione',
     nomePA: 'Minoxidil',
@@ -6380,20 +6381,6 @@ function demoBenvenutoInit() {
   try { chiuso = localStorage.getItem(DEMO_BENV_KEY) === '1'; } catch(e) {}
   document.getElementById('demo-benvenuto').style.display = (DEMO_MODE && !chiuso) ? 'block' : 'none';
 }
-// Demo aperta sullo stesso sito dell'app vera (stesso localStorage): archivio,
-// contatore schede e inventario sono quelli reali. Lo segnaliamo se il browser
-// contiene già un archivio o un token GitHub (letti direttamente: in demo
-// ghGetToken() restituisce sempre '').
-function demoAvvisoBrowserInit() {
-  let datiVeri = false;
-  if (DEMO_MODE) {
-    try {
-      const arch = JSON.parse(localStorage.getItem(ARCH_KEY) || '[]');
-      datiVeri = (Array.isArray(arch) && arch.length > 0) || !!localStorage.getItem(GH_TOKEN_KEY);
-    } catch(e) {}
-  }
-  document.getElementById('demo-avviso-browser').style.display = datiVeri ? 'block' : 'none';
-}
 function demoBenvenutoChiudi() {
   try { localStorage.setItem(DEMO_BENV_KEY, '1'); } catch(e) {}
   document.getElementById('demo-benvenuto').style.display = 'none';
@@ -6401,10 +6388,9 @@ function demoBenvenutoChiudi() {
 
 (async function bootInit() {
   applyLogos();
-  document.addEventListener('wheel', numberWheelBlur, { passive: true });
+  document.addEventListener('wheel', numberWheel, { passive: false });
   applyDemoMode();
   demoBenvenutoInit();
-  demoAvvisoBrowserInit();
   if (window.location.hash && window.location.hash.startsWith('#prev=')) {
     await prevCheckSharedLink();
     return; // non avviare il resto dell'app
