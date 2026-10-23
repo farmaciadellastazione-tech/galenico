@@ -6231,6 +6231,23 @@ function applyDemoMode() {
   document.getElementById('ev2-indirizzo').textContent = FARMACIA.indirizzo;
 }
 
+// Demo: compila una lozione Minoxidil 5% (stessa formula del test "motore
+// unico") riusando il percorso di "Importa ricetta".
+function caricaEsempioDemo() {
+  ricettaApplicaJson({
+    tipoPrep: 'soluzione',
+    nomePA: 'Minoxidil',
+    ingredienti: [
+      { nome: 'Minoxidil',           qty: 5,  unit: 'g', isPa: true },
+      { nome: 'Etanolo 96°',         qty: 50, unit: 'g' },
+      { nome: 'Glicole propilenico', qty: 35, unit: 'g' },
+      { nome: 'Acqua purificata',    qty: 10, unit: 'g' },
+    ],
+  });
+  const btn = document.querySelector('nav .nav-btn');
+  if (btn) showPage('preparazione', btn);
+}
+
 (async function bootInit() {
   applyLogos();
   applyDemoMode();

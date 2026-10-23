@@ -32,7 +32,7 @@ function makeEl(id) {
   return el;
 }
 
-async function boot(search, { token } = {}) {
+async function boot(search, { token, ls = {} } = {}) {
   const pricingSrc = readFileSync(join(ROOT, 'pricing.js'), 'utf8');
   const html = readFileSync(join(ROOT, 'index.html'), 'utf8');
   const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -43,6 +43,7 @@ async function boot(search, { token } = {}) {
   const byId = (id) => { if(!store.has(id)) store.set(id, makeEl(id)); return store.get(id); };
   const lsMap = new Map();
   if (token) lsMap.set('gal_gh_token', token);
+  Object.entries(ls).forEach(([k, v]) => lsMap.set(k, v));
   const fetched = [];
   const opened = [];
   const ctx = {};
@@ -69,7 +70,10 @@ async function boot(search, { token } = {}) {
   vm.runInContext(inline, ctx, { filename: 'index-inline.js' });
   for (let i = 0; i < 20; i++) await new Promise(r => setImmediate(r)); // lascia finire il boot async
   const gh = () => fetched.filter(u => u.includes('api.github.com'));
-  return { ctx, byId, fetched, gh, opened, eval: (src) => vm.runInContext(src, ctx) };
+  const parseEuros = (s) => { const out=[]; const r=/€\s*([0-9]+(?:[.,][0-9]+)?)/g; let mm; while((mm=r.exec(s))) out.push(parseFloat(mm[1].replace('.','').replace(',','.'))); return out; };
+  const prezzoPubblico = () => { const h=byId('tariff-totale').innerHTML; const i=h.indexOf('Prezzo al pubblico'); const eu=parseEuros(i>=0?h.slice(i):h); return eu.length?eu[0]:null; };
+  const schedaTotale = () => { const eu=parseEuros(byId('scheda-preview').innerHTML); return eu.length?eu[eu.length-1]:null; };
+  return { ctx, byId, fetched, gh, opened, lsMap, prezzoPubblico, schedaTotale, eval: (src) => vm.runInContext(src, ctx) };
 }
 
 describe('Modalità demo (?demo=1)', () => {
@@ -118,5 +122,32 @@ describe('Modalità demo (?demo=1)', () => {
     const mail = decodeURIComponent(H.opened[0] || '');
     expect(mail).toContain('Minoxidil');
     expect(mail).not.toMatch(/Stazione|Via Fiume|01317570115|6706/);
+  });
+});
+
+describe('Demo: esempio e benvenuto', () => {
+  it('"Prova un esempio" compila Minoxidil 5% e Tariffazione = Scheda', async () => {
+    const H = await boot('?demo=1');
+    H.eval('caricaEsempioDemo()');
+    const righe = H.eval('liberaRighe').map(r => r.nome);
+    expect(righe).toEqual(['Minoxidil', 'Etanolo 96°', 'Glicole propilenico', 'Acqua purificata']);
+    expect(H.eval('tipoPrep')).toBe('soluzione');
+    H.eval('calcTariff(); aggiornaScheda()');
+    const tar = H.prezzoPubblico(), sch = H.schedaTotale();
+    expect(tar).toBeGreaterThan(0);
+    expect(sch).toBeCloseTo(tar, 2);
+  });
+
+  it('benvenuto visibile in demo, nascosto in produzione', async () => {
+    expect((await boot('?demo=1')).byId('demo-benvenuto').style.display).toBe('block');
+    expect((await boot('')).byId('demo-benvenuto').style.display).toBe('none');
+  });
+
+  it('chiuso con ✕ non ricompare al riavvio', async () => {
+    const H = await boot('?demo=1');
+    H.eval('demoBenvenutoChiudi()');
+    expect(H.byId('demo-benvenuto').style.display).toBe('none');
+    const ls = Object.fromEntries(H.lsMap);
+    expect((await boot('?demo=1', { ls })).byId('demo-benvenuto').style.display).toBe('none');
   });
 });
