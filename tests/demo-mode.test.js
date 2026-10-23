@@ -194,6 +194,43 @@ describe('Grado alcolico', () => {
   });
 });
 
+describe('Grado alcolico: calcolato e bloccato se la formula ha già etanolo', () => {
+  async function esempio() {
+    const H = await boot('?demo=1');
+    H.eval('caricaEsempioDemo()');
+    return H;
+  }
+
+  it('esempio Minoxidil: campo Grado in sola lettura', async () => {
+    const H = await esempio();
+    expect(H.byId('grado-alc').readOnly).toBe(true);
+  });
+
+  it('Invio su campo bloccato non modifica la formula', async () => {
+    const H = await esempio();
+    const prima = JSON.stringify(H.eval('liberaRighe'));
+    H.eval('gradoAlcKeydown')({ key: 'Enter', preventDefault(){} });
+    expect(JSON.stringify(H.eval('liberaRighe'))).toBe(prima);
+  });
+
+  it('✎ sblocca; dopo l\'applicazione il campo si riblocca', async () => {
+    const H = await esempio();
+    H.eval('gradoAlcSblocca()');
+    expect(H.byId('grado-alc').readOnly).toBe(false);
+    H.byId('grado-alc').value = '50';
+    H.eval('gradoAlcChanged()');
+    const etanolo = H.eval('liberaRighe').find(r => r.nome.startsWith('Etanolo'));
+    expect(etanolo.unit).toBe('ml');                 // ricalcolato dal grado
+    expect(H.byId('grado-alc').readOnly).toBe(true);
+  });
+
+  it('formula senza etanolo: campo modificabile (veicolo da costruire)', async () => {
+    const H = await boot('?demo=1');
+    H.eval(`liberaRighe = [{ nome:'Acqua purificata', qty:'100', unit:'ml', isPa:false, densita:null }]; calcPrep();`);
+    expect(H.byId('grado-alc').readOnly).toBe(false);
+  });
+});
+
 describe('Rotellina sui campi numerici', () => {
   const campo = (type) => { const el = { type, blurred: false, blur(){ this.blurred = true; } }; return el; };
 

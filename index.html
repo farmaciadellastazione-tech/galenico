@@ -461,7 +461,9 @@
         style="width:80px;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
         onchange="gradoAlcChanged()" onkeydown="gradoAlcKeydown(event)">
       <span style="font-family:var(--mono);font-size:13px;color:var(--text-faint)">% v/v</span>
-      <span style="font-size:11px;color:var(--text-faint);margin-left:8px">modifica per scalare etanolo (compensa con acqua)</span>
+      <button id="grado-alc-edit" onclick="gradoAlcSblocca()" title="Imposta il grado: ricalcola etanolo e acqua" aria-label="Modifica grado alcolico"
+        style="display:none;margin-left:6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:none;cursor:pointer;font-size:12px;padding:2px 6px;color:var(--text-muted)">✎</button>
+      <span id="grado-alc-hint" style="font-size:11px;color:var(--text-faint);margin-left:8px">modifica per scalare etanolo (compensa con acqua)</span>
     </div>
     <div class="field-row" id="row-libera-conc" style="margin-bottom:8px;flex-wrap:wrap">
       <span class="field-label">Concentrazione</span>
@@ -1841,7 +1843,36 @@ function liberaSommaVolumeLiquidi() {
   return sumMl;
 }
 
+// Grado alcolico: se la formula contiene già etanolo il grado è un RISULTATO
+// (sola lettura, stile "calcolato"); ✎ lo sblocca per una modifica, poi si
+// riblocca. Senza etanolo resta un comando per costruire il veicolo.
+let gradoAlcSbloccato = false;
+function gradoAlcAggiornaBlocco() {
+  const el = document.getElementById('grado-alc');
+  if (!el) return;
+  const haEtanolo = liberaRighe.some(r => {
+    const n = invNominalizza(r.nome || '');
+    return (n.includes('etanolo') || n.includes('alcol')) && (parseFloat(r.qty) || 0) > 0;
+  });
+  const bloccato = haEtanolo && !gradoAlcSbloccato;
+  el.readOnly = bloccato;
+  el.style.background = bloccato ? 'var(--accent-light)' : 'var(--bg)';
+  el.style.color = bloccato ? 'var(--accent)' : '';
+  const btn = document.getElementById('grado-alc-edit');
+  if (btn) btn.style.display = bloccato ? '' : 'none';
+  const hint = document.getElementById('grado-alc-hint');
+  if (hint) hint.textContent = bloccato ? 'calcolato dalla formula · ✎ per impostarlo'
+                                        : 'modifica per scalare etanolo (compensa con acqua)';
+}
+function gradoAlcSblocca() {
+  gradoAlcSbloccato = true;
+  gradoAlcAggiornaBlocco();
+  const el = document.getElementById('grado-alc');
+  if (el && el.focus) { el.focus(); if (el.select) el.select(); }
+}
+
 function aggiornaTotaleDerived() {
+  gradoAlcAggiornaBlocco();
   const totEl = document.getElementById('totale-prep');
   const derivedEl = document.getElementById('totale-prep-derived');
   const gradoEl = document.getElementById('grado-alc');
@@ -1879,6 +1910,7 @@ function aggiornaTotaleDerived() {
   // Campo grado: sempre popolato quando soluzione + formula computabile
   if (gradoEl && document.activeElement !== gradoEl) {
     gradoEl.value = info.grado > 0 ? fmt(info.grado, 1).replace(',','.') : '';
+    gradoEl.dataset.calc = gradoEl.value; // vedi gradoAlcKeydown
   }
   // Volume soluzione: auto-fill con somma liquidi quando non in focus
   const volEl = document.getElementById('vol-soluzione');
@@ -1936,11 +1968,15 @@ function volSoluzioneKeydown(ev) {
 function gradoAlcKeydown(ev) {
   if (ev.key !== 'Enter') return;
   ev.preventDefault();
+  // Invio "a vuoto" (valore ancora quello calcolato dalla formula) non deve
+  // riscrivere etanolo/acqua arrotondando al grado mostrato.
+  const el = document.getElementById('grado-alc');
+  if (el && el.dataset.calc !== undefined && el.value === el.dataset.calc) return;
   gradoAlcChanged();
 }
 
 // Crea/aggiorna le righe "Etanolo 96°" e "Acqua purificata" per un veicolo
-// idroalcolico di volume totMl (ml) al grado (% v/v) indicato. Condivisa da
+// idroalcolico di volume totMl (ml) al grado (% v/v) indicato; true se applicato. Condivisa da
 // volSoluzioneChanged() e gradoAlcChanged(): compilare entrambe le mascherine
 // (Volume soluzione + Grado alcolico), in qualunque ordine, popola sempre i due
 // ingredienti del veicolo.
@@ -1982,6 +2018,7 @@ function liberaApplyVolGrado(totMl, grado) {
   liberaRighe[acIdx].qty = String(parseFloat(newAcMl.toFixed(2)));
   liberaRighe[acIdx].unit = 'ml';
   calcPrep();
+  return true;
 }
 
 // L'utente modifica il grado alcolico desiderato: ricalcola la quantità di etanolo 96°
@@ -2016,7 +2053,12 @@ function gradoAlcChanged() {
       }
     }
   }
-  liberaApplyVolGrado(totMl, desiredGrado);
+  // Applicato: torna un risultato calcolato. Se invece non è stato possibile
+  // (avvisi) resta sbloccato, così si può correggere il valore.
+  if (liberaApplyVolGrado(totMl, desiredGrado)) {
+    gradoAlcSbloccato = false;
+    gradoAlcAggiornaBlocco();
+  }
 }
 
 function liberaCalcTotale() {
@@ -3954,7 +3996,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 151;
+const APP_VERSION = 152;
 
 // Modalità demo (?demo=1 nel link): versione di prova da far girare tra
 // colleghi. Niente lettura/scrittura sui Gist e dati farmacia generici.
@@ -5994,6 +6036,7 @@ function resetRicetta() {
   tarPADaAllegatoA = true;
   _suppManRighe = [];
   tipoScheda = 'soluzione';
+  gradoAlcSbloccato = false;
   setEditingMode(null);
 
   const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
