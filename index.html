@@ -928,11 +928,11 @@
     <div class="etiq-form">
       <div class="full">
         <label>Farmacia (intestazione)</label>
-        <input type="text" id="e-farmacia" value="Farmacia Della Stazione" oninput="etiqIntestazioneModificata()">
+        <input type="text" id="e-farmacia" value="Farmacia Della Stazione" oninput="etiqAggiorna()" onchange="etiqIntestazioneModificata('farmacia')">
       </div>
       <div class="full">
         <label>Indirizzo</label>
-        <input type="text" id="e-indirizzo" value="Via Fiume 75 — 19122 La Spezia — Tel. 0187-706147" oninput="etiqIntestazioneModificata()">
+        <input type="text" id="e-indirizzo" value="Via Fiume 75 — 19122 La Spezia — Tel. 0187-706147" oninput="etiqAggiorna()" onchange="etiqIntestazioneModificata('indirizzo')">
       </div>
       <div class="full">
         <label>Paziente / sig.</label>
@@ -4115,7 +4115,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 160;
+const APP_VERSION = 161;
 
 // DEMO_MODE è definito nel primo <script> dell'<head> (isola anche il localStorage).
 
@@ -4713,87 +4713,98 @@ function fmtGiorno(d) {
 // ETICHETTE DYMO
 // ═══════════════════════════════════════════
 
-function etiqAggiorna() {
-  const farmacia  = document.getElementById('e-farmacia').value;
-  const indirizzo = document.getElementById('e-indirizzo').value;
-  const paziente  = document.getElementById('e-paziente').value;
-  const nome      = document.getElementById('e-nome').value || '—';
-  const qty       = document.getElementById('e-qty').value;
-  const uso       = document.getElementById('e-uso').value;
-  const data      = document.getElementById('e-data').value;
-  const mesi      = document.getElementById('e-mesi').value;
-  const prezzoRaw = parseFloat(document.getElementById('e-prezzo').value);
-  const h         = document.getElementById('e-h').value.trim();
+// Dati delle etichette dai campi della pagina, già pronti per la stampa.
+// UNICA fonte per anteprima (etiqAggiorna) e testo DYMO (etiqTesti): quello
+// che si vede è quello che si stampa. Campi vuoti → stringa vuota (niente
+// "sig. —" o "pr. —" stampati).
+function etiqDati() {
+  const v = id => (document.getElementById(id).value || '');
+  const nome = v('e-nome').trim() || '—', qty = v('e-qty').trim();
+  const paz = v('e-paziente').trim(), data = v('e-data').trim(), mesi = v('e-mesi').trim();
+  const prezzo = parseFloat(v('e-prezzo'));
+  const indirizzo = v('e-indirizzo').trim();
+  return {
+    farmacia: v('e-farmacia').trim(),
+    indirizzo,
+    indirizzoBreve: etiqIndirizzoBreve(indirizzo),
+    paziente: paz ? 'sig. ' + paz : '',
+    nome,
+    nomeQty: nome + (qty ? ' ' + qty : ''),
+    data: data ? 'pr. ' + data : '',
+    vale: mesi ? 'vale ' + mesi + ' mesi' : '',
+    prezzo: !isNaN(prezzo) && prezzo > 0 ? '€ ' + prezzo.toFixed(2) : '',
+    uso: v('e-uso'),
+    h: v('e-h').trim(),
+  };
+}
 
-  document.getElementById('ev-farmacia').textContent  = farmacia;
-  document.getElementById('ev-indirizzo').textContent = indirizzo;
-  document.getElementById('ev-paziente').textContent  = paziente ? 'sig. '+paziente : '—';
-  document.getElementById('ev-nome').textContent      = nome + (qty ? '  '+qty : '');
-  document.getElementById('ev-data').textContent      = data ? 'pr. '+data : 'pr. —';
-  document.getElementById('ev-vale').textContent      = mesi ? 'vale '+mesi+' mesi' : '';
-  document.getElementById('ev-uso').textContent       = uso;
-  document.getElementById('ev-prezzo').textContent    = !isNaN(prezzoRaw) && prezzoRaw>0 ? '€ '+prezzoRaw.toFixed(2) : '';
-  document.getElementById('ev2-farmacia').textContent  = farmacia;
-  document.getElementById('ev2-indirizzo').textContent = etiqIndirizzoBreve(indirizzo);
-  document.getElementById('ev2-nome').textContent     = nome;
-  document.getElementById('ev2-h').textContent        = h ? h : '';
+function etiqAggiorna() {
+  const d = etiqDati();
+  const set = (id, t) => { document.getElementById(id).textContent = t; };
+  set('ev-farmacia', d.farmacia);
+  set('ev-indirizzo', d.indirizzo);
+  set('ev-paziente', d.paziente);
+  set('ev-nome', d.nomeQty);
+  set('ev-data', d.data);
+  set('ev-vale', d.vale);
+  set('ev-uso', d.uso);
+  set('ev-prezzo', d.prezzo);
+  set('ev2-farmacia', d.farmacia);
+  set('ev2-indirizzo', d.indirizzoBreve);
+  set('ev2-nome', d.nome);
+  set('ev2-h', d.h);
 }
 
 // Etichetta 2 (sicurezza, poco spazio): indirizzo senza telefono e senza CAP.
 // "Via Fiume 75 — 19122 La Spezia — Tel. 0187-706147" → "Via Fiume 75 — La Spezia".
+// Telefono: "Tel"/"Telefono"/"☎" seguito da un numero (\b: non "Castel 5").
+// CAP: 5 cifre seguite dal nome della città.
 function etiqIndirizzoBreve(indirizzo) {
   return (indirizzo || '')
-    .replace(/\s*[—–,-]\s*Tel\b.*$/i, '')
-    .replace(/\b\d{5}\s+/, '')
+    .replace(/\s*[—–,-]?\s*(?:\btel\.?|\btelefono|☎)\s*:?\s*[\d+(_].*$/i, '')
+    .replace(/\b\d{5}\s+(?=\p{L})/u, '')
     .trim();
 }
 
-// Intestazione delle etichette modificata dall'utente: la ricordiamo nel
-// browser (es. un collega scrive il nome della sua farmacia). Finché non viene
-// toccata non si salva nulla e valgono i dati di FARMACIA.
+// Intestazione delle etichette modificata dall'utente (es. un collega scrive il
+// nome della sua farmacia): si salva solo il campo cambiato, all'uscita dal
+// campo. Vuoto o uguale al predefinito → salvataggio cancellato e tornano i
+// dati di FARMACIA (così un loro aggiornamento arriva anche qui).
 const ETIQ_FARMACIA_KEY = 'gal_etichetta_farmacia';
 const ETIQ_INDIRIZZO_KEY = 'gal_etichetta_indirizzo';
-function etiqIntestazioneModificata() {
-  try {
-    localStorage.setItem(ETIQ_FARMACIA_KEY, document.getElementById('e-farmacia').value);
-    localStorage.setItem(ETIQ_INDIRIZZO_KEY, document.getElementById('e-indirizzo').value);
-  } catch(e) {}
+const _ETIQ_CAMPI = {
+  farmacia:  { id: 'e-farmacia',  key: ETIQ_FARMACIA_KEY,  def: () => FARMACIA.nomeEtichetta },
+  indirizzo: { id: 'e-indirizzo', key: ETIQ_INDIRIZZO_KEY, def: () => FARMACIA.indirizzoTel },
+};
+function etiqIntestazioneModificata(campo) {
+  for (const c of (campo ? [campo] : Object.keys(_ETIQ_CAMPI))) {
+    const { id, key, def } = _ETIQ_CAMPI[c];
+    const el = document.getElementById(id);
+    const v = el.value.trim();
+    try {
+      if (!v || v === def()) { localStorage.removeItem(key); if (!v) el.value = def(); }
+      else localStorage.setItem(key, v);
+    } catch(e) {}
+  }
   etiqAggiorna();
 }
 function etiqCaricaIntestazione() {
-  try {
-    const f = localStorage.getItem(ETIQ_FARMACIA_KEY), i = localStorage.getItem(ETIQ_INDIRIZZO_KEY);
-    if (f !== null) document.getElementById('e-farmacia').value = f;
-    if (i !== null) document.getElementById('e-indirizzo').value = i;
-  } catch(e) {}
+  for (const { id, key } of Object.values(_ETIQ_CAMPI)) {
+    try { const v = localStorage.getItem(key); if (v) document.getElementById(id).value = v; } catch(e) {}
+  }
 }
 
-// Testi delle due etichette dai campi della pagina: gli stessi dati
-// dell'anteprima (etiqAggiorna), così quello che si vede è quello che si stampa.
+// Testi delle due etichette da copiare in DYMO Connect: stessi dati
+// dell'anteprima (etiqDati). L'etichetta 2 mette farmacia e indirizzo breve su
+// una riga, come prima.
 function etiqTesti() {
-  const farmacia  = document.getElementById('e-farmacia').value;
-  const indirizzo = document.getElementById('e-indirizzo').value;
-  const nome    = document.getElementById('e-nome').value || '—';
-  const qty     = document.getElementById('e-qty').value;
-  const paz     = document.getElementById('e-paziente').value;
-  const data    = document.getElementById('e-data').value;
-  const mesi    = document.getElementById('e-mesi').value;
-  const prezzo  = parseFloat(document.getElementById('e-prezzo').value);
-  const uso     = document.getElementById('e-uso').value;
-  const h       = document.getElementById('e-h').value;
-  const testo1 =
-    farmacia+'\n'+
-    indirizzo+'\n'+
-    (paz ? 'sig. '+paz+'\n' : '')+
-    nome+(qty?' '+qty:'')+'\n'+
-    (data?'pr. '+data:'')+(mesi?' — vale '+mesi+' mesi':'')+'\n'+
-    (!isNaN(prezzo)&&prezzo>0?'€ '+prezzo.toFixed(2)+'  ':'')+uso;
-  const testo2 =
-    farmacia+' — '+etiqIndirizzoBreve(indirizzo)+'\n'+
-    nome+'\n'+
-    (h?h+'\n':'')+
-    '⚠ Tenere fuori dalla portata dei bambini.\n'+
-    'Conservare al riparo dalla luce.';
+  const d = etiqDati();
+  const testo1 = [d.farmacia, d.indirizzo, d.paziente, d.nomeQty,
+    [d.data, d.vale].filter(Boolean).join(' — '),
+    [d.prezzo, d.uso].filter(Boolean).join('  ')].filter(Boolean).join('\n');
+  const testo2 = [[d.farmacia, d.indirizzoBreve].filter(Boolean).join(' — '), d.nome, d.h,
+    '⚠ Tenere fuori dalla portata dei bambini.',
+    'Conservare al riparo dalla luce.'].filter(Boolean).join('\n');
   return { testo1, testo2 };
 }
 

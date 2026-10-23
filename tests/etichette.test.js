@@ -140,3 +140,47 @@ describe('Etichette: intestazione ricordata', () => {
     expect([...H.lsMap.keys()].some(k => k.startsWith('gal_etichetta'))).toBe(false);
   });
 });
+
+describe('Etichette: review v160', () => {
+  it('salva solo il campo modificato; vuoto o uguale al predefinito → torna al predefinito', () => {
+    const H = buildCtx();
+    H.byId('e-farmacia').value = 'Farmacia Rossi';
+    H.byId('e-indirizzo').value = 'Via Fiume 75 — 19122 La Spezia — Tel. 0187-706147';
+    H.ctx.etiqIntestazioneModificata('farmacia');
+    expect(H.lsMap.get('gal_etichetta_farmacia')).toBe('Farmacia Rossi');
+    expect(H.lsMap.has('gal_etichetta_indirizzo')).toBe(false);          // non toccato → non salvato
+    H.byId('e-farmacia').value = '';
+    H.ctx.etiqIntestazioneModificata('farmacia');
+    expect(H.lsMap.has('gal_etichetta_farmacia')).toBe(false);
+    expect(H.byId('e-farmacia').value).toBe('Farmacia Della Stazione');   // ripristinato
+    H.byId('e-farmacia').value = 'Farmacia Della Stazione';
+    H.ctx.etiqIntestazioneModificata('farmacia');
+    expect(H.lsMap.has('gal_etichetta_farmacia')).toBe(false);
+  });
+
+  it('indirizzo breve: altri modi di scrivere il telefono; CAP solo prima della città', () => {
+    const H = buildCtx();
+    const b = H.ctx.etiqIndirizzoBreve;
+    expect(b('Via Roma 1 — 20100 Milano — Telefono 02-123')).toBe('Via Roma 1 — Milano');
+    expect(b('Via Roma 1 20100 Milano Tel. 02-123')).toBe('Via Roma 1 Milano');
+    expect(b('Via Roma 1 — 20100 Milano ☎ 02 123')).toBe('Via Roma 1 — Milano');
+    expect(b('Via T. Tasso 12 — 20100 Milano')).toBe('Via T. Tasso 12 — Milano');
+  });
+
+  it('anteprima e testo Dymo dalla stessa fonte (righe vuote, H ripulite, stessi dati etichetta 2)', () => {
+    const H = buildCtx();
+    H.byId('e-farmacia').value = 'Farmacia Rossi';
+    H.byId('e-indirizzo').value = 'Via Roma 1 — 20100 Milano';
+    H.byId('e-nome').value = 'Crema';
+    H.byId('e-qty').value = '50 g';
+    H.byId('e-h').value = '   ';
+    H.ctx.etiqAggiorna();
+    const t = H.ctx.etiqTesti();
+    const r1 = t.testo1.split('\n'), r2 = t.testo2.split('\n');
+    expect(H.byId('ev-paziente').textContent).toBe('');           // niente "sig. —" in stampa
+    expect(r1).not.toContain('sig. —');
+    expect(r1).toContain(H.byId('ev-nome').textContent);          // stessa riga nome+quantità
+    expect(r2[0]).toBe(H.byId('ev2-farmacia').textContent + ' — ' + H.byId('ev2-indirizzo').textContent);
+    expect(r2.some(r => r.trim() === '' )).toBe(false);           // H solo spazi → nessuna riga
+  });
+});

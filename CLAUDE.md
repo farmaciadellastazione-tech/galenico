@@ -68,6 +68,7 @@ All state is in `localStorage` under `gal_*` keys:
 - `gal_gh_token` — GitHub PAT (gist scope)
 - `gal_groq_key` — Groq API key (must start with `gsk_`)
 - `gal_fornitori` — extra suppliers for the order email (`[{nome, email}]`); `gal_fornitore_sel` — email of the selected supplier
+- `gal_etichetta_farmacia` / `gal_etichetta_indirizzo` — label header edited by the user on the Etichette page (saved only when it differs from `FARMACIA`; clearing the field restores the default). These override the hardcoded identity on labels in that browser.
 - In demo mode (`?demo` / `?demo=1`) every `gal_*` key is transparently remapped to `gal_demo_*` (Storage patch in the first `<script>` of `<head>`), so the demo never sees or touches real data.
 
 Inventory mirrors to a **hardcoded GitHub Gist** (`GIST_ID = '6e97567a6b7e6408930936807c327144'`, file `galenico_inventario.json`) when a token is present. `invSave()` writes locally then PATCHes the Gist. `invSyncFromGist()` runs on init and overwrites local with remote. The list shown to users is always `invLoadMerged()` = `INV_HARDCODED` (built-in baseline) merged with localStorage by normalized name; `INV_OBBLIGATORIE` is a set that pins certain substances to the top of search results.
