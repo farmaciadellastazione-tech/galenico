@@ -254,3 +254,26 @@ describe('isAcquaNome: nomi abbreviati e con sigle (review v162)', () => {
     expect(H.ctx.liberaSommaVolumeLiquidi()).toBeCloseTo(100, 1);
   });
 });
+
+// Garanzia richiesta dall'utente (v164, ricerca prezzi): calcoli e ricerche di
+// prezzo LEGGONO soltanto. Inventario, archivio e ordini salvati non vengono mai
+// scritti né cancellati.
+describe('I calcoli non toccano i dati salvati', () => {
+  it('calcPrep / calcTariff / aggiornaScheda / invGetPrezzo: nessuna scrittura su inventario, archivio, ordini', () => {
+    const H = buildCtx();
+    const scritture = [];
+    const ls = H.ctx.localStorage;
+    const set = ls.setItem, rem = ls.removeItem;
+    ls.setItem = (k, v) => { scritture.push(k); return set(k, v); };
+    ls.removeItem = (k) => { scritture.push(k); return rem(k); };
+    for (const tipo of [SOLUZ, CREMA]) {
+      H.run(tipo, [ {nome:'Acido ialuronico', qty:'1', unit:'g', isPa:true},
+                    {nome:'Acqua di rose', qty:'20', unit:'ml'},
+                    {nome:'Olio di jojoba', qty:'10', unit:'g'},
+                    {nome:'Acqua purificata', qty:'69', unit:'ml'} ]);
+    }
+    H.ctx.invGetPrezzo('Acido ialuronico', H.ctx.invLoadMerged());
+    const protette = scritture.filter(k => /gal_(inventario|archivio|ordini)/.test(k));
+    expect(protette).toEqual([]);
+  });
+});

@@ -1813,7 +1813,7 @@ function liberaRenderRighe() {
     let prevEdit = '';
     if (modPreventivo && r.nome) {
       const qN = invNominalizza(r.nome);
-      const isAllA = qN ? Object.keys(ALLEGATO_A).some(k => k.includes(qN) || qN.includes(k.split(' ')[0])) : false;
+      const isAllA = qN ? !!trovaVoceAllegatoA(qN) : false;
       if (!isAllA) {
         const prezzoVal = (r.prezzoAcq && r.prezzoAcq > 0) ? r.prezzoAcq : '';
         prevEdit = `<div class="prev-edit-row">
@@ -2520,7 +2520,7 @@ function calcPrep() {
       const fonteEl = document.getElementById('t-pa-fonte');
       if (tPaEl) {
         const qNorm = invNominalizza(paRiga.nome);
-        const chiaveAll = Object.keys(ALLEGATO_A).find(k => k.includes(qNorm) || qNorm.includes(k.split(' ')[0]));
+        const chiaveAll = trovaVoceAllegatoA(qNorm);
         if (chiaveAll) {
           tPaEl.value = ALLEGATO_A[chiaveAll].toFixed(4);
           tPaEl.readOnly = true;
@@ -2579,7 +2579,7 @@ function calcPrep() {
     if (_paIdx < 0) {
       _paIdx = ingr.findIndex(r => {
         const qN = invNominalizza(r.nome);
-        return Object.keys(ALLEGATO_A).some(k => k.includes(qN) || qN.includes(k.split(' ')[0]));
+        return !!trovaVoceAllegatoA(qN);
       });
       if (_paIdx < 0 && ingr.length > 0) _paIdx = 0;
     }
@@ -2605,7 +2605,7 @@ function calcPrep() {
       grams *= _perUnitFactor;
       mlQty *= _perUnitFactor;
       const qNorm = invNominalizza(r.nome);
-      const chiaveAll = !r.daSpecialita && Object.keys(ALLEGATO_A).find(k => k.includes(qNorm) || qNorm.includes(k.split(' ')[0]));
+      const chiaveAll = !r.daSpecialita && trovaVoceAllegatoA(qNorm);
       let prezzo = 0;
       let isLiquido = (!!densita && r.unit === 'g') || r.unit === 'ml';
       let specRes = null;
@@ -4115,7 +4115,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 163;
+const APP_VERSION = 164;
 
 // DEMO_MODE è definito nel primo <script> dell'<head> (isola anche il localStorage).
 
@@ -5084,12 +5084,9 @@ function aiImportaTutti(comps, tipo) {
 
   liberaRighe = compsForLibera.map((c, i) => {
     const qNorm = invNominalizza(c.nome);
-    // Match esatto/substring sulla chiave intera (NON sul primo token: "acido borico" matchava
-    // "acido acetilsalicilico" perché entrambi iniziano per "acido").
-    const chiaveAll = Object.keys(ALLEGATO_A).find(k => {
-      const kn = invNominalizza(k);
-      return kn === qNorm || kn.includes(qNorm) || qNorm.includes(kn);
-    });
+    // Stessa ricerca di tutto il resto dell'app (pricing.js), mai sul primo token:
+    // "acido borico" matchava "acido acetilsalicilico" perché iniziano per "acido".
+    const chiaveAll = trovaVoceAllegatoA(qNorm);
     const invFound = invFindBest(c.nome, inv);
     let nomeFinal = c.nome;
     let prezzoAcq = 0;
