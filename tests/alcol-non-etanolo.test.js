@@ -169,3 +169,59 @@ describe('isEtanoloNome: solo forme sicure di etanolo (review v156)', () => {
     expect(ctx._aiIsEtanolo('Alcool cetearilico')).toBe(false);
   });
 });
+
+// Stesso difetto per l'acqua: "contiene acqua" = acqua di riempimento. Acqua di
+// rose / hamamelis / termale / ossigenata sono ingredienti, non il riempimento.
+describe('Acque aromatiche e acqua ossigenata non sono acqua di riempimento', () => {
+  it('isAcquaNome: solo acqua "semplice"', () => {
+    const { ctx } = buildCtx();
+    for (const n of ['Acqua', 'Acqua purificata', 'Acqua depurata', 'Acqua distillata', 'Acqua bidistillata',
+                     'Acqua demineralizzata', 'Acqua deionizzata', 'Acqua sterile', 'Acqua per preparazioni iniettabili'])
+      expect([n, ctx.isAcquaNome(n)]).toEqual([n, true]);
+    for (const n of ['Acqua di rose', 'Acqua di hamamelis', 'Acqua termale', 'Acqua ossigenata', 'Acqua di calce'])
+      expect([n, ctx.isAcquaNome(n)]).toEqual([n, false]);
+  });
+
+  it('grado alcolico: "Acqua di rose" (prima dell\'acqua purificata) non viene sovrascritta', () => {
+    const H = buildCtx();
+    H.run(SOLUZ, [ {nome:'Minoxidil', qty:'5', unit:'g', isPa:true},
+                   {nome:'Etanolo 96°', qty:'30', unit:'ml'},
+                   {nome:'Acqua di rose', qty:'20', unit:'ml'},
+                   {nome:'Acqua purificata', qty:'45', unit:'ml'} ]);
+    H.ctx.document.getElementById('vol-soluzione').value = '100';
+    H.ctx.document.getElementById('grado-alc').value = '30';
+    H.ctx.gradoAlcChanged();
+    const righe = H.ctx.liberaRighe;
+    expect(righe.find(r => r.nome === 'Acqua di rose').qty).toBe('20');
+    expect(H.ctx.liberaSommaVolumeLiquidi()).toBeCloseTo(100, 1);
+  });
+
+  it('grado alcolico: "Acqua ossigenata" non viene usata come acqua di riempimento', () => {
+    const H = buildCtx();
+    H.run(SOLUZ, [ {nome:'Minoxidil', qty:'5', unit:'g', isPa:true},
+                   {nome:'Acqua ossigenata', qty:'10', unit:'ml'},
+                   {nome:'Etanolo 96°', qty:'30', unit:'ml'} ]);
+    H.ctx.document.getElementById('vol-soluzione').value = '100';
+    H.ctx.document.getElementById('grado-alc').value = '20';
+    H.ctx.gradoAlcChanged();
+    const righe = H.ctx.liberaRighe;
+    expect(righe.find(r => r.nome === 'Acqua ossigenata').qty).toBe('10');
+    expect(righe.some(r => r.nome === 'Acqua purificata')).toBe(true);   // riempimento aggiunto a parte
+  });
+
+  it('procedura: "Acqua di rose" compare come ingrediente, come un nome neutro', () => {
+    const H = buildCtx();
+    const con = (nome) => H.run(SOLUZ, [ {nome:'Minoxidil', qty:'5', unit:'g', isPa:true},
+                                         {nome, qty:'20', unit:'ml'},
+                                         {nome:'Acqua purificata', qty:'80', unit:'ml'} ]).proc
+      .split('Tariffazione — D.M.')[0];   // solo procedura (i prezzi sono un altro tema)
+    const norm = (s) => s.replace(/acqua di rose|qwyzzk/gi, 'X');
+    expect(norm(con('Acqua di rose'))).toBe(norm(con('Qwyzzk')));
+  });
+
+  it('import AI: "Acqua di rose" non è l\'acqua di riempimento', () => {
+    const { ctx } = buildCtx();
+    expect(ctx._aiIsAcqua('Acqua di rose')).toBe(false);
+    expect(ctx._aiIsAcqua('Acqua purificata')).toBe(true);
+  });
+});

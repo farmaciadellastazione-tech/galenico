@@ -2117,7 +2117,7 @@ function liberaApplyVolGrado(totMl, grado) {
   // L'acqua completa il volume insieme agli ALTRI liquidi già in formula
   // (glicole, glicerina...): vanno sottratti, altrimenti il volume finale
   // supera totMl e il grado reale risulta più basso di quello chiesto.
-  let acIdx = liberaRighe.findIndex(r => invNominalizza(r.nome || '').includes('acqua'));
+  let acIdx = liberaRighe.findIndex(r => isAcquaNome(r.nome || ''));
   const altriMl = Math.max(0, liberaSommaVolumeLiquidi() - volMlRiga(liberaRighe[etIdx]) - volMlRiga(liberaRighe[acIdx]));
   if (newEtMl + altriMl > totMl + 1e-6) {
     const maxGrado = Math.max(0, (totMl - altriMl) * 0.96 / totMl * 100);
@@ -2296,7 +2296,7 @@ function calcPrep() {
     const paIsPolvere = paRow && GIA_POLVERE.some(k => _n(paRow).includes(k));
     const hasCrystalline = paRow && !paIsPolvere; // default: PA è cristallino
     const hasEt = ingr.some(r => isEtanoloNome(_n(r)));
-    const hasAcqua = ingr.some(r => _n(r).includes('acqua'));
+    const hasAcqua = ingr.some(r => isAcquaNome(_n(r)));
     const _etRiga = ingr.find(r => isEtanoloNome(_n(r)));
     const acquaNote = hasAcqua ? 'acqua purificata' : 'solvente appropriato';
     const pesate = ingr.map(r => _pesataMisuraLine(r));
@@ -2329,7 +2329,7 @@ function calcPrep() {
         if (i === 0) return false; // PA
         const n = _n(r);
         if (isEtanoloNome(n)) return false;
-        if (n.includes('acqua')) return false;
+        if (isAcquaNome(n)) return false;
         return true;
       });
       proc = [
@@ -3345,12 +3345,12 @@ function aggiornaScheda() {
       const _nmS = r => invNominalizza(r.nome);
       const _etRS    = ingrL.find(r => { const n=_nmS(r); return isEtanoloNome(n); });
       const _hasEtS  = !!_etRS;
-      const _hasAcS  = ingrL.some(r => _nmS(r).includes('acqua'));
+      const _hasAcS  = ingrL.some(r => isAcquaNome(_nmS(r)));
       const _coSolvS = ingrL.filter((r, i) => {
         if (i === 0) return false; // PA
         const n = _nmS(r);
         if (isEtanoloNome(n)) return false;
-        if (n.includes('acqua')) return false;
+        if (isAcquaNome(n)) return false;
         return true;
       });
       proc = [
@@ -4115,7 +4115,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 161;
+const APP_VERSION = 162;
 
 // DEMO_MODE è definito nel primo <script> dell'<head> (isola anche il localStorage).
 
@@ -5417,7 +5417,7 @@ function _aiIsEtanolo(nome) {
 }
 function _aiIsAcqua(nome) {
   const n = invNominalizza(nome || '');
-  return n.includes('acqua');
+  return isAcquaNome(n);
 }
 
 // Converte una riga di comps in ml (usa densità per le g, ignora pz/%).

@@ -356,6 +356,19 @@ function isEtanoloNome(nome) {
     .every(p => AMMESSE.has(p) || /^\d+(°|%)?$/.test(p));
 }
 
+// True se il nome indica acqua "semplice", usabile come acqua di riempimento
+// (q.b.) e come solvente nella procedura: "acqua" da sola o con soli
+// qualificativi di purezza (purificata, depurata, distillata, sterile, per
+// preparazioni iniettabili...). Acqua di rose / hamamelis / termale / di calce /
+// ossigenata sono ingredienti veri: il vecchio includes('acqua') li sovrascriveva
+// impostando il grado alcolico e li toglieva dalla procedura.
+const _ACQUA_QUALIFICATIVI = new Set(['purificata', 'depurata', 'distillata', 'bidistillata',
+  'demineralizzata', 'deionizzata', 'sterile', 'per', 'preparazioni', 'iniettabili', 'ppi', 'fu']);
+function isAcquaNome(nome) {
+  const parole = invNominalizza(nome).replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+  return parole[0] === 'acqua' && parole.slice(1).every(p => _ACQUA_QUALIFICATIVI.has(p));
+}
+
 // Chiavi di DENSITA che indicano etanolo (ricavate, non duplicate a mano): per
 // queste decide isEtanoloNome, non la sottostringa (altrimenti "alcool
 // cetilico" avrebbe d=0,807).
@@ -614,7 +627,7 @@ const _exports = {
   STUPEFACENTI, DOPING, OP_TECNOLOGICHE_AUTO,
   ALLEGATO_B_VOCI, IVA_RATE, ART_7_INCREMENTO, ART_8_PER_UNIT, COMP_MAX, OP_TECNOLOGICA_COSTO,
   COMP_INCLUSI, getCompInclusi, getCompMax, calcCompAggiuntivi, calcAllegatoBVoce6,
-  fmt, invNominalizza, invMatchScore, hasHazard, getDensita, isEtanoloNome, tarNormalizza, tarCercaPA,
+  fmt, invNominalizza, invMatchScore, hasHazard, getDensita, isEtanoloNome, isAcquaNome, tarNormalizza, tarCercaPA,
   isStupefacente, isDoping, getOpTecnologicheAuto,
   invFindBest, getHDaInventario, rigaHazardous, invGetPrezzo,
   calcAllegatoB, calcAllegatoBVoce7, calcSupplementi, calcIvaTotale, calcCostoSpecialita,
