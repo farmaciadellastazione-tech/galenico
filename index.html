@@ -3906,6 +3906,10 @@ const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
 const APP_VERSION = 146;
 
+// Modalità demo (?demo=1 nel link): versione di prova da far girare tra
+// colleghi. Niente lettura/scrittura sui Gist e dati farmacia generici.
+const DEMO_MODE = new URLSearchParams(location.search || '').has('demo');
+
 // Loghi farmacia embeddati come data URI (single-file app, no asset fetch).
 // LOGO_WIDE: logo completo orizzontale (per intestazione Scheda stampata).
 // LOGO_SQUARE: monogramma quadrato (per app header e angolo etichette Dymo).
