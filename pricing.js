@@ -337,10 +337,29 @@ function hasHazard(hStr) {
   });
 }
 
+// True se il nome indica etanolo: "etanolo" a parola intera (non
+// "fenossietanolo"), "etil alcool", oppure "alcool/alcol ..." (al 96%, etilico,
+// denaturato...) TRANNE gli altri alcoli (cetilico, benzilico, stearilico...),
+// che il vecchio includes('alcol') scambiava per etanolo: densità, % etanolo,
+// procedura ("sciogliere il PA nell'etanolo") e grado alcolico sbagliati.
+function isEtanoloNome(nome) {
+  const t = invNominalizza(nome);
+  if (/(^|\s)etanolo/.test(t) || /^etil\s+alcoo?l/.test(t)) return true;
+  const m = t.match(/^alcoo?l\b\s*(.*)$/);
+  if (!m) return false;
+  return !/^(cetil|cetostearil|stearil|benzil|feniletil|isopropil|polivinil|lauril|oleil|miristil|cinnamil|anisil|butil|metil)/.test(m[1]);
+}
+
+// Chiavi di DENSITA che indicano etanolo: per queste decide isEtanoloNome,
+// non la sottostringa (altrimenti "alcool cetilico" avrebbe d=0,807).
+const _DENSITA_ETANOLO = new Set(['etanolo', 'alcol etilico', 'etanolo 96', 'alcool']);
+
 // Cerca la densità di un liquido per nome (substring match). null per solidi.
 function getDensita(nome) {
+  if (isEtanoloNome(nome)) return DENSITA['etanolo'];
   const n = nome.toLowerCase();
   for (const [k,v] of Object.entries(DENSITA)) {
+    if (_DENSITA_ETANOLO.has(k)) continue;
     if (n.includes(k)) return v;
   }
   return null;
@@ -588,7 +607,7 @@ const _exports = {
   STUPEFACENTI, DOPING, OP_TECNOLOGICHE_AUTO,
   ALLEGATO_B_VOCI, IVA_RATE, ART_7_INCREMENTO, ART_8_PER_UNIT, COMP_MAX, OP_TECNOLOGICA_COSTO,
   COMP_INCLUSI, getCompInclusi, getCompMax, calcCompAggiuntivi, calcAllegatoBVoce6,
-  fmt, invNominalizza, invMatchScore, hasHazard, getDensita, tarNormalizza, tarCercaPA,
+  fmt, invNominalizza, invMatchScore, hasHazard, getDensita, isEtanoloNome, tarNormalizza, tarCercaPA,
   isStupefacente, isDoping, getOpTecnologicheAuto,
   invFindBest, getHDaInventario, rigaHazardous, invGetPrezzo,
   calcAllegatoB, calcAllegatoBVoce7, calcSupplementi, calcIvaTotale, calcCostoSpecialita,

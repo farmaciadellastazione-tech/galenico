@@ -1813,19 +1813,7 @@ function liberaGetIngr() {
 // Per la conversione ml↔g del Totale preparazione (soluzione).
 // Convenzione: "etanolo" / "alcool" è considerato 96° (0.96 v/v di etanolo puro, d=0.807).
 // Densità soluzione idroalcolica: approssimazione lineare d = 1.0 - 0.211 × (grado/100).
-//
-// True se il nome (già normalizzato) indica etanolo. NON gli altri alcoli
-// (cetilico, benzilico, cetostearilico...), che il vecchio includes('alcol')
-// scambiava per etanolo. Usata dal Grado alcolico.
-function isEtanoloNome(n) {
-  // "etanolo" a parola intera (non "fenossietanolo"), "etil alcool", oppure
-  // "alcool/alcol ..." (al 96%, etilico, denaturato...) TRANNE gli altri alcoli.
-  const t = n.trim();
-  if (/(^|\s)etanolo/.test(t) || /^etil\s+alcoo?l/.test(t)) return true;
-  const m = t.match(/^alcoo?l\b\s*(.*)$/);
-  if (!m) return false;
-  return !/^(cetil|cetostearil|stearil|benzil|feniletil|isopropil|polivinil|lauril|oleil|miristil|cinnamil|anisil|butil|metil)/.test(m[1]);
-}
+// (isEtanoloNome — "questo nome è etanolo?" — è in pricing.js, condivisa.)
 function calcSoluzioneInfo(totalePrep, totalePrepUnit) {
   const ingr = liberaGetIngr();
   // Somma ml di etanolo 96° nella formula (qualunque sia l'unità della riga)
@@ -2198,9 +2186,9 @@ function calcPrep() {
     const paRow = ingr[0];
     const paIsPolvere = paRow && GIA_POLVERE.some(k => _n(paRow).includes(k));
     const hasCrystalline = paRow && !paIsPolvere; // default: PA è cristallino
-    const hasEt = ingr.some(r => _n(r).includes('etanolo') || _n(r).includes('alcool') || _n(r).includes('alcol'));
+    const hasEt = ingr.some(r => isEtanoloNome(_n(r)));
     const hasAcqua = ingr.some(r => _n(r).includes('acqua'));
-    const _etRiga = ingr.find(r => _n(r).includes('etanolo') || _n(r).includes('alcool') || _n(r).includes('alcol'));
+    const _etRiga = ingr.find(r => isEtanoloNome(_n(r)));
     const acquaNote = hasAcqua ? 'acqua purificata' : 'solvente appropriato';
     const pesate = ingr.map(r => _pesataMisuraLine(r));
     const totLabel = totG > 0 ? fmt(totG,1)+' g' : 'volume finale';
@@ -2231,7 +2219,7 @@ function calcPrep() {
       const coSolventi = ingr.filter((r, i) => {
         if (i === 0) return false; // PA
         const n = _n(r);
-        if (n.includes('etanolo') || n.includes('alcool') || n.includes('alcol')) return false;
+        if (isEtanoloNome(n)) return false;
         if (n.includes('acqua')) return false;
         return true;
       });
@@ -2461,7 +2449,7 @@ function calcPrep() {
     // Denominatore corretto: il volume soluzione (volMl), non i grammi totali.
     const etRiga = ingr.find(r => {
       const n = invNominalizza(r.nome);
-      return n.includes('etanolo') || n.includes('alcool') || n.includes('alcol');
+      return isEtanoloNome(n);
     });
     const _volForEt = volMl > 0 ? volMl : totG; // fallback se non c'è volume calcolato
     if (etRiga && _volForEt > 0) {
@@ -3223,7 +3211,7 @@ function aggiornaScheda() {
       // NB: <input type="number"> rifiuta la virgola → usare toFixed() che produce "."
       if (document.getElementById('s-qt'))   document.getElementById('s-qt').value   = qt.toFixed(1);
       if (document.getElementById('s-conc')) document.getElementById('s-conc').value = conc.toFixed(2);
-      const etRiga = ingr.find(r => { const n=invNominalizza(r.nome); return n.includes('etanolo')||n.includes('alcool')||n.includes('alcol'); });
+      const etRiga = ingr.find(r => { const n=invNominalizza(r.nome); return isEtanoloNome(n); });
       mlET96s = etRiga ? (parseFloat(etRiga.qty)||0) / 0.807 : 0;
       percEt = mlET96s > 0 ? mlET96s / qt * 96 : 0;
     } else {
@@ -3234,7 +3222,7 @@ function aggiornaScheda() {
       mlET96s = percEt > 0 ? qt*percEt/96 : 0;
     }
     const nFlac  = 1;
-    const _etInvS = invLoadMerged().find(s => invNominalizza(s.nome).includes('etanolo') || invNominalizza(s.nome).includes('alcool'));
+    const _etInvS = invLoadMerged().find(s => isEtanoloNome(s.nome));
     const pET    = _etInvS ? (_etInvS.prezzo||0) : 0;
 
     if (liberaRighe.length > 0) {
@@ -3248,13 +3236,13 @@ function aggiornaScheda() {
       formulaItems.push({nome:'Flacone ambrato', val:String(nFlac), unit:'pz'});
       // Procedura intelligente coerente con calcPrep: PA → etanolo → co-solventi → acqua.
       const _nmS = r => invNominalizza(r.nome);
-      const _etRS    = ingrL.find(r => { const n=_nmS(r); return n.includes('etanolo')||n.includes('alcool')||n.includes('alcol'); });
+      const _etRS    = ingrL.find(r => { const n=_nmS(r); return isEtanoloNome(n); });
       const _hasEtS  = !!_etRS;
       const _hasAcS  = ingrL.some(r => _nmS(r).includes('acqua'));
       const _coSolvS = ingrL.filter((r, i) => {
         if (i === 0) return false; // PA
         const n = _nmS(r);
-        if (n.includes('etanolo') || n.includes('alcool') || n.includes('alcol')) return false;
+        if (isEtanoloNome(n)) return false;
         if (n.includes('acqua')) return false;
         return true;
       });
@@ -3973,7 +3961,7 @@ function compilaScheda() {
     document.getElementById('s-conc').value = concL.toFixed(2);
     const etRiga = ingr.find(r => {
       const n = invNominalizza(r.nome);
-      return n.includes('etanolo') || n.includes('alcool') || n.includes('alcol');
+      return isEtanoloNome(n);
     });
     if (document.getElementById('s-et')) document.getElementById('s-et').value = etRiga ? etRiga.qty : '0';
   }
@@ -4020,7 +4008,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 155;
+const APP_VERSION = 156;
 
 // DEMO_MODE è definito nel primo <script> dell'<head> (isola anche il localStorage).
 
@@ -5270,7 +5258,7 @@ let _aiLastImportTipo = null;
 // Match etanolo/acqua tra i nomi proposti dall'AI.
 function _aiIsEtanolo(nome) {
   const n = invNominalizza(nome || '');
-  return n.includes('etanolo') || n.includes('alcool') || n.includes('alcol');
+  return isEtanoloNome(n);
 }
 function _aiIsAcqua(nome) {
   const n = invNominalizza(nome || '');
