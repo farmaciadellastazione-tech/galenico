@@ -2977,6 +2977,8 @@ let _schedaTotale = 0; // ultimo prezzo al pubblico mostrato dalla Scheda (overr
 // s-prezzo se presente, altrimenti il totale calcolato da aggiornaScheda().
 function schedaPrezzoFinale() {
   const man = parseFloat(document.getElementById('s-prezzo').value)||0;
+  // Ricalcola prima di leggere: _schedaTotale potrebbe essere di prima dell'ultima modifica.
+  if (!(man > 0)) { try { aggiornaScheda(); } catch (e) { console.error(e); } }
   const p = man > 0 ? man : _schedaTotale;
   return p > 0 ? p.toFixed(2) : '';
 }

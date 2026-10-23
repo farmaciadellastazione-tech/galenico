@@ -301,6 +301,16 @@ describe('Tariffazione ↔ Scheda: stesso prezzo (motore unico)', () => {
     expect(parseFloat(arch[0].prezzo)).toBeCloseTo(r.sch, 2);
   });
 
+  it('Salva in archivio subito dopo una modifica (Scheda non ancora ridisegnata): prezzo aggiornato', () => {
+    H.run(SOL, MINOX, { 't-fl':'1.55', 'totale-prep':'100', 's-prep':'Minoxidil 5%', 's-farm':'Test' });
+    H.byId('t-fl').value = '3.00';
+    H.ctx.calcTariff();                       // niente aggiornaScheda() prima del salvataggio
+    const tar = H.read().tar;
+    H.ctx.salvaInArchivio();
+    const arch = JSON.parse(H.ctx.localStorage.getItem('gal_archivio_schede_v1') || '[]');
+    expect(parseFloat(arch[0].prezzo)).toBeCloseTo(tar, 2);
+  });
+
   it('Prezzo manuale in Scheda: resta un override esplicito', () => {
     const r = H.run(SOL, MINOX, { 't-fl':'1.55', 'totale-prep':'100', 's-prezzo':'25.00' });
     expect(r.sch).toBeCloseTo(25.00, 2);
