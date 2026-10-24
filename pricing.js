@@ -442,13 +442,17 @@ function getHDaInventario(nome, inv) {
   if (!nome || !Array.isArray(inv)) return '';
   let conH = invLottiSostanza(nome, inv).find(s => s.h);
   if (!conH) {
+    const numeroOUnita = w => /^\d+(?:p\d+)?$/.test(w) || _UNITA.has(w);
     const parole = _paroleNome(nome).split(' ');
-    const senzaNumeri = parole.filter(w => !/^\d+(?:p\d+)?$/.test(w) && !_UNITA.has(w)).join(' ');
+    const senzaNumeri = parole.filter(w => !numeroOUnita(w)).join(' ');
     if (senzaNumeri && senzaNumeri !== parole.join(' ')) {
+      const qw = _parolePiene(senzaNumeri);
       conH = invLottiSostanza(senzaNumeri, inv).find(s => s.h)
-        // dosi diverse in inventario ("Melatonina 1 mg", "5 mg"): un prodotto che
-        // contiene tutte le parole (intere) e ha i codici H
-        || _indiceInventario(inv).find(x => x.s.h && _parolePiene(senzaNumeri).every(w => x.w.includes(w)))?.s;
+        // dosi diverse in inventario ("Melatonina 1 mg", "5 mg"): un prodotto con
+        // le stesse parole più soli numeri e unità — non "Idrochinone
+        // monometiletere" per "Idrochinone 4%" (Art. 8a non dovuto)
+        || _indiceInventario(inv).find(x => x.s.h && qw.every(w => x.w.includes(w))
+             && x.w.filter(w => !qw.includes(w)).every(numeroOUnita))?.s;
     }
   }
   return conH ? conH.h : '';
