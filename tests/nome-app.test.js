@@ -21,8 +21,9 @@ describe('Nome Benadù', () => {
     expect(manifest.name).toContain('Benadù');
   });
   it('licenza e README', () => {
-    expect(leggi('LICENSE').split('\n')[0]).toBe('Benadù — Licenza d\'uso');
-    expect(leggi('README.md').split('\n')[0]).toBe('# Benadù');
+    // fine riga \n o \r\n: su Windows git li converte al checkout (core.autocrlf)
+    expect(leggi('LICENSE').split(/\r?\n/)[0]).toBe('Benadù — Licenza d\'uso');
+    expect(leggi('README.md').split(/\r?\n/)[0]).toBe('# Benadù');
   });
   it('nomi interni invariati (dati e Gist)', () => {
     expect(html).toContain("const GIST_FILE = 'galenico_inventario.json'");
