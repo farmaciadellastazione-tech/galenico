@@ -2540,15 +2540,11 @@ function calcPrep() {
       document.getElementById('procedura').innerHTML = proc.map(p => '<li>'+p+'</li>').join('');
     }
 
-    // Sincronizza PA name e qt/conc PRIMA di sincronizzaTariffazione
-    // Propaga prima sostanza (anche senza qty) a prep-pa-nome e t-pa-nome
-    const primaRiga = liberaRighe.length > 0 ? liberaRighe[0] : null;
-    if (primaRiga && primaRiga.nome) {
-      if (document.getElementById('prep-pa-nome')) document.getElementById('prep-pa-nome').value = primaRiga.nome;
-    }
-
+    // Sincronizza PA name e qt/conc PRIMA di sincronizzaTariffazione: la riga PA
+    // (prima con nome, con quantità se c'è) → prep-pa-nome, t-pa-nome e prezzo.
+    // Senza righe con nome, sincronizzaTariffazione svuota prezzo e nomi del PA.
     const paRiga = rigaPAPrezzo();
-    if (paRiga && paRiga.nome) {
+    if (paRiga) {
       document.getElementById('prep-pa-nome').value = paRiga.nome;
       if (document.getElementById('t-pa-nome')) {
         document.getElementById('t-pa-nome').value = paRiga.nome;
@@ -2720,10 +2716,11 @@ function opRipristinaAuto() {
 }
 
 // Riga del PA per il prezzo in Tariffazione: la prima con nome e quantità,
-// altrimenti la prima riga (calcPrep e sincronizzaTariffazione usano questa).
+// altrimenti la prima con un nome; null se nessuna riga ha un nome
+// (calcPrep e sincronizzaTariffazione usano questa).
 function rigaPAPrezzo() {
   const ingr = liberaGetIngr();
-  return ingr.length > 0 ? ingr[0] : (liberaRighe[0] || null);
+  return ingr.length > 0 ? ingr[0] : (liberaRighe.find(r => r.nome) || null);
 }
 
 // Prezzo del PA in Tariffazione (t-pa): Allegato A (bloccato), poi inventario
@@ -2750,12 +2747,14 @@ function aggiornaPrezzoPA(riga) {
   }
 }
 
-// Nessuna riga con un nome: niente PA, il prezzo di prima non resta (né bloccato).
+// Nessuna riga con un nome: niente PA — né il prezzo di prima (né bloccato) né
+// i nomi (la Scheda e i lotti del PA non devono vedere una sostanza tolta).
 function svuotaPrezzoPA() {
   const tPaEl = document.getElementById('t-pa');
   const fonteEl = document.getElementById('t-pa-fonte');
   if (tPaEl) { tPaEl.value = ''; tPaEl.readOnly = false; tPaEl.style.background = 'var(--bg)'; }
   if (fonteEl) fonteEl.innerHTML = '';
+  ['prep-pa-nome', 't-pa-nome'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   tarPADaAllegatoA = false;
 }
 
@@ -2785,15 +2784,13 @@ function sincronizzaTariffazione() {
     if (tarPage) tarPage.insertBefore(notaEl, tarPage.children[2]);
   }
 
-  const nomePA = document.getElementById('prep-pa-nome') ? document.getElementById('prep-pa-nome').value.trim() : '';
-  if (!liberaRighe.some(r => r.nome)) {
-    svuotaPrezzoPA();
-  } else if (nomePA) {
-    // Stessa riga PA e stesso prezzo (lotto compreso) di calcPrep; se il nome PA
-    // non è quello della riga, il prezzo per nome (come prima).
-    const _rigaPA = rigaPAPrezzo();
-    aggiornaPrezzoPA(_rigaPA && invNominalizza(_rigaPA.nome) === invNominalizza(nomePA) ? _rigaPA : { nome: nomePA });
-    if (document.getElementById('t-pa-nome')) document.getElementById('t-pa-nome').value = nomePA;
+  // Stessa riga PA e stesso prezzo (lotto compreso) di calcPrep; mai il prezzo
+  // "per nome" da un prep-pa-nome rimasto da una sostanza tolta.
+  const _rigaPA = rigaPAPrezzo();
+  if (!_rigaPA) svuotaPrezzoPA();
+  else {
+    aggiornaPrezzoPA(_rigaPA);
+    if (document.getElementById('t-pa-nome')) document.getElementById('t-pa-nome').value = _rigaPA.nome;
   }
   const mapTipo = {soluzione:'liquida', tintura:'tintura', unguento:'semisolida', capsule:'capsule', cartine:'cartine', polvere:'polvere', sospensione:'sospensione'};
   if (mapTipo[tipoPrep] && mapTipo[tipoPrep] !== tipoTariff) {
