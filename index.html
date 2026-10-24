@@ -2547,35 +2547,13 @@ function calcPrep() {
       if (document.getElementById('prep-pa-nome')) document.getElementById('prep-pa-nome').value = primaRiga.nome;
     }
 
-    const paRiga = ingr.length > 0 ? ingr[0] : primaRiga;
+    const paRiga = rigaPAPrezzo();
     if (paRiga && paRiga.nome) {
       document.getElementById('prep-pa-nome').value = paRiga.nome;
       if (document.getElementById('t-pa-nome')) {
         document.getElementById('t-pa-nome').value = paRiga.nome;
       }
-      // Imposta prezzo PA direttamente: All.A ha priorità, poi inventario, poi prezzoAcq dalla riga
-      const tPaEl = document.getElementById('t-pa');
-      const fonteEl = document.getElementById('t-pa-fonte');
-      if (tPaEl) {
-        const qNorm = invNominalizza(paRiga.nome);
-        const chiaveAll = trovaVoceAllegatoA(qNorm);
-        if (chiaveAll) {
-          tPaEl.value = ALLEGATO_A[chiaveAll].toFixed(4);
-          tPaEl.readOnly = true;
-          tPaEl.style.background = 'var(--accent-light)';
-          if (fonteEl) fonteEl.innerHTML = '<strong style="color:var(--accent)">✓ Allegato A — €'+ALLEGATO_A[chiaveAll].toFixed(4)+'/g (obbligatorio)</strong>';
-          tarPADaAllegatoA = true;
-        } else {
-          // Cerca in inventario
-          const invFound = invTrovaPerPrezzo(qNorm, invLoadMerged(), paRiga.lotto);
-          const prezzo = (invFound && invFound.prezzo > 0) ? invFound.prezzo : paRiga.prezzoAcq || 0;
-          tPaEl.value = prezzo > 0 ? prezzo.toFixed(4) : '';
-          tPaEl.readOnly = false;
-          tPaEl.style.background = 'var(--bg)';
-          if (fonteEl && prezzo > 0) fonteEl.innerHTML = '<strong style="color:var(--accent-mid)">✓ Inventario — €'+prezzo.toFixed(4)+'/g (Art. 5)</strong>';
-          tarPADaAllegatoA = false;
-        }
-      }
+      aggiornaPrezzoPA(paRiga);
     }
     // Cartine/Capsule: le righe rappresentano QUANTITÀ PER SINGOLO PEZZO.
     // Per pricing/Allegato B serve la massa TOTALE: _perUnitFactor moltiplica per N° pezzi.
@@ -2741,6 +2719,37 @@ function opRipristinaAuto() {
   calcTariff(); aggiornaScheda();
 }
 
+// Riga del PA per il prezzo in Tariffazione: la prima con nome e quantità,
+// altrimenti la prima riga (calcPrep e sincronizzaTariffazione usano questa).
+function rigaPAPrezzo() {
+  const ingr = liberaGetIngr();
+  return ingr.length > 0 ? ingr[0] : (liberaRighe[0] || null);
+}
+
+// Prezzo del PA in Tariffazione (t-pa): Allegato A (bloccato), poi inventario
+// col lotto della riga, poi prezzoAcq della riga.
+function aggiornaPrezzoPA(riga) {
+  const tPaEl = document.getElementById('t-pa');
+  const fonteEl = document.getElementById('t-pa-fonte');
+  if (!tPaEl || !riga || !riga.nome) return;
+  const chiaveAll = trovaVoceAllegatoA(riga.nome);
+  if (chiaveAll) {
+    tPaEl.value = ALLEGATO_A[chiaveAll].toFixed(4);
+    tPaEl.readOnly = true;
+    tPaEl.style.background = 'var(--accent-light)';
+    if (fonteEl) fonteEl.innerHTML = '<strong style="color:var(--accent)">✓ Allegato A — €'+ALLEGATO_A[chiaveAll].toFixed(4)+'/g (obbligatorio)</strong>';
+    tarPADaAllegatoA = true;
+  } else {
+    const invFound = invTrovaPerPrezzo(riga.nome, invLoadMerged(), riga.lotto);
+    const prezzo = (invFound && invFound.prezzo > 0) ? invFound.prezzo : riga.prezzoAcq || 0;
+    tPaEl.value = prezzo > 0 ? prezzo.toFixed(4) : '';
+    tPaEl.readOnly = false;
+    tPaEl.style.background = 'var(--bg)';
+    if (fonteEl && prezzo > 0) fonteEl.innerHTML = '<strong style="color:var(--accent-mid)">✓ Inventario — €'+prezzo.toFixed(4)+'/g (Art. 5)</strong>';
+    tarPADaAllegatoA = false;
+  }
+}
+
 function sincronizzaTariffazione() {
   // Modalità unica libera (v46+): nascondi i selettori tipo/PA della Tariffazione e mostra la nota.
   ['tar-card-tipo','tariff-card-pa'].forEach(id => {
@@ -2769,12 +2778,10 @@ function sincronizzaTariffazione() {
 
   const nomePA = document.getElementById('prep-pa-nome') ? document.getElementById('prep-pa-nome').value.trim() : '';
   if (nomePA) {
-    const trovato = invGetPrezzo(nomePA, invLoadMerged());
-    if (trovato) {
-      const paEl = document.getElementById('t-pa');
-      const fonteEl = document.getElementById('t-pa-fonte');
-      if (paEl) { paEl.value = trovato.prezzo.toFixed(4); paEl.readOnly = trovato.fonte==='allegatoA'; paEl.style.background = trovato.fonte==='allegatoA'?'var(--accent-light)':'var(--bg)'; }
-      if (fonteEl) { fonteEl.innerHTML = trovato.fonte==='allegatoA' ? '<strong style="color:var(--accent)">✓ Allegato A — €'+trovato.prezzo.toFixed(4)+'/g (obbligatorio)</strong>' : '<strong style="color:var(--accent-mid)">✓ Inventario — €'+trovato.prezzo.toFixed(4)+'/g (Art. 5)</strong>'; tarPADaAllegatoA = trovato.fonte==='allegatoA'; }
+    // Stessa riga PA e stesso prezzo (lotto compreso) di calcPrep.
+    const _rigaPA = rigaPAPrezzo();
+    if (_rigaPA && invNominalizza(_rigaPA.nome) === invNominalizza(nomePA)) {
+      aggiornaPrezzoPA(_rigaPA);
       if (document.getElementById('t-pa-nome')) document.getElementById('t-pa-nome').value = nomePA;
     }
   }
