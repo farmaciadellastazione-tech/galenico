@@ -516,16 +516,18 @@ function _soloAggiunteInnocue(extra, completamento) {
   return true;
 }
 // `sostanza`: le parole senza le aggiunte innocue (ma col colore) e senza le
-// confezioni ("500 g", "1 kg"), per riconoscere i lotti della stessa sostanza
-// scritti in modo diverso in inventario ("Etanolo 96°" e "Etanolo 96° Farmalabor",
-// "Talco 500 g" e "Talco 1 kg"). Gli altri numeri restano: sono gradi o purezze
-// di prodotti diversi (Macrogol 400 ≠ 4000, Etanolo 96° ≠ 99,9%, Idrochinone 4%).
+// confezioni in peso ("500 g", "1 kg"), per riconoscere i lotti della stessa
+// sostanza scritti in modo diverso in inventario ("Etanolo 96°" e "Etanolo 96°
+// Farmalabor", "Talco 500 g" e "Talco 1 kg"). Gli altri numeri restano: gradi,
+// purezze, dosi e volumi di prodotti diversi (Macrogol 400 ≠ 4000, Etanolo 96° ≠
+// 99,9%, Idrochinone 4%, Melatonina 1 mg ≠ 5 mg, Flacone 100 ml ≠ 250 ml).
+const _UNITA_CONFEZIONE = new Set(['g', 'kg']);
 function _paroleSostanza(w) {
   const out = [];
   for (let i = 0; i < w.length; i++) {
     const x = w[i];
     if (_PAROLE_INNOCUE.has(x) && !_COLORI.has(x)) continue;
-    if (/^\d+(?:p\d+)?$/.test(x) && _UNITA.has(w[i + 1])) { i++; continue; }
+    if (/^\d+(?:p\d+)?$/.test(x) && _UNITA_CONFEZIONE.has(w[i + 1])) { i++; continue; }
     out.push(x);
   }
   return out;
