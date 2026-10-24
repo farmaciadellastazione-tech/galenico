@@ -2745,9 +2745,18 @@ function aggiornaPrezzoPA(riga) {
     tPaEl.value = prezzo > 0 ? prezzo.toFixed(4) : '';
     tPaEl.readOnly = false;
     tPaEl.style.background = 'var(--bg)';
-    if (fonteEl && prezzo > 0) fonteEl.innerHTML = '<strong style="color:var(--accent-mid)">✓ Inventario — €'+prezzo.toFixed(4)+'/g (Art. 5)</strong>';
+    if (fonteEl) fonteEl.innerHTML = prezzo > 0 ? '<strong style="color:var(--accent-mid)">✓ Inventario — €'+prezzo.toFixed(4)+'/g (Art. 5)</strong>' : ''; // niente "Allegato A" rimasto
     tarPADaAllegatoA = false;
   }
+}
+
+// Nessuna riga con un nome: niente PA, il prezzo di prima non resta (né bloccato).
+function svuotaPrezzoPA() {
+  const tPaEl = document.getElementById('t-pa');
+  const fonteEl = document.getElementById('t-pa-fonte');
+  if (tPaEl) { tPaEl.value = ''; tPaEl.readOnly = false; tPaEl.style.background = 'var(--bg)'; }
+  if (fonteEl) fonteEl.innerHTML = '';
+  tarPADaAllegatoA = false;
 }
 
 function sincronizzaTariffazione() {
@@ -2777,13 +2786,14 @@ function sincronizzaTariffazione() {
   }
 
   const nomePA = document.getElementById('prep-pa-nome') ? document.getElementById('prep-pa-nome').value.trim() : '';
-  if (nomePA) {
-    // Stessa riga PA e stesso prezzo (lotto compreso) di calcPrep.
+  if (!liberaRighe.some(r => r.nome)) {
+    svuotaPrezzoPA();
+  } else if (nomePA) {
+    // Stessa riga PA e stesso prezzo (lotto compreso) di calcPrep; se il nome PA
+    // non è quello della riga, il prezzo per nome (come prima).
     const _rigaPA = rigaPAPrezzo();
-    if (_rigaPA && invNominalizza(_rigaPA.nome) === invNominalizza(nomePA)) {
-      aggiornaPrezzoPA(_rigaPA);
-      if (document.getElementById('t-pa-nome')) document.getElementById('t-pa-nome').value = nomePA;
-    }
+    aggiornaPrezzoPA(_rigaPA && invNominalizza(_rigaPA.nome) === invNominalizza(nomePA) ? _rigaPA : { nome: nomePA });
+    if (document.getElementById('t-pa-nome')) document.getElementById('t-pa-nome').value = nomePA;
   }
   const mapTipo = {soluzione:'liquida', tintura:'tintura', unguento:'semisolida', capsule:'capsule', cartine:'cartine', polvere:'polvere', sospensione:'sospensione'};
   if (mapTipo[tipoPrep] && mapTipo[tipoPrep] !== tipoTariff) {
