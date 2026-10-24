@@ -2961,9 +2961,11 @@ function capsTagliaChanged(taglia) {
     return (n.includes('capsul') || n.includes('cps')) && n.includes('taglia') && n.includes(taglia) && s.unit === 'pz';
   });
   // La prima capsula trovata per questa taglia, dal suo lotto aperto più recente
-  // con un prezzo (con più lotti, found[0] era il più vecchio, magari chiuso).
+  // con un prezzo (con più lotti, found[0] era il più vecchio, magari chiuso); se
+  // i lotti aperti non hanno ancora un prezzo, l'ultimo lotto che ce l'ha.
   const primoNome = found.length ? invNominalizza(found[0].nome) : '';
-  const scelta = invLottiAperti(found.filter(s => invNominalizza(s.nome) === primoNome)).filter(s => s.prezzo > 0).pop() || null;
+  const lottiCaps = found.filter(s => invNominalizza(s.nome) === primoNome);
+  const scelta = invLottiAperti(lottiCaps).filter(s => s.prezzo > 0).pop() || lottiCaps.filter(s => s.prezzo > 0).pop() || null;
   if (scelta && scelta.prezzo > 0) {
     capsVuoteSel(scelta.nome, scelta.prezzo);
     document.getElementById('caps-vuote-cerca').value = scelta.nome;
