@@ -448,11 +448,12 @@ function getHDaInventario(nome, inv) {
     if (senzaNumeri && senzaNumeri !== parole.join(' ')) {
       const qw = _parolePiene(senzaNumeri);
       conH = invLottiSostanza(senzaNumeri, inv).find(s => s.h)
-        // dosi diverse in inventario ("Melatonina 1 mg", "5 mg"): un prodotto con
-        // le stesse parole più soli numeri e unità — non "Idrochinone
-        // monometiletere" per "Idrochinone 4%" (Art. 8a non dovuto)
+        // dosi diverse in inventario ("Melatonina 1 mg Farmalabor", "5 mg"): un
+        // prodotto con le stesse parole più sole aggiunte innocue (dosi, fornitore,
+        // F.U.: la stessa regola del prezzo) — non "Idrochinone monometiletere"
+        // per "Idrochinone 4%" (Art. 8a non dovuto)
         || _indiceInventario(inv).find(x => x.s.h && qw.every(w => x.w.includes(w))
-             && x.w.filter(w => !qw.includes(w)).every(numeroOUnita))?.s;
+             && _soloAggiunteInnocue(x.w.filter(w => !qw.includes(w)), true, true))?.s;
     }
   }
   return conH ? conH.h : '';
