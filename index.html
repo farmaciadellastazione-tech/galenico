@@ -2930,6 +2930,12 @@ function cartScaleOnNCartChange() {
   calcPrep();
 }
 
+// Menu di capsule vuote e flaconi: più lotti con stesso nome e prezzo = un bottone.
+function _unoPerNomePrezzo(items) {
+  const visti = new Set();
+  return items.filter(s => { const k = invNominalizza(s.nome) + '|' + (s.prezzo || 0); if (visti.has(k)) return false; visti.add(k); return true; });
+}
+
 function capsTagliaChanged(taglia) {
   // Auto-cerca capsule vuote in inventario per la taglia selezionata
   const inv = invLoadMerged();
@@ -2937,10 +2943,13 @@ function capsTagliaChanged(taglia) {
     const n = invNominalizza(s.nome);
     return (n.includes('capsul') || n.includes('cps')) && n.includes('taglia') && n.includes(taglia) && s.unit === 'pz';
   });
-  if (found.length > 0 && found[0].prezzo > 0) {
-    // Auto-seleziona la prima capsule trovata per questa taglia
-    capsVuoteSel(found[0].nome, found[0].prezzo);
-    document.getElementById('caps-vuote-cerca').value = found[0].nome;
+  // La prima capsula trovata per questa taglia, dal suo lotto aperto più recente
+  // con un prezzo (con più lotti, found[0] era il più vecchio, magari chiuso).
+  const primoNome = found.length ? invNominalizza(found[0].nome) : '';
+  const scelta = invLottiAperti(found.filter(s => invNominalizza(s.nome) === primoNome)).filter(s => s.prezzo > 0).pop() || null;
+  if (scelta && scelta.prezzo > 0) {
+    capsVuoteSel(scelta.nome, scelta.prezzo);
+    document.getElementById('caps-vuote-cerca').value = scelta.nome;
   } else {
     // Nessuna capsule in inventario per questa taglia — svuota selezione
     document.getElementById('caps-vuote-prezzo').value = 0;
@@ -2957,7 +2966,7 @@ function capsVuoteCerca(q) {
   if (!q || q.length < 2) { dd.innerHTML = ''; return; }
   const inv = invLoadMerged();
   const qNorm = invNominalizza(q);
-  const res = inv.filter(s => invNominalizza(s.nome).includes(qNorm) && s.unit === 'pz').slice(0,6);
+  const res = _unoPerNomePrezzo(inv.filter(s => invNominalizza(s.nome).includes(qNorm) && s.unit === 'pz')).slice(0,6);
   dd.innerHTML = res.map(s =>
     `<button onclick="capsVuoteSel('${s.nome.replace(/'/g,"\\'")}',${s.prezzo||0})"
       style="font-size:11px;padding:2px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">
@@ -2986,9 +2995,9 @@ function tarCercaFlacone() {
   const dd = document.getElementById('t-fl-suggerimenti');
   if (!q) { dd.innerHTML = ''; return; }
   const inv = invLoadMerged();
-  const matches = inv.filter(s =>
+  const matches = _unoPerNomePrezzo(inv.filter(s =>
     invNominalizza(s.nome).includes(invNominalizza(q)) && s.prezzo > 0
-  ).slice(0, 8);
+  )).slice(0, 8);
   if (!matches.length) { dd.innerHTML = '<span style="font-size:12px;color:var(--text-faint)">Nessun risultato</span>'; return; }
   dd.innerHTML = matches.map(s =>
     `<button onclick="tarSelezionaFlacone('${s.nome.replace(/'/g,"\\'")}',${s.prezzo})" style="font-size:12px;font-family:var(--mono);padding:3px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer">${s.nome} — €${s.prezzo.toFixed(2)}</button>`
