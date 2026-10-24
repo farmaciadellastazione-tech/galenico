@@ -1904,7 +1904,7 @@ function liberaCercaComp(i, q) {
       seen.add(key);
       const lotti = invLottiSostanza(k, inv);
       lotti.forEach(l => seen.add(invNominalizza(l.nome))); // la stessa sostanza non ricompare dall'inventario
-      const aperti = lotti.filter(l => !l.dataCh);
+      const aperti = invLottiAperti(lotti);   // stessa regola del prezzo (pricing.js)
       const l1 = aperti.length === 1 ? aperti[0] : null;
       candidates.push({nome, prezzo: ALLEGATO_A[k], fonte:'allegatoA', lotto: l1?.lottoInt || l1?.lotto || '', h: (lotti.find(l => l.h) || {}).h || ''});
     });
@@ -1919,7 +1919,7 @@ function liberaCercaComp(i, q) {
       lotti.forEach(l => seen.add(invNominalizza(l.nome)));
       seen.add(key);
       // Lotti aperti (se sono tutti chiusi, tutti); una sola ricerca per sostanza.
-      const aperti = lotti.filter(l => !l.dataCh).length ? lotti.filter(l => !l.dataCh) : lotti;
+      const aperti = invLottiAperti(lotti);   // stessa regola del prezzo (pricing.js)
       const h = (lotti.find(l => l.h) || {}).h || '';
       const perLotto = new Set(aperti.filter(l => l.prezzo > 0).map(l => l.prezzo)).size > 1;
       const base = aperti.find(l => l.prezzo > 0) || aperti[0] || s;
@@ -3436,8 +3436,9 @@ function aggiornaScheda() {
         'Trasferire nel recipiente finale. Etichettare.',
       ];
       // Lotti da liberaRighe
+      const _invL = invLoadMerged(); // una volta per tutte le righe
       lottiItems = ingrL.map(r => {
-        const _lotti = invLottiSostanza(r.nome, invLoadMerged()); // solo se il lotto è uno
+        const _lotti = invLottiSostanza(r.nome, _invL); // solo se il lotto è uno
         const invFound = _lotti.length === 1 ? _lotti[0] : null;
         return {nome: r.nome, lotto: r.lotto || invFound?.lottoInt || invFound?.lotto || '—'};
       });
@@ -3575,8 +3576,9 @@ function aggiornaScheda() {
         'Miscelare per geometria (porzioni successive) per almeno 5 minuti.',
         'Trasferire in flacone/bustine. Etichettare con nome, concentrazione, data e scadenza.',
       ];
+      const _invL = invLoadMerged(); // una volta per tutte le righe
       lottiItems = ingrL.map(r => {
-        const _lotti = invLottiSostanza(r.nome, invLoadMerged()); // solo se il lotto è uno
+        const _lotti = invLottiSostanza(r.nome, _invL); // solo se il lotto è uno
         const invFound = _lotti.length === 1 ? _lotti[0] : null;
         return {nome: r.nome, lotto: r.lotto || invFound?.lottoInt || invFound?.lotto || '—'};
       });
@@ -3870,11 +3872,15 @@ function trovaLottiCandidati(keywords) {
     return kw.some(k => k && n.includes(k));
   }));
 }
-// Lotti della SOLA sostanza `nome` (righe della formula libera): stessa ricerca a
-// parole intere del prezzo. Non per prima parola: "Acido salicilico" proponeva
-// (e prestampava, FEFO) il lotto di un altro acido.
+// Lotti della SOLA sostanza `nome` (righe della formula libera, PA, eccipiente):
+// stessa ricerca a parole intere del prezzo; se non trova niente, i nomi che
+// contengono tutte le parole scritte a inizio parola ("Lattosio" → Lattosio
+// monoidrato). Mai per prima parola: "Acido salicilico" proponeva (e
+// prestampava, FEFO) il lotto di un altro acido.
 function trovaLottiSostanza(nome) {
-  return _candidatiLotto(invLottiSostanza(nome, invLoadMerged()));
+  const inv = invLoadMerged();
+  const lotti = invLottiSostanza(nome, inv);
+  return _candidatiLotto(lotti.length ? lotti : invVociPerRicerca(nome, inv));
 }
 function _candidatiLotto(items) {
   const candidati = items.filter(item => {
@@ -4167,14 +4173,17 @@ function compilaScheda() {
 
   // 5. Lotti da Inventario (merged: hardcoded + localStorage + Gist)
   //    Per ogni materia prima popolo il <select> con i candidati FEFO e seleziono il primo.
-  const paNome  = nomePA.toLowerCase();
-  const eccipIn = (document.getElementById('s-eccip') && document.getElementById('s-eccip').value)
-    ? document.getElementById('s-eccip').value.toLowerCase().split(' ')[0]
-    : '';
-  const candPA = paNome ? trovaLottiCandidati([paNome, paNome.split(' ')[0]]) : [];
+  // PA ed eccipiente scritti: lotti della sola sostanza (non per prima parola,
+  // che dava il lotto di un altro acido). Eccipiente non indicato: i soliti.
+  const eccipNome = (document.getElementById('s-eccip') && document.getElementById('s-eccip').value.trim()) || '';
+  const candPA = nomePA ? trovaLottiSostanza(nomePA) : [];
   const candET = trovaLottiCandidati(['etanolo','alcool etilico']);
   const candAC = trovaLottiCandidati(['acqua']);
-  const candEC = trovaLottiCandidati(eccipIn ? [eccipIn] : ['lattosio','cellulosa','amido','talco']);
+  // Eccipiente come testo libero ("Lattosio/talco"): i lotti di ogni sostanza.
+  const candEC = eccipNome
+    ? eccipNome.split(/[\/,+;]/).map(s => s.trim()).filter(Boolean).flatMap(trovaLottiSostanza)
+        .sort((a,b) => (a.scad||'9999-12').localeCompare(b.scad||'9999-12'))
+    : trovaLottiCandidati(['lattosio','cellulosa','amido','talco']);
   popolaLottoSelect('s-lotto-as',    candPA);
   popolaLottoSelect('s-lotto-et',    candET);
   popolaLottoSelect('s-lotto-ac',    candAC);
