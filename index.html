@@ -3979,9 +3979,10 @@ function schedaLottiRender(force, prefill) {
     '<input type="text" id="s-lotto-r' + i + '" value="' + esc(r.lotto || '') + '" oninput="schedaLottoInput(' + i + ', this.value)" style="width:120px;">' +
     '<select id="s-lotto-r' + i + '-sel" onchange="schedaLottoSel(' + i + ')" style="margin-left:6px;font-size:12px;max-width:220px"><option value="">— scegli lotto —</option></select></div>'
   ).join('');
+  const invL = invLoadMerged(); // una volta per tutte le righe
   righe.forEach(({ r, i }) => {
     const id = 's-lotto-r' + i;
-    const cand = trovaLottiSostanza(r.nome);
+    const cand = trovaLottiSostanza(r.nome, invL);
     popolaLottoSelect(id, cand); // seleziona il primo FEFO e lo scrive nell'input
     const inp = document.getElementById(id), sel = document.getElementById(id + '-sel');
     if (r.lotto || !prefill) {

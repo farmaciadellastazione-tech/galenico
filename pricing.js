@@ -442,8 +442,9 @@ function getHDaInventario(nome, inv) {
   if (!nome || !Array.isArray(inv)) return '';
   let conH = invLottiSostanza(nome, inv).find(s => s.h);
   if (!conH) {
-    const senzaNumeri = _paroleNome(nome).split(' ').filter(w => !/^\d+(?:p\d+)?$/.test(w) && !_UNITA.has(w)).join(' ');
-    if (senzaNumeri) conH = invLottiSostanza(senzaNumeri, inv).find(s => s.h);
+    const parole = _paroleNome(nome).split(' ');
+    const senzaNumeri = parole.filter(w => !/^\d+(?:p\d+)?$/.test(w) && !_UNITA.has(w)).join(' ');
+    if (senzaNumeri && senzaNumeri !== parole.join(' ')) conH = invLottiSostanza(senzaNumeri, inv).find(s => s.h);
   }
   return conH ? conH.h : '';
 }
