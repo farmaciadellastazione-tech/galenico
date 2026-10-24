@@ -1403,13 +1403,21 @@ function initCapsuleTaglie() {
 // getHDaInventario, rigaHazardous, invFindBest — vedi pricing.js (puri, prendono inv esplicito)
 // hasHazard, invNominalizza, invMatchScore — vedi pricing.js
 
+// Ogni voce salvata è un lotto: più lotti con lo stesso nome restano tutti
+// (prima l'ultimo sovrascriveva gli altri, e prezzo/lotto/scadenza degli altri
+// sparivano dal resto dell'app). La voce di base (INV_HARDCODED) è sostituita dal
+// primo lotto salvato con lo stesso nome; ogni lotto ne eredita H e prezzo se vuoti.
 function invLoadMerged() {
   const stored = invLoad();
   const merged = INV_HARDCODED.map(h => ({ ...h, _hardcoded: true }));
   stored.forEach(s => {
-    const idx = merged.findIndex(h => invNominalizza(h.nome) === invNominalizza(s.nome));
-    if (idx >= 0) merged[idx] = { ...merged[idx], ...s, h: s.h || merged[idx].h, prezzo: s.prezzo || merged[idx].prezzo, _hardcoded: false }; // preserva H codes e prezzo hardcoded se stored è vuoto
-    else merged.push({ ...s, _hardcoded: false });
+    const k = invNominalizza(s.nome);
+    const base = INV_HARDCODED.find(h => invNominalizza(h.nome) === k);
+    const lotto = base ? { ...base, ...s, h: s.h || base.h, prezzo: s.prezzo || base.prezzo, _hardcoded: false } // preserva H codes e prezzo hardcoded se stored è vuoto
+                       : { ...s, _hardcoded: false };
+    const idx = merged.findIndex(h => h._hardcoded && invNominalizza(h.nome) === k);
+    if (idx >= 0) merged[idx] = lotto;
+    else merged.push(lotto);
   });
   return merged;
 }
@@ -1422,7 +1430,9 @@ function invCercaNome(q) {
   if (!dd) return;
   if (!q || q.length < 3) { dd.innerHTML = ''; return; }
   const inv = invLoadMerged ? invLoadMerged() : [];
-  const matches = inv.filter(s => invNominalizza(s.nome).includes(invNominalizza(q))).slice(0, 6);
+  const _visti = new Set(); // un nome una volta sola, anche se ha più lotti
+  const matches = inv.filter(s => invNominalizza(s.nome).includes(invNominalizza(q)))
+    .filter(s => { const k = invNominalizza(s.nome); if (_visti.has(k)) return false; _visti.add(k); return true; }).slice(0, 6);
   dd.innerHTML = matches.map(s =>
     `<button onclick="document.getElementById('inv-nome-libero').value='${s.nome.replace(/'/g,"\\'")}';
       if(document.getElementById('inv-h')) document.getElementById('inv-h').value='${(s.h||'').replace(/'/g,"\\'")}';
@@ -1833,7 +1843,7 @@ function liberaRenderRighe() {
       ${specBtn}
       <input type="text" value="${r.nome}" placeholder="Sostanza" autocomplete="off"
         style="width:180px;font-family:var(--mono);font-size:13px;padding:3px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
-        oninput="liberaRighe[${i}].nome=this.value; liberaRighe[${i}].densita=null; liberaCercaComp(${i},this.value)">
+        oninput="liberaNomeInput(${i}, this.value)">
       <input type="number" value="${r.qty}" placeholder="Quantità" min="0" step="0.1"
         style="width:75px;font-family:var(--mono);font-size:13px;padding:3px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)"
         oninput="liberaRighe[${i}].qty=this.value; calcPrep()">
@@ -1853,6 +1863,22 @@ function liberaRenderRighe() {
   }).join('');
 }
 
+// Nome della riga scritto a mano: è un'altra sostanza, quindi lotto, prezzo
+// d'acquisto, fonte e codici H di quella di prima non valgono più (prima
+// restavano: la Scheda stampava il lotto della sostanza precedente e la riga ne
+// usava il prezzo). Li rimette liberaSelComp scegliendo dal menu.
+function liberaNomeInput(i, v) {
+  const r = liberaRighe[i];
+  if (!r) return;
+  r.nome = v;
+  r.densita = null;
+  r.lotto = '';
+  r.prezzoAcq = 0;
+  r.fonte = null;
+  r.h = '';
+  liberaCercaComp(i, v);
+}
+
 let _liberaCercaTimer = null;
 function liberaCercaComp(i, q) {
   clearTimeout(_liberaCercaTimer);
@@ -1861,39 +1887,49 @@ function liberaCercaComp(i, q) {
     if (!dd) return;
     if (!q || q.length < 3) { dd.innerHTML=''; return; }
     const inv = typeof invLoadMerged === 'function' ? invLoadMerged() : [];
-    const qNorm = invNominalizza(q);
 
     // Costruisci lista unificata: per ogni sostanza una sola voce
     // Priorità prezzo: All.A > inventario. Lotto: sempre dall'inventario se disponibile
     const seen = new Set();
     const candidates = [];
 
-    // Prima cerca in Allegato A (stessi suggerimenti di Tariffazione: parole in
-    // qualunque ordine, "ossido di zinco" → zinco ossido)
-    const vociSugg = new Set(vociAllegatoAPerRicerca(q));
-    Object.keys(ALLEGATO_A).forEach(k => {
-      if (!vociSugg.has(k)) return;
+    // Prima l'Allegato A, nell'ordine di vicinanza (stessi suggerimenti e stesso
+    // ordine di Tariffazione: parole in qualunque ordine, "ossido di zinco" → zinco ossido).
+    // Lotto e H dall'inventario con la stessa ricerca del prezzo; il lotto solo se è
+    // uno (con più lotti si sceglie nella Scheda).
+    vociAllegatoAPerRicerca(q).forEach(k => {
       const nome = k.charAt(0).toUpperCase() + k.slice(1);
       const key = invNominalizza(nome);
       if (seen.has(key)) return;
       seen.add(key);
-      // Cerca lotto in inventario
-      const invFound = inv.find(s => invNominalizza(s.nome).includes(key) || key.includes(invNominalizza(s.nome)));
-      candidates.push({nome, prezzo: ALLEGATO_A[k], fonte:'allegatoA', lotto: invFound?.lottoInt || invFound?.lotto || '', h: invFound?.h || ''});
+      const lotti = invLottiSostanza(k, inv);
+      lotti.forEach(l => seen.add(invNominalizza(l.nome))); // la stessa sostanza non ricompare dall'inventario
+      const aperti = lotti.filter(l => !l.dataCh);
+      const l1 = aperti.length === 1 ? aperti[0] : null;
+      candidates.push({nome, prezzo: ALLEGATO_A[k], fonte:'allegatoA', lotto: l1?.lottoInt || l1?.lotto || '', h: (lotti.find(l => l.h) || {}).h || ''});
     });
 
-    // Poi cerca in inventario (solo sostanze non già trovate in All.A)
-    inv.forEach(s => {
-      if (!invNominalizza(s.nome).includes(qNorm)) return;
+    // Poi l'inventario (sostanze non già proposte dall'Allegato A), parole in
+    // qualunque ordine. Lotti a prezzi diversi: un bottone per lotto, perché il
+    // prezzo della riga è quello del lotto usato.
+    invVociPerRicerca(q, inv).forEach(s => {
       const key = invNominalizza(s.nome);
       if (seen.has(key)) return;
+      const lotti = invLottiSostanza(s.nome, inv);
+      lotti.forEach(l => seen.add(invNominalizza(l.nome)));
       seen.add(key);
-      candidates.push({nome: s.nome, prezzo: s.prezzo||0, fonte:'inventario', lotto: s.lottoInt || s.lotto || '', h: s.h || ''});
+      // Lotti aperti (se sono tutti chiusi, tutti); una sola ricerca per sostanza.
+      const aperti = lotti.filter(l => !l.dataCh).length ? lotti.filter(l => !l.dataCh) : lotti;
+      const h = (lotti.find(l => l.h) || {}).h || '';
+      const perLotto = new Set(aperti.filter(l => l.prezzo > 0).map(l => l.prezzo)).size > 1;
+      const base = aperti.find(l => l.prezzo > 0) || aperti[0] || s;
+      (perLotto ? aperti : [aperti.length === 1 ? aperti[0] : { ...base, lotto: '', lottoInt: '' }]).forEach(l =>
+        candidates.push({nome: l.nome, prezzo: l.prezzo||0, fonte:'inventario', lotto: l.lottoInt || l.lotto || '', h}));
     });
 
     if (!candidates.length) { dd.innerHTML = '<span style="font-size:11px;color:var(--text-faint)">nessun risultato</span>'; return; }
 
-    dd.innerHTML = candidates.slice(0,6).map(s => {
+    dd.innerHTML = candidates.slice(0,8).map(s => {
       const prezzoLabel = s.prezzo>0 ? ' — €'+s.prezzo.toFixed(4)+'/g' : '';
       const fonteLabel = s.fonte==='allegatoA' ? ' <span style="color:var(--accent)">✓All.A</span>' : '';
       const lottoLabel = s.lotto ? ' <span style="color:var(--text-faint)">lotto:'+s.lotto+'</span>' : '';
@@ -2531,7 +2567,7 @@ function calcPrep() {
           tarPADaAllegatoA = true;
         } else {
           // Cerca in inventario
-          const invFound = invTrovaPerPrezzo(qNorm, invLoadMerged());
+          const invFound = invTrovaPerPrezzo(qNorm, invLoadMerged(), paRiga.lotto);
           const prezzo = (invFound && invFound.prezzo > 0) ? invFound.prezzo : paRiga.prezzoAcq || 0;
           tPaEl.value = prezzo > 0 ? prezzo.toFixed(4) : '';
           tPaEl.readOnly = false;
@@ -2577,6 +2613,7 @@ function calcPrep() {
     liberaGrPA = paG * _perUnitFactor;
     liberaRigheExtra = [];
     liberaCostoExtra = 0;
+    const _invRighe = invLoadMerged(); // una volta per tutte le righe
 
     // Determina indice PA: marker esplicito → fallback Allegato A → prima riga
     let _paIdx = ingr.findIndex(r => r.isPa);
@@ -2613,6 +2650,7 @@ function calcPrep() {
       let prezzo = 0;
       let isLiquido = (!!densita && r.unit === 'g') || r.unit === 'ml';
       let specRes = null;
+      let lottiAmbigui = false;
       if (r.daSpecialita) {
         // Ridosaggio da specialità (es. Frisium 10mg → capsule 4mg): si paga la
         // confezione intera aperta, non la singola unità. Vedi calcCostoSpecialita.
@@ -2623,10 +2661,16 @@ function calcPrep() {
         prezzo = ALLEGATO_A[chiaveAll]; // All.A sempre in €/g
         isLiquido = false;
       } else {
-        const invFound = invTrovaPerPrezzo(r.nome, invLoadMerged());
+        // Prezzo del lotto usato nella preparazione (r.lotto); senza lotto, solo se
+        // i lotti hanno tutti lo stesso prezzo — altrimenti avviso "scegli il lotto".
+        const invFound = invTrovaPerPrezzo(r.nome, _invRighe, r.lotto);
         if (invFound && invFound.prezzo > 0) {
           prezzo = invFound.prezzo;
           isLiquido = (invFound.unit === 'ml' || !!densita);
+        } else if (!invFound && !(r.prezzoAcq > 0) && invLottiPrezziDiversi(r.nome, _invRighe)) {
+          // (con prezzoAcq > 0 vale il prezzo scelto dal menu: lotti senza codice)
+          lottiAmbigui = true;
+          isLiquido = r.unit === 'ml';
         } else {
           prezzo = r.prezzoAcq||0;
           isLiquido = r.unit === 'ml';
@@ -2644,7 +2688,7 @@ function calcPrep() {
       const costo = qtPerCosto * prezzo;
       if (prezzo > 0) liberaCostoExtra += costo;
       // qty mostrata = per-cartina originale in cartine, altrimenti il valore totale
-      liberaRigheExtra.push({nome: r.nome, qty: q, unit: r.unit, grams, mlQty, prezzo, costo, isLiquido: isLiquido && !chiaveAll, isPa: _ri === _paIdx,
+      liberaRigheExtra.push({nome: r.nome, qty: q, unit: r.unit, grams, mlQty, prezzo, costo, isLiquido: isLiquido && !chiaveAll, isPa: _ri === _paIdx, lottiAmbigui,
         ...(r.daSpecialita ? { daSpecialita:true, specNome:r.specNome, confezioni: specRes?.confezioni||0, unitaAvanzate: specRes?.unitaAvanzate||0, prezzoConf: parseFloat(r.specConfPrezzo)||0 } : {})});
     });
     // Capsule vuote: aggiunge DOPO il loop ingredienti (così non viene azzerata col reset)
@@ -2752,8 +2796,9 @@ function sincronizzaTariffazione() {
     if (document.getElementById('t-mgpa')  && document.getElementById('mg-pa-cps')) document.getElementById('t-mgpa').value  = document.getElementById('mg-pa-cps').value;
   } else {
     // soluzione / sospensione / unguento / polvere: ponte quantità + concentrazione per la Tariffazione
-    if (document.getElementById('t-qt'))   document.getElementById('t-qt').value   = document.getElementById('qt').value;
-    if (document.getElementById('t-conc')) document.getElementById('t-conc').value = document.getElementById('conc').value;
+    // t-qt/t-conc sono input number: la virgola (preventivi salvati prima della v167) va in punto.
+    if (document.getElementById('t-qt'))   document.getElementById('t-qt').value   = String(document.getElementById('qt').value).replace(',', '.');
+    if (document.getElementById('t-conc')) document.getElementById('t-conc').value = String(document.getElementById('conc').value).replace(',', '.');
   }
   // Componenti aggiuntivi (Art. 5) — n° ingredienti meno i componenti inclusi nella
   // voce base (2 per liquidi/sospensioni/semisolide/polveri, 1 per capsule/cartine).
@@ -2965,8 +3010,20 @@ function tarRicercaPA() {
   const sug = document.getElementById('t-pa-suggerimenti');
   const fonte = document.getElementById('t-pa-fonte');
   const inputPA = document.getElementById('t-pa');
+  // Il nome non trova più la voce: un prezzo di legge bloccato prima non vale più
+  // (scritto "zinco ossido", poi corretto in "zinco o…" o cancellato).
+  const sblocca = () => {
+    if (inputPA.readOnly || tarPADaAllegatoA) {
+      if (inputPA.readOnly) inputPA.value = '';
+      inputPA.readOnly = false;
+      inputPA.style.background = '';
+      inputPA.style.color = '';
+      tarPADaAllegatoA = false;
+      calcTariff();
+    }
+  };
 
-  if (!q) { sug.innerHTML = ''; fonte.textContent = ''; return; }
+  if (!q) { sug.innerHTML = ''; fonte.textContent = ''; sblocca(); return; }
 
   // Voce dell'Allegato A con la stessa ricerca di tutta l'app (pricing.js),
   // anche per nomi corti (talco, iodio, fenolo):
@@ -2986,6 +3043,7 @@ function tarRicercaPA() {
   }
 
   // Suggerimenti (da 3 lettere)
+  sblocca();
   if (q.length < 3) { sug.innerHTML = ''; fonte.textContent = ''; return; }
   const risultati = tarCercaPA(nome);
   if (risultati.length) {
@@ -2997,10 +3055,6 @@ function tarRicercaPA() {
   } else {
     sug.innerHTML = '';
     fonte.innerHTML = '<span style="color:var(--text-muted)">Non in All. A — si usa prezzo di acquisto (Art. 5)</span>';
-    inputPA.readOnly = false;
-    inputPA.style.background = '';
-    inputPA.style.color = '';
-    tarPADaAllegatoA = false;
   }
 }
 
@@ -3040,7 +3094,7 @@ function formatMateriaRow(r) {
   const dispQty = r.isLiquido ? fmt(r.unit==='ml'?r.qty:r.qty/(getDensita(r.nome)||1),1)+' ml' : fmt(r.grams,2)+' g';
   const dispUnit = r.isLiquido ? '/ml' : '/g';
   return { name: titleCase(r.nome)+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, val: r.costo,
-    badge: r.prezzo===0?'⚠ inserire prezzo in inventario':'', badgeType:'warn' };
+    badge: r.prezzo===0 ? (r.lottiAmbigui ? '⚠ più lotti a prezzi diversi: scegli il lotto' : '⚠ inserire prezzo in inventario') : '', badgeType:'warn' };
 }
 
 function calcTariff() {
@@ -3374,7 +3428,8 @@ function aggiornaScheda() {
       ];
       // Lotti da liberaRighe
       lottiItems = ingrL.map(r => {
-        const invFound = invLoadMerged().find(s => invNominalizza(s.nome).includes(invNominalizza(r.nome)));
+        const _lotti = invLottiSostanza(r.nome, invLoadMerged()); // solo se il lotto è uno
+        const invFound = _lotti.length === 1 ? _lotti[0] : null;
         return {nome: r.nome, lotto: r.lotto || invFound?.lottoInt || invFound?.lotto || '—'};
       });
     } else {
@@ -3512,7 +3567,8 @@ function aggiornaScheda() {
         'Trasferire in flacone/bustine. Etichettare con nome, concentrazione, data e scadenza.',
       ];
       lottiItems = ingrL.map(r => {
-        const invFound = invLoadMerged().find(s => invNominalizza(s.nome).includes(invNominalizza(r.nome)));
+        const _lotti = invLottiSostanza(r.nome, invLoadMerged()); // solo se il lotto è uno
+        const invFound = _lotti.length === 1 ? _lotti[0] : null;
         return {nome: r.nome, lotto: r.lotto || invFound?.lottoInt || invFound?.lotto || '—'};
       });
     } else {
@@ -3800,11 +3856,22 @@ function trovaLottiCandidati(keywords) {
   const inv = invLoadMerged();
   const kw = (keywords||[]).filter(Boolean).map(k => String(k).toLowerCase());
   if (!kw.length) return [];
-  const candidati = inv.filter(item => {
-    if (!item.lotto && !item.lottoInt) return false;
-    if (item.dataCh) return false; // escludi lotti chiusi
+  return _candidatiLotto(inv.filter(item => {
     const n = (item.nome||'').toLowerCase();
     return kw.some(k => k && n.includes(k));
+  }));
+}
+// Lotti della SOLA sostanza `nome` (righe della formula libera): stessa ricerca a
+// parole intere del prezzo. Non per prima parola: "Acido salicilico" proponeva
+// (e prestampava, FEFO) il lotto di un altro acido.
+function trovaLottiSostanza(nome) {
+  return _candidatiLotto(invLottiSostanza(nome, invLoadMerged()));
+}
+function _candidatiLotto(items) {
+  const candidati = items.filter(item => {
+    if (!item.lotto && !item.lottoInt) return false;
+    if (item.dataCh) return false; // escludi lotti chiusi
+    return true;
   });
   candidati.sort((a,b) => (a.scad||'9999-12').localeCompare(b.scad||'9999-12'));
   return candidati.map(c => ({
@@ -3883,8 +3950,7 @@ function schedaLottiRender(force, prefill) {
   ).join('');
   righe.forEach(({ r, i }) => {
     const id = 's-lotto-r' + i;
-    const n = invNominalizza(r.nome);
-    const cand = trovaLottiCandidati([n, n.split(' ')[0]]);
+    const cand = trovaLottiSostanza(r.nome);
     popolaLottoSelect(id, cand); // seleziona il primo FEFO e lo scrive nell'input
     const inp = document.getElementById(id), sel = document.getElementById(id + '-sel');
     if (r.lotto || !prefill) {
@@ -3905,6 +3971,9 @@ function schedaLottoInput(i, v) {
   liberaRighe[i].lotto = v;
   const inp = document.getElementById('s-lotto-r' + i);
   if (inp) inp.dataset.scad = '';
+  // Prezzo della riga = prezzo del lotto usato: si ricalcola quando il codice è
+  // vuoto o corrisponde a un lotto, non a metà digitazione.
+  if (!v || invLottiSostanza(liberaRighe[i].nome, invLoadMerged()).some(s => s.lottoInt === v || s.lotto === v)) calcPrep();
   if (sMesiAuto) ricalcolaScadenzaAuto(); else aggiornaScheda();
 }
 
@@ -3915,6 +3984,7 @@ function schedaLottoSel(i) {
   const opt = sel.options[sel.selectedIndex];
   if (opt && opt.dataset.lotto) { inp.value = opt.dataset.lotto; inp.dataset.scad = opt.dataset.scad || ''; }
   liberaRighe[i].lotto = inp.value;
+  calcPrep(); // prezzo della riga = prezzo del lotto usato
   if (sMesiAuto) ricalcolaScadenzaAuto(); else aggiornaScheda();
 }
 
@@ -4102,6 +4172,7 @@ function compilaScheda() {
   popolaLottoSelect('s-lotto-eccip', candEC);
   // Formula libera: una riga lotto per ingrediente, lotti vuoti ← primo FEFO.
   schedaLottiRender(true, true);
+  calcPrep(); // il prezzo delle righe d'inventario è quello del lotto appena scelto
   // Calcolo automatico della validità in base ai lotti selezionati e al tipo
   sMesiAuto = true;
   ricalcolaScadenzaAuto();
@@ -4123,7 +4194,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 167;
+const APP_VERSION = 168;
 
 // DEMO_MODE è definito nel primo <script> dell'<head> (isola anche il localStorage).
 
@@ -4890,7 +4961,8 @@ function aiGetSystemPrompt() {
   const inv = typeof invLoadMerged === 'function' ? invLoadMerged() : [];
   const invTxt = inv.length > 0
     ? 'SOSTANZE DISPONIBILI IN INVENTARIO (preferiscile quando possibile):\n' +
-      inv.map(s => '- ' + s.nome + (s.prezzo>0?' \u20ac'+s.prezzo.toFixed(4)+'/'+s.unit:'') + (s.h?' ['+s.h+']':'')).join('\n') + '\n\n'
+      inv.filter((s, i) => inv.findIndex(t => invNominalizza(t.nome) === invNominalizza(s.nome)) === i) // una riga per sostanza, anche con pi\u00f9 lotti
+        .map(s => '- ' + s.nome + (s.prezzo>0?' \u20ac'+s.prezzo.toFixed(4)+'/'+s.unit:'') + (s.h?' ['+s.h+']':'')).join('\n') + '\n\n'
     : 'INVENTARIO VUOTO\n\n';
   return 'Sei un assistente farmaceutico specializzato ESCLUSIVAMENTE in galenica magistrale. ' +
     'Rispondi SOLO a domande su: preparazioni galeniche, formule farmaceutiche (FU XII), principi attivi, eccipienti, solventi, ' +
@@ -5104,7 +5176,11 @@ function aiImportaTutti(comps, tipo) {
     // "acido borico" matchava "acido acetilsalicilico" perché iniziano per "acido".
     const chiaveAll = trovaVoceAllegatoA(qNorm);
     const invFound = invTrovaPerPrezzo(c.nome, inv);
-    const invLotto = invFound || _aiInInventario(c.nome, inv);   // lotto: anche nomi abbreviati
+    // Lotto: anche nomi abbreviati, ma solo se la sostanza ha un solo lotto aperto
+    // (con più lotti lo sceglie la Scheda, FEFO, e il prezzo segue quel lotto).
+    const _invAI = invFound || _aiInInventario(c.nome, inv);
+    const _lottiAI = _invAI ? invLottiSostanza(_invAI.nome, inv).filter(s => !s.dataCh) : [];
+    const invLotto = _lottiAI.length === 1 ? _lottiAI[0] : null;
     let nomeFinal = c.nome;
     let prezzoAcq = 0;
     let fonte = 'art5';

@@ -430,11 +430,21 @@ function invFindBest(nome, inv) {
 }
 
 // Codici H della sostanza `nome` dall'inventario passato. '' se non trovata.
+// Stessa ricerca a parole intere del prezzo (invLottiSostanza): non più il
+// "contiene" nei due sensi, che dava a "Fenossietanolo" l'H225 dell'"Etanolo".
+// I codici H sono della sostanza: il primo lotto che li ha vale per tutti.
+// Se il nome ha una concentrazione ("Idrochinone 4%") e così non trova niente,
+// si riprova senza numeri: per l'Art. 8a meglio applicare il supplemento che
+// perderlo (per il PREZZO invece la concentrazione indica un'altra voce).
 function getHDaInventario(nome, inv) {
-  if (!nome) return '';
-  const q = invNominalizza(nome);
-  const found = inv.find(s => invNominalizza(s.nome).includes(q) || q.includes(invNominalizza(s.nome)));
-  return found ? (found.h || '') : '';
+  if (!nome || !Array.isArray(inv)) return '';
+  let lotti = invLottiSostanza(nome, inv);
+  if (!lotti.length) {
+    const senzaNumeri = _paroleNome(nome).split(' ').filter(w => !/^\d+(?:p\d+)?$/.test(w) && !_UNITA.has(w)).join(' ');
+    if (senzaNumeri) lotti = invLottiSostanza(senzaNumeri, inv);
+  }
+  const conH = lotti.find(s => s.h);
+  return conH ? conH.h : '';
 }
 
 // True se la riga è da supplementare con Art. 8a (€2,50). Override manuale
@@ -453,11 +463,12 @@ function rigaHazardous(r, inv) {
 // jojoba" quello dell'olio di arachidi, ad "acqua di rose" quello dell'acqua
 // depurata, a "timo" quello del timolo (campo bloccato).
 
-// Nome → parole: minuscolo, senza accenti; decimali uniti ("99,5" → "995"), i
-// punti tolti ("F.U." → "fu", "Lidocaina." → "lidocaina"), il resto della
-// punteggiatura diventa spazio; "ac" (abbreviazione) → "acido".
+// Nome → parole: minuscolo, senza accenti; decimali in una sola parola col
+// separatore "p" ("99,5" → "99p5", "2,00" → "2p00": non "200", che sembrava una
+// purezza), i punti tolti ("F.U." → "fu", "Lidocaina." → "lidocaina"), il resto
+// della punteggiatura diventa spazio; "ac" (abbreviazione) → "acido".
 function _paroleNome(s) {
-  return invNominalizza(s).replace(/(\d)[.,](\d)/g, '$1$2').replace(/\./g, '')
+  return invNominalizza(s).replace(/(\d)[.,](\d)/g, '$1p$2').replace(/\./g, '')
     .replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
     .split(' ').map(w => w === 'ac' ? 'acido' : w).join(' ');
 }
@@ -471,6 +482,10 @@ const _PAROLE_INNOCUE = new Set(['fu', 'ph', 'eur', 'usp', 'bp', 'qb', 'puro', '
   'purissima', 'ventilato', 'ventilata', 'micronizzato', 'micronizzata', 'polvere', 'cristalli',
   'cristallino', 'cristallina', 'farmaceutico', 'farmaceutica', 'grado', 'qualita', 'uso',
   'bianco', 'bianca', 'naturale', 'anidro', 'anidra', 'farmalabor', 'acef', 'fagron']);
+// Il colore è innocuo quando lo scrive l'operatore ("Talco bianco" → talco), non
+// quando completa il nome: "cera" non è "cera bianca" (cera d'api naturale ≠
+// cera FU sbiancata).
+const _COLORI = new Set(['bianco', 'bianca']);
 const _UNITA = new Set(['g', 'kg', 'mg', 'ml', 'l']);
 // Nomi di sale: "atropina" in ricetta è l'atropina solfato. Ammessi solo quando
 // la voce è più lunga del nome scritto e il prezzo è univoco ("chinina" no:
@@ -480,23 +495,29 @@ const _SALI = new Set(['solfato', 'cloridrato', 'bromidrato', 'nitrato', 'fosfat
 function _parolePiene(p) { return p.split(' ').filter(w => w && !_PAROLE_VUOTE.has(w)); }
 function _sottoinsieme(a, b) { const sb = new Set(b); return a.every(w => sb.has(w)); }
 // True se le parole in più sono tutte innocue. Un numero lo è solo se è una
-// quantità con unità ("500 g") o una purezza ≥ 90 ("99", "99,5%" → "995");
-// una concentrazione ("0,9%", "5%", "70%") indica un'altra forma.
-function _soloAggiunteInnocue(extra) {
+// quantità con unità ("500 g") o una purezza ≥ 90 ("99", "99,5%" → "99p5");
+// una concentrazione ("0,9%", "2,00%", "5%", "70%") indica un'altra forma.
+// `completamento`: le parole sono quelle che la VOCE aggiunge al nome scritto.
+function _soloAggiunteInnocue(extra, completamento) {
   for (let i = 0; i < extra.length; i++) {
     const w = extra[i];
-    if (_PAROLE_INNOCUE.has(w) || _UNITA.has(w)) continue;
-    if (/^\d+$/.test(w)) {
+    if (_PAROLE_INNOCUE.has(w) && !(completamento && _COLORI.has(w))) continue;
+    if (_UNITA.has(w)) continue;
+    if (/^\d+(?:p\d+)?$/.test(w)) {
       if (_UNITA.has(extra[i + 1])) { i++; continue; }
-      if (parseInt(w, 10) >= 90) continue;
+      if (parseFloat(w.replace('p', '.')) >= 90) continue;
     }
     return false;
   }
   return true;
 }
+// `sostanza`: le parole senza le aggiunte innocue (ma col colore), per riconoscere
+// i lotti della stessa sostanza scritti in modo diverso in inventario
+// ("Etanolo 96°" e "Etanolo 96° Farmalabor"; non "Etanolo 70°").
 function _vocePerNome(nome) {
   const p = _paroleNome(nome), w = _parolePiene(p);
-  return { p, w, firma: [...w].sort().join(' ') };
+  return { p, w, firma: [...w].sort().join(' '),
+           sostanza: w.filter(x => !_PAROLE_INNOCUE.has(x) || _COLORI.has(x)).sort().join(' ') };
 }
 
 let _ALL_A_INDICE = null;   // calcolato una volta: [{k, p, w, firma, prezzo}]
@@ -505,22 +526,32 @@ function _indiceAllegatoA() {
   return _ALL_A_INDICE;
 }
 
-// Ricerca comune a voci dell'Allegato A e d'inventario. `voci` = [{p, w, firma, prezzo}].
+// Ricerca comune a voci dell'Allegato A e d'inventario. `voci` = [{p, w, firma, ...}].
 // In ordine: nome esatto (anche con punteggiatura diversa); stesse parole in
 // altro ordine; voce + sole aggiunte innocue nel nome (la più lunga); nome +
-// sole aggiunte innocue nella voce, se la voce INIZIA col nome e il prezzo è
-// univoco ("mentolo" → mentolo naturale; "olio" → nessuna).
-function _trovaVoce(nome, voci) {
+// sole aggiunte innocue nella voce, se la voce INIZIA col nome ("mentolo" →
+// mentolo naturale). In quest'ultimo caso TUTTE le voci che iniziano col nome
+// devono essere compatibili e dare la stessa `chiave` (prezzo per l'Allegato A,
+// sostanza per l'inventario): "zinco" non è zinco solfato se c'è anche zinco
+// ossido, "olio" non è nessun olio. Con `stessoPrezzoBasta` (solo Allegato A)
+// basta che più voci che iniziano col nome abbiano tutte la stessa chiave:
+// "vaselina" → vaselina bianca/filante, entrambe €0,023 (il prezzo di legge è
+// quello comunque); una voce sola che il colore distingue no ("cera").
+function _trovaVoce(nome, voci, chiave, stessoPrezzoBasta) {
+  chiave = chiave || (x => x.prezzo);
   const q = _vocePerNome(nome);
   if (!q.w.length) return null;
   const e = voci.find(x => x.p === q.p) || voci.find(x => x.firma === q.firma);
   if (e) return e;
   const conAggiunte = voci.filter(x => _sottoinsieme(x.w, q.w) && _soloAggiunteInnocue(q.w.filter(w => !x.w.includes(w))));
   if (conAggiunte.length) return conAggiunte.sort((a, b) => b.w.length - a.w.length || b.p.length - a.p.length)[0];
-  const piuLunghe = voci.filter(x => x.w.length > q.w.length && q.w.every((w, i) => x.w[i] === w)
-    && _soloAggiunteInnocue(x.w.slice(q.w.length).filter(w => !_SALI.has(w))));
-  if (piuLunghe.length && new Set(piuLunghe.map(x => x.prezzo)).size === 1)
-    return piuLunghe.sort((a, b) => a.p.length - b.p.length)[0];
+  const conPrefisso = voci.filter(x => x.w.length > q.w.length && q.w.every((w, i) => x.w[i] === w));
+  const piuLunghe = conPrefisso.filter(x => _soloAggiunteInnocue(x.w.slice(q.w.length).filter(w => !_SALI.has(w)), true));
+  const piuCorta = arr => arr.sort((a, b) => a.p.length - b.p.length)[0];
+  if (piuLunghe.length && piuLunghe.length === conPrefisso.length && new Set(piuLunghe.map(chiave)).size === 1)
+    return piuCorta(piuLunghe);
+  if (stessoPrezzoBasta && conPrefisso.length > 1 && new Set(conPrefisso.map(chiave)).size === 1)
+    return piuCorta(conPrefisso);
   return null;
 }
 
@@ -530,20 +561,73 @@ function trovaVoceAllegatoA(nome) {
   const q = invNominalizza(nome);
   if (!q) return null;
   if (ALLEGATO_A[q] !== undefined) return q;
-  const e = _trovaVoce(q, _indiceAllegatoA());
+  const e = _trovaVoce(q, _indiceAllegatoA(), null, true);
   if (e) return e.k;
   if (isAcquaNome(q) && ALLEGATO_A['acqua depurata'] !== undefined) return 'acqua depurata';
   return null;
 }
 
-// Voce d'inventario per il PREZZO di un nome, o null: la stessa ricerca, mai
-// somiglianza vaga (invFindBest resta per lotti/frasi H). "Acqua di rose" ≠
-// "Acqua"; "Etanolo" → "Etanolo 96°"; "Olio" → nessuna se gli oli sono diversi.
-function invTrovaPerPrezzo(nome, inv) {
-  if (!nome || !Array.isArray(inv)) return null;
-  const voci = inv.filter(s => s && s.nome).map(s => ({ s, prezzo: s.prezzo, ..._vocePerNome(s.nome) })).filter(x => x.w.length);
-  const e = _trovaVoce(nome, voci);
-  return e ? e.s : null;
+// Voci d'inventario già scomposte in parole, calcolate una volta per array
+// (calcPrep cerca ogni riga nello stesso inventario).
+const _INV_INDICE = new WeakMap();
+function _indiceInventario(inv) {
+  let voci = _INV_INDICE.get(inv);
+  if (!voci) {
+    voci = inv.filter(s => s && s.nome).map(s => ({ s, prezzo: s.prezzo, ..._vocePerNome(s.nome) })).filter(x => x.w.length);
+    _INV_INDICE.set(inv, voci);
+  }
+  return voci;
+}
+
+// Tutti i lotti d'inventario della sostanza `nome` (stesse parole del nome
+// trovato, in qualunque ordine), o []. Stessa ricerca del prezzo, mai
+// somiglianza vaga: "Acqua di rose" ≠ "Acqua"; "Etanolo" → i lotti di
+// "Etanolo 96°"; "Olio" → nessuno se gli oli sono diversi.
+function invLottiSostanza(nome, inv) {
+  if (!nome || !Array.isArray(inv)) return [];
+  const voci = _indiceInventario(inv);
+  const e = _trovaVoce(nome, voci, x => x.sostanza);
+  return e ? voci.filter(x => x.sostanza === e.sostanza).map(x => x.s) : [];
+}
+
+// Lotti ancora aperti (senza data di chiusura); se sono tutti chiusi, tutti.
+function _lottiAperti(lotti) {
+  const aperti = lotti.filter(s => !s.dataCh);
+  return aperti.length ? aperti : lotti;
+}
+
+// True se la sostanza ha più lotti aperti con prezzi diversi: il prezzo dipende
+// dal lotto usato nella preparazione.
+function invLottiPrezziDiversi(nome, inv) {
+  return new Set(_lottiAperti(invLottiSostanza(nome, inv)).filter(s => s.prezzo > 0).map(s => s.prezzo)).size > 1;
+}
+
+// Voce d'inventario per il PREZZO di un nome, o null. Con `lotto` (il lotto
+// usato nella preparazione, lottoInt o lotto del fornitore) vale quel lotto,
+// anche se chiuso; senza, va bene solo se i lotti aperti hanno tutti lo stesso prezzo.
+function invTrovaPerPrezzo(nome, inv, lotto) {
+  const lotti = invLottiSostanza(nome, inv);
+  if (!lotti.length) return null;
+  if (lotto) {
+    const l = lotti.find(s => s.lottoInt === lotto || s.lotto === lotto);
+    if (l) return l;
+  }
+  const aperti = _lottiAperti(lotti);
+  const conPrezzo = aperti.filter(s => s.prezzo > 0);
+  if (new Set(conPrezzo.map(s => s.prezzo)).size > 1) return null;
+  return conPrezzo[conPrezzo.length - 1] || aperti[aperti.length - 1];
+}
+
+// Voci d'inventario da SUGGERIRE per un nome (menu della Preparazione): come
+// vociAllegatoAPerRicerca, ogni parola scritta è l'inizio di una parola del
+// nome, in qualunque ordine ("olio mandorle" → Olio di mandorle dolci).
+function invVociPerRicerca(nome, inv) {
+  const qw = _parolePiene(_paroleNome(nome || ''));
+  if (!qw.length || !Array.isArray(inv)) return [];
+  return _indiceInventario(inv)
+    .filter(x => qw.every(w => x.w.some(xw => xw.startsWith(w))))
+    .sort((a, b) => a.p.length - b.p.length)
+    .map(x => x.s);
 }
 
 // Prezzo canonico. Precedenza: Allegato A vince sempre (prezzi obbligatori per
@@ -724,6 +808,7 @@ const _exports = {
   fmt, invNominalizza, invMatchScore, hasHazard, getDensita, isEtanoloNome, isAcquaNome, tarNormalizza, tarCercaPA,
   isStupefacente, isDoping, getOpTecnologicheAuto,
   invFindBest, getHDaInventario, rigaHazardous, invGetPrezzo, trovaVoceAllegatoA, invTrovaPerPrezzo, vociAllegatoAPerRicerca,
+  invLottiSostanza, invLottiPrezziDiversi, invVociPerRicerca,
   calcAllegatoB, calcAllegatoBVoce7, calcSupplementi, calcIvaTotale, calcCostoSpecialita,
 };
 Object.assign(globalThis, _exports);
