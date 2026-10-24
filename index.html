@@ -394,7 +394,7 @@
     style="margin-left:8px;font-size:14px;font-family:var(--sans);padding:4px 10px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text-muted);cursor:pointer;line-height:1">☾</button>
   <div id="app-version-badge" style="margin-left:8px;font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:99px;background:var(--badge-bg);color:var(--badge-fg);white-space:nowrap;cursor:default" title="Versione app"></div>
 </header>
-<div id="demo-banner">🧪 VERSIONE DI PROVA — i dati restano solo nel tuo browser. Calcoli conformi al D.M. 22/09/2017. Le sostanze di esempio hanno prezzi d'acquisto indicativi: per un confronto reale inserisci il tuo prezzo in Inventario. <button onclick="caricaEsempioDemo()" style="margin-left:6px;font:inherit;font-size:11px;padding:2px 8px;border:1px solid currentColor;border-radius:var(--radius);background:none;color:inherit;cursor:pointer">▶ Prova un esempio</button></div>
+<div id="demo-banner">🧪 VERSIONE DI PROVA — i dati restano solo nel tuo browser. Calcoli secondo il D.M. 22/09/2017 — da verificare sempre (<a href="https://github.com/farmaciadellastazione-tech/galenico/blob/root/LICENSE" target="_blank" rel="noopener" style="color:inherit">licenza</a>). Le sostanze di esempio hanno prezzi d'acquisto indicativi: per un confronto reale inserisci il tuo prezzo in Inventario. <button onclick="caricaEsempioDemo()" style="margin-left:6px;font:inherit;font-size:11px;padding:2px 8px;border:1px solid currentColor;border-radius:var(--radius);background:none;color:inherit;cursor:pointer">▶ Prova un esempio</button></div>
 <div id="prev-banner">⚠ MODALITÀ PREVENTIVO ATTIVA — i prezzi/H mancanti sono modificabili a mano; le schede salvate saranno marcate PREVENTIVO con numerazione separata, non valide come preparazioni reali.</div>
 
 <main>
@@ -414,6 +414,9 @@
       <li>Poi prova una tua formula con <strong>+ Sostanza</strong>, oppure cambia il <strong>Volume soluzione</strong>: i grammi si ricalcolano</li>
     </ol>
     <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">L'assistente 🤖 AI e "Importa ricetta" sono facoltativi e richiedono una chiave gratuita.</div>
+    <div style="font-size:12px;color:var(--warn);background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:var(--radius);padding:8px 10px;margin-bottom:10px;line-height:1.5">
+      ⚠ <strong>Strumento di supporto, senza garanzia.</strong> Prezzi e calcoli vanno sempre verificati dal farmacista sul D.M. 22/09/2017 e sulle modifiche vigenti; la responsabilità della tariffa e della preparazione resta di chi la esegue. Non inserire dati dei pazienti nell'assistente AI (le domande vanno a un servizio esterno). Uso soggetto alla <a href="https://github.com/farmaciadellastazione-tech/galenico/blob/root/LICENSE" target="_blank" rel="noopener" style="color:inherit">licenza</a>.
+    </div>
     <button class="btn-add" onclick="caricaEsempioDemo()" style="font-size:14px">▶ Prova un esempio</button>
   </div>
   <!-- Import ricetta via foto/testo (AI) — compila automaticamente i campi sotto -->
