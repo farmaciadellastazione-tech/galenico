@@ -3938,6 +3938,8 @@ function popolaLottoSelect(fieldId, candidati) {
     inp.value = candidati[0].lotto;
     inp.dataset.scad = candidati[0].scad || '';
   } else {
+    // nessun lotto scelto: niente lotto di una scheda precedente da stampare
+    inp.value = '';
     inp.dataset.scad = '';
   }
 }
@@ -4206,7 +4208,8 @@ function compilaScheda() {
   // ogni sostanza. La virgola decimale non divide ("Etanolo 99,9%").
   const candEC = eccipNome
     ? eccipNome.split(/[\/+;]|,(?!\d)/).map(s => s.trim()).filter(Boolean).flatMap(s => trovaLottiSostanza(s, _invEC))
-        .sort((a,b) => (a.scad||'9999-12').localeCompare(b.scad||'9999-12'))
+        // prima i lotti certi, poi quelli per ripiego (proposti, non scelti); FEFO dentro ciascuno
+        .sort((a,b) => (!!a.ripiego - !!b.ripiego) || (a.scad||'9999-12').localeCompare(b.scad||'9999-12'))
     : trovaLottiCandidati(['lattosio','cellulosa','amido','talco'], _invEC);
   popolaLottoSelect('s-lotto-as',    candPA);
   popolaLottoSelect('s-lotto-et',    candET);
