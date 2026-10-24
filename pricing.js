@@ -436,14 +436,15 @@ function invFindBest(nome, inv) {
 // Se il nome ha una concentrazione ("Idrochinone 4%") e così non trova niente,
 // si riprova senza numeri: per l'Art. 8a meglio applicare il supplemento che
 // perderlo (per il PREZZO invece la concentrazione indica un'altra voce).
+// Lo stesso se la sostanza trovata non ha codici H ("Acido salicilico 99%" senza
+// H → quelli di "Acido salicilico").
 function getHDaInventario(nome, inv) {
   if (!nome || !Array.isArray(inv)) return '';
-  let lotti = invLottiSostanza(nome, inv);
-  if (!lotti.length) {
+  let conH = invLottiSostanza(nome, inv).find(s => s.h);
+  if (!conH) {
     const senzaNumeri = _paroleNome(nome).split(' ').filter(w => !/^\d+(?:p\d+)?$/.test(w) && !_UNITA.has(w)).join(' ');
-    if (senzaNumeri) lotti = invLottiSostanza(senzaNumeri, inv);
+    if (senzaNumeri) conH = invLottiSostanza(senzaNumeri, inv).find(s => s.h);
   }
-  const conH = lotti.find(s => s.h);
   return conH ? conH.h : '';
 }
 
@@ -505,19 +506,31 @@ function _soloAggiunteInnocue(extra, completamento) {
     if (_UNITA.has(w)) continue;
     if (/^\d+(?:p\d+)?$/.test(w)) {
       if (_UNITA.has(extra[i + 1])) { i++; continue; }
-      if (parseFloat(w.replace('p', '.')) >= 90) continue;
+      const n = parseFloat(w.replace('p', '.'));
+      if (n >= 90 && n <= 100) continue;   // purezza; oltre 100 è un grado (Macrogol 4000)
     }
     return false;
   }
   return true;
 }
-// `sostanza`: le parole senza le aggiunte innocue (ma col colore), per riconoscere
-// i lotti della stessa sostanza scritti in modo diverso in inventario
-// ("Etanolo 96°" e "Etanolo 96° Farmalabor"; non "Etanolo 70°").
+// `sostanza`: le parole senza le aggiunte innocue (ma col colore) e senza le
+// confezioni ("500 g", "1 kg"), per riconoscere i lotti della stessa sostanza
+// scritti in modo diverso in inventario ("Etanolo 96°" e "Etanolo 96° Farmalabor",
+// "Talco 500 g" e "Talco 1 kg"). Gli altri numeri restano: sono gradi o purezze
+// di prodotti diversi (Macrogol 400 ≠ 4000, Etanolo 96° ≠ 99,9%, Idrochinone 4%).
+function _paroleSostanza(w) {
+  const out = [];
+  for (let i = 0; i < w.length; i++) {
+    const x = w[i];
+    if (_PAROLE_INNOCUE.has(x) && !_COLORI.has(x)) continue;
+    if (/^\d+(?:p\d+)?$/.test(x) && _UNITA.has(w[i + 1])) { i++; continue; }
+    out.push(x);
+  }
+  return out;
+}
 function _vocePerNome(nome) {
   const p = _paroleNome(nome), w = _parolePiene(p);
-  return { p, w, firma: [...w].sort().join(' '),
-           sostanza: w.filter(x => !_PAROLE_INNOCUE.has(x) || _COLORI.has(x)).sort().join(' ') };
+  return { p, w, firma: [...w].sort().join(' '), sostanza: _paroleSostanza(w).sort().join(' ') };
 }
 
 let _ALL_A_INDICE = null;   // calcolato una volta: [{k, p, w, firma, prezzo}]
@@ -605,17 +618,27 @@ function invLottiPrezziDiversi(nome, inv) {
 // Voce d'inventario per il PREZZO di un nome, o null. Con `lotto` (il lotto
 // usato nella preparazione, lottoInt o lotto del fornitore) vale quel lotto,
 // anche se chiuso; senza, va bene solo se i lotti aperti hanno tutti lo stesso prezzo.
+// Il lotto scelto vale anche se è di un nome più lungo con le stesse parole
+// ("Burro di karite" col lotto di "Burro di karite raffinato": è quello proposto
+// dalla Scheda); senza lotto, un nome scritto uguale a un lotto vale quel lotto
+// ("Talco 500 g" tra Talco 500 g e Talco 1 kg).
+const _eLotto = lotto => s => s.lottoInt === lotto || s.lotto === lotto;
 function invTrovaPerPrezzo(nome, inv, lotto) {
+  if (!nome || !Array.isArray(inv)) return null;
   const lotti = invLottiSostanza(nome, inv);
-  if (!lotti.length) return null;
   if (lotto) {
-    const l = lotti.find(s => s.lottoInt === lotto || s.lotto === lotto);
+    const l = lotti.find(_eLotto(lotto)) || invVociPerRicerca(nome, inv).find(_eLotto(lotto));
     if (l) return l;
   }
+  if (!lotti.length) return null;
   const aperti = _lottiAperti(lotti);
-  const conPrezzo = aperti.filter(s => s.prezzo > 0);
-  if (new Set(conPrezzo.map(s => s.prezzo)).size > 1) return null;
-  return conPrezzo[conPrezzo.length - 1] || aperti[aperti.length - 1];
+  const unico = arr => {
+    const conPrezzo = arr.filter(s => s.prezzo > 0);
+    return new Set(conPrezzo.map(s => s.prezzo)).size > 1 ? null : (conPrezzo[conPrezzo.length - 1] || arr[arr.length - 1]);
+  };
+  const p = _paroleNome(nome);
+  const stessoNome = aperti.filter(s => _paroleNome(s.nome) === p);
+  return unico(aperti) || (stessoNome.length ? unico(stessoNome) : null);
 }
 
 // Voci d'inventario da SUGGERIRE per un nome (menu della Preparazione): come
@@ -808,7 +831,7 @@ const _exports = {
   fmt, invNominalizza, invMatchScore, hasHazard, getDensita, isEtanoloNome, isAcquaNome, tarNormalizza, tarCercaPA,
   isStupefacente, isDoping, getOpTecnologicheAuto,
   invFindBest, getHDaInventario, rigaHazardous, invGetPrezzo, trovaVoceAllegatoA, invTrovaPerPrezzo, vociAllegatoAPerRicerca,
-  invLottiSostanza, invLottiPrezziDiversi, invVociPerRicerca,
+  invLottiSostanza, invLottiPrezziDiversi, invVociPerRicerca, invLottiAperti: _lottiAperti,
   calcAllegatoB, calcAllegatoBVoce7, calcSupplementi, calcIvaTotale, calcCostoSpecialita,
 };
 Object.assign(globalThis, _exports);
