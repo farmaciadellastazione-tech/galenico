@@ -4183,9 +4183,11 @@ function compilaScheda() {
   const candPA = nomePA ? trovaLottiSostanza(nomePA) : [];
   const candET = trovaLottiCandidati(['etanolo','alcool etilico']);
   const candAC = trovaLottiCandidati(['acqua']);
-  // Eccipiente come testo libero ("Lattosio/talco"): i lotti di ogni sostanza.
+  // Eccipiente come testo libero ("Lattosio/talco", "Lattosio, talco"): i lotti di
+  // ogni sostanza. La virgola decimale non divide ("Etanolo 99,9%").
+  const _invEC = invLoadMerged();
   const candEC = eccipNome
-    ? eccipNome.split(/[\/,+;]/).map(s => s.trim()).filter(Boolean).flatMap(trovaLottiSostanza)
+    ? eccipNome.split(/[\/+;]|,(?!\d)/).map(s => s.trim()).filter(Boolean).flatMap(s => trovaLottiSostanza(s, _invEC))
         .sort((a,b) => (a.scad||'9999-12').localeCompare(b.scad||'9999-12'))
     : trovaLottiCandidati(['lattosio','cellulosa','amido','talco']);
   popolaLottoSelect('s-lotto-as',    candPA);
