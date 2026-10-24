@@ -2961,7 +2961,9 @@ function capsTagliaChanged(taglia) {
   // con un prezzo (con più lotti, found[0] era il più vecchio, magari chiuso); se
   // i lotti aperti non hanno ancora un prezzo, l'ultimo lotto che ce l'ha.
   const primoNome = found.length ? invNominalizza(found[0].nome) : '';
-  const lottiCaps = found.filter(s => invNominalizza(s.nome) === primoNome);
+  // in ordine di inserimento (ts), non di posizione nella lista (es. dopo un merge dal Gist)
+  const lottiCaps = found.filter(s => invNominalizza(s.nome) === primoNome)
+    .map((s, i) => ({ s, i })).sort((a, b) => ((a.s.ts || 0) - (b.s.ts || 0)) || (a.i - b.i)).map(x => x.s);
   const scelta = invLottiAperti(lottiCaps).filter(s => s.prezzo > 0).pop() || lottiCaps.filter(s => s.prezzo > 0).pop() || null;
   if (scelta && scelta.prezzo > 0) {
     capsVuoteSel(scelta.nome, scelta.prezzo);
