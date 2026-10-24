@@ -19,13 +19,15 @@ describe('Lotti della Scheda', () => {
     expect(A.byId('s-lotto-as').value).toBe('');
   });
 
-  it('riga "Burro di karite": lotti di "Burro di karite raffinato", e il prezzo segue il lotto', () => {
+  it('riga "Burro di karite": lotti di "Burro di karite raffinato" proposti; scelto, il prezzo segue il lotto', () => {
     const inv = [ { nome: 'Burro di karite raffinato', prezzo: 0.08, lottoInt: 'K1', scad: '2027-01' } ];
     expect(A.run(UNG, [ {nome:'Burro di karite', qty:'10', unit:'g'}, {nome:'Vaselina bianca', qty:'40', unit:'g'} ],
                  { 't-fl':'0' }, inv) && A.ctx.trovaLottiSostanza('Burro di karite').map(c => c.lotto)).toEqual(['K1']);
+    // Lotto di ripiego: proposto ma non scelto in automatico (decisione dell'utente,
+    // 2026-10-24; prima di v169 (13) veniva preselezionato FEFO).
     A.ctx.schedaLottiRender(true, true);
-    expect(A.ctx.liberaRighe[0].lotto).toBe('K1');
-    A.ctx.calcPrep();
+    expect(A.ctx.liberaRighe[0].lotto).toBe('');
+    A.ctx.schedaLottoInput(0, 'K1');
     expect(A.ctx.liberaRigheExtra[0].prezzo).toBe(0.08);
   });
 

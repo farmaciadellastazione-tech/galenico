@@ -3892,11 +3892,16 @@ function trovaLottiCandidati(keywords) {
   }));
 }
 // Lotti della SOLA sostanza `nome` (righe della formula libera, PA, eccipiente):
-// invLottiPerRiga, la stessa funzione del prezzo col lotto ("Lattosio" →
-// Lattosio monoidrato; mai un altro olio per "Olio"). Mai per prima parola:
+// invLottiPerRiga, la stessa funzione del prezzo col lotto. Mai per prima parola:
 // "Acido salicilico" proponeva (e prestampava, FEFO) il lotto di un altro acido.
+// I lotti trovati per ripiego (nome più generico: "Olio" con il solo olio di
+// ricino in magazzino) hanno `ripiego: true`: si propongono ma non si scelgono
+// in automatico (decisione dell'utente) — il prezzo li usa solo se li sceglie lui.
 function trovaLottiSostanza(nome, inv) {
-  return _candidatiLotto(invLottiPerRiga(nome, inv || invLoadMerged()));
+  inv = inv || invLoadMerged();
+  const certi = invLottiSostanza(nome, inv);
+  if (certi.length) return _candidatiLotto(certi);
+  return _candidatiLotto(invLottiPerRiga(nome, inv)).map(c => ({ ...c, ripiego: true }));
 }
 function _candidatiLotto(items) {
   const candidati = items.filter(item => {
@@ -3925,10 +3930,11 @@ function popolaLottoSelect(fieldId, candidati) {
     opt.value = String(i);
     opt.dataset.lotto = c.lotto;
     opt.dataset.scad  = c.scad;
-    opt.textContent = (c.demo ? '[DEMO] ' : '') + c.lotto + (c.scad ? ' (scad. '+c.scad+')' : '') + ' — ' + titleCase(c.nome);
+    opt.textContent = (c.demo ? '[DEMO] ' : '') + (c.ripiego ? '≈ ' : '') + c.lotto + (c.scad ? ' (scad. '+c.scad+')' : '') + ' — ' + titleCase(c.nome);
     sel.appendChild(opt);
   });
-  if (candidati.length > 0) {
+  // Lotti per ripiego (nome più generico, segnati "≈"): proposti, mai scelti da soli.
+  if (candidati.length > 0 && !candidati[0].ripiego) {
     sel.value = '0';
     inp.value = candidati[0].lotto;
     inp.dataset.scad = candidati[0].scad || '';
