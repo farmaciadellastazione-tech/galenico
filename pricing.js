@@ -507,14 +507,16 @@ function _sottoinsieme(a, b) { const sb = new Set(b); return a.every(w => sb.has
 // quantità con unità ("500 g") o una purezza ≥ 90 ("99", "99,5%" → "99p5");
 // una concentrazione ("0,9%", "2,00%", "5%", "70%") indica un'altra forma.
 // `completamento`: le parole sono quelle che la VOCE aggiunge al nome scritto.
-function _soloAggiunteInnocue(extra, completamento) {
+// `doseInnocua` (solo Allegato A, prezzo per grammo): anche "5 mg" è innocuo.
+function _soloAggiunteInnocue(extra, completamento, doseInnocua) {
   for (let i = 0; i < extra.length; i++) {
     const w = extra[i];
     if (_PAROLE_INNOCUE.has(w) && !(completamento && _COLORI.has(w))) continue;
     if (_UNITA.has(w)) continue;
     if (/^\d+(?:p\d+)?$/.test(w)) {
       // quantità con unità ("500 g", "1 l"); "5 mg" è una dose: altro prodotto
-      if (_UNITA.has(extra[i + 1]) && extra[i + 1] !== 'mg') { i++; continue; }
+      // d'inventario, ma non un'altra voce dell'Allegato A
+      if (_UNITA.has(extra[i + 1]) && (extra[i + 1] !== 'mg' || doseInnocua)) { i++; continue; }
       const n = parseFloat(w.replace('p', '.'));
       if (n >= 90 && n <= 100) continue;   // purezza; oltre 100 è un grado (Macrogol 4000)
     }
@@ -562,24 +564,25 @@ function _indiceAllegatoA() {
 // mentolo naturale). In quest'ultimo caso TUTTE le voci che iniziano col nome
 // devono essere compatibili e dare la stessa `chiave` (prezzo per l'Allegato A,
 // sostanza per l'inventario): "zinco" non è zinco solfato se c'è anche zinco
-// ossido, "olio" non è nessun olio. Con `stessoPrezzoBasta` (solo Allegato A)
+// ossido, "olio" non è nessun olio. Con `perAllegatoA` (solo Allegato A)
 // basta che più voci che iniziano col nome abbiano tutte la stessa chiave:
 // "vaselina" → vaselina bianca/filante, entrambe €0,023 (il prezzo di legge è
 // quello comunque); una voce sola che il colore distingue no ("cera").
-function _trovaVoce(nome, voci, chiave, stessoPrezzoBasta) {
+// `perAllegatoA`: anche lo "stesso prezzo" qui sopra e la dose in mg innocua.
+function _trovaVoce(nome, voci, chiave, perAllegatoA) {
   chiave = chiave || (x => x.prezzo);
   const q = _vocePerNome(nome);
   if (!q.w.length) return null;
   const e = voci.find(x => x.p === q.p) || voci.find(x => x.firma === q.firma);
   if (e) return e;
-  const conAggiunte = voci.filter(x => _sottoinsieme(x.w, q.w) && _soloAggiunteInnocue(q.w.filter(w => !x.w.includes(w))));
+  const conAggiunte = voci.filter(x => _sottoinsieme(x.w, q.w) && _soloAggiunteInnocue(q.w.filter(w => !x.w.includes(w)), false, perAllegatoA));
   if (conAggiunte.length) return conAggiunte.sort((a, b) => b.w.length - a.w.length || b.p.length - a.p.length)[0];
   const conPrefisso = voci.filter(x => x.w.length > q.w.length && q.w.every((w, i) => x.w[i] === w));
-  const piuLunghe = conPrefisso.filter(x => _soloAggiunteInnocue(x.w.slice(q.w.length).filter(w => !_SALI.has(w)), true));
+  const piuLunghe = conPrefisso.filter(x => _soloAggiunteInnocue(x.w.slice(q.w.length).filter(w => !_SALI.has(w)), true, perAllegatoA));
   const piuCorta = arr => arr.sort((a, b) => a.p.length - b.p.length)[0];
   if (piuLunghe.length && piuLunghe.length === conPrefisso.length && new Set(piuLunghe.map(chiave)).size === 1)
     return piuCorta(piuLunghe);
-  if (stessoPrezzoBasta && conPrefisso.length > 1 && new Set(conPrefisso.map(chiave)).size === 1)
+  if (perAllegatoA && conPrefisso.length > 1 && new Set(conPrefisso.map(chiave)).size === 1)
     return piuCorta(conPrefisso);
   return null;
 }
