@@ -2553,8 +2553,10 @@ function calcPrep() {
     // Per altre forme: qt = grammi totali come prima.
     const _isLiquidForm = tipoPrep === 'soluzione' || tipoPrep === 'tintura' || tipoPrep === 'sospensione';
     const _qtBase = _isLiquidForm && volMl > 0 ? volMl : totG;
-    if (document.getElementById('qt'))   document.getElementById('qt').value   = fmt(_qtBase * _perUnitFactor, 2);
-    if (document.getElementById('conc')) document.getElementById('conc').value = fmt(conc, 2); // ora vera % p/v per soluzioni
+    // NB: qt/conc finiscono in t-qt/t-conc (<input type="number">), che scartano la virgola
+    // di fmt() → toFixed() col punto, altrimenti la Tariffazione vede qt = 0 (niente scaglioni).
+    if (document.getElementById('qt'))   document.getElementById('qt').value   = (_qtBase * _perUnitFactor).toFixed(2);
+    if (document.getElementById('conc')) document.getElementById('conc').value = conc.toFixed(2); // ora vera % p/v per soluzioni
 
     // Etanolo: % v/v equivalente per il campo nascosto 'perc-et' (Tariffazione/Scheda).
     // Denominatore corretto: il volume soluzione (volMl), non i grammi totali.
@@ -4121,7 +4123,7 @@ function compilaScheda() {
 
 const INV_KEY   = 'gal_inventario_v1';
 const GH_TOKEN_KEY = 'gal_gh_token';
-const APP_VERSION = 166;
+const APP_VERSION = 167;
 
 // DEMO_MODE è definito nel primo <script> dell'<head> (isola anche il localStorage).
 
