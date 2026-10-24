@@ -401,7 +401,7 @@ function tarNormalizza(s) {
 // sola prima parola, che proponeva l'acido acetilsalicilico per "acido
 // ialuronico". Solo suggerimenti: il prezzo lo decide trovaVoceAllegatoA.
 function vociAllegatoAPerRicerca(nome) {
-  const qw = _parolePiene(_paroleNome(nome || ''));
+  const qw = _parolePiene(_paroleNome(nome || '', true));
   if (!qw.length) return [];
   return _indiceAllegatoA()
     .filter(x => qw.every(w => x.w.some(xw => xw.startsWith(w))))
@@ -467,11 +467,13 @@ function rigaHazardous(r, inv) {
 // Nome → parole: minuscolo, senza accenti; decimali in una sola parola col
 // separatore "p" ("99,5" → "99p5", "2,00" → "2p00": non "200", che sembrava una
 // purezza), i punti tolti ("F.U." → "fu", "Lidocaina." → "lidocaina"), il resto
-// della punteggiatura diventa spazio; "ac" (abbreviazione) → "acido".
-function _paroleNome(s) {
+// della punteggiatura diventa spazio; "ac" (abbreviazione) → "acido", ma non
+// nei suggerimenti (`perRicerca`), dove "ac" è l'inizio di una parola che si sta
+// scrivendo ("cellulosa ac…" → acetoftalato).
+function _paroleNome(s, perRicerca) {
   return invNominalizza(s).replace(/(\d)[.,](\d)/g, '$1p$2').replace(/\./g, '')
     .replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
-    .split(' ').map(w => w === 'ac' ? 'acido' : w).join(' ');
+    .split(' ').map(w => w === 'ac' && !perRicerca ? 'acido' : w).join(' ');
 }
 // Parole che non cambiano la sostanza: articoli/preposizioni (ignorate anche
 // nell'ordine: "ossido di zinco" = "zinco ossido")...
@@ -645,7 +647,7 @@ function invTrovaPerPrezzo(nome, inv, lotto) {
 // vociAllegatoAPerRicerca, ogni parola scritta è l'inizio di una parola del
 // nome, in qualunque ordine ("olio mandorle" → Olio di mandorle dolci).
 function invVociPerRicerca(nome, inv) {
-  const qw = _parolePiene(_paroleNome(nome || ''));
+  const qw = _parolePiene(_paroleNome(nome || '', true));
   if (!qw.length || !Array.isArray(inv)) return [];
   return _indiceInventario(inv)
     .filter(x => qw.every(w => x.w.some(xw => xw.startsWith(w))))
