@@ -444,7 +444,12 @@ function getHDaInventario(nome, inv) {
   if (!conH) {
     const parole = _paroleNome(nome).split(' ');
     const senzaNumeri = parole.filter(w => !/^\d+(?:p\d+)?$/.test(w) && !_UNITA.has(w)).join(' ');
-    if (senzaNumeri && senzaNumeri !== parole.join(' ')) conH = invLottiSostanza(senzaNumeri, inv).find(s => s.h);
+    if (senzaNumeri && senzaNumeri !== parole.join(' ')) {
+      conH = invLottiSostanza(senzaNumeri, inv).find(s => s.h)
+        // dosi diverse in inventario ("Melatonina 1 mg", "5 mg"): un prodotto che
+        // contiene tutte le parole (intere) e ha i codici H
+        || _indiceInventario(inv).find(x => x.s.h && _parolePiene(senzaNumeri).every(w => x.w.includes(w)))?.s;
+    }
   }
   return conH ? conH.h : '';
 }
@@ -508,7 +513,8 @@ function _soloAggiunteInnocue(extra, completamento) {
     if (_PAROLE_INNOCUE.has(w) && !(completamento && _COLORI.has(w))) continue;
     if (_UNITA.has(w)) continue;
     if (/^\d+(?:p\d+)?$/.test(w)) {
-      if (_UNITA.has(extra[i + 1])) { i++; continue; }
+      // quantità con unità ("500 g", "1 l"); "5 mg" è una dose: altro prodotto
+      if (_UNITA.has(extra[i + 1]) && extra[i + 1] !== 'mg') { i++; continue; }
       const n = parseFloat(w.replace('p', '.'));
       if (n >= 90 && n <= 100) continue;   // purezza; oltre 100 è un grado (Macrogol 4000)
     }
@@ -517,25 +523,30 @@ function _soloAggiunteInnocue(extra, completamento) {
   return true;
 }
 // `sostanza`: le parole senza le aggiunte innocue (ma col colore) e senza le
-// confezioni in peso ("500 g", "1 kg"), per riconoscere i lotti della stessa
-// sostanza scritti in modo diverso in inventario ("Etanolo 96°" e "Etanolo 96°
-// Farmalabor", "Talco 500 g" e "Talco 1 kg"). Gli altri numeri restano: gradi,
-// purezze, dosi e volumi di prodotti diversi (Macrogol 400 ≠ 4000, Etanolo 96° ≠
-// 99,9%, Idrochinone 4%, Melatonina 1 mg ≠ 5 mg, Flacone 100 ml ≠ 250 ml).
-const _UNITA_CONFEZIONE = new Set(['g', 'kg']);
-function _paroleSostanza(w) {
+// confezioni ("500 g", "1 kg", "500 ml", "1 l"), per riconoscere i lotti della
+// stessa sostanza scritti in modo diverso in inventario ("Etanolo 96°" e
+// "Etanolo 96° Farmalabor", "Talco 500 g" e "Talco 1 kg", "Glicerolo 1 l" e
+// "500 ml"). Gli altri numeri restano: gradi, purezze e dosi di prodotti diversi
+// (Macrogol 400 ≠ 4000, Etanolo 96° ≠ 99,9%, Idrochinone 4%, Melatonina 1 mg ≠
+// 5 mg). Per i contenitori a pezzi e le voci senza unità di misura (`aPezzi`) il
+// volume è il prodotto: Flacone 100 ml ≠ 250 ml.
+const _UNITA_MISURA = new Set(['g', 'kg', 'ml', 'l']);   // unità della voce d'inventario
+const _UNITA_CONFEZIONE = new Set(['g', 'kg', 'ml', 'l']);
+const _UNITA_CONFEZIONE_PEZZI = new Set(['g', 'kg']);
+function _paroleSostanza(w, aPezzi) {
+  const unita = aPezzi ? _UNITA_CONFEZIONE_PEZZI : _UNITA_CONFEZIONE;
   const out = [];
   for (let i = 0; i < w.length; i++) {
     const x = w[i];
     if (_PAROLE_INNOCUE.has(x) && !_COLORI.has(x)) continue;
-    if (/^\d+(?:p\d+)?$/.test(x) && _UNITA_CONFEZIONE.has(w[i + 1])) { i++; continue; }
+    if (/^\d+(?:p\d+)?$/.test(x) && unita.has(w[i + 1])) { i++; continue; }
     out.push(x);
   }
   return out;
 }
-function _vocePerNome(nome) {
+function _vocePerNome(nome, aPezzi) {
   const p = _paroleNome(nome), w = _parolePiene(p);
-  return { p, w, firma: [...w].sort().join(' '), sostanza: _paroleSostanza(w).sort().join(' ') };
+  return { p, w, firma: [...w].sort().join(' '), sostanza: _paroleSostanza(w, aPezzi).sort().join(' ') };
 }
 
 let _ALL_A_INDICE = null;   // calcolato una volta: [{k, p, w, firma, prezzo}]
@@ -591,7 +602,7 @@ const _INV_INDICE = new WeakMap();
 function _indiceInventario(inv) {
   let voci = _INV_INDICE.get(inv);
   if (!voci) {
-    voci = inv.filter(s => s && s.nome).map(s => ({ s, prezzo: s.prezzo, ..._vocePerNome(s.nome) })).filter(x => x.w.length);
+    voci = inv.filter(s => s && s.nome).map(s => ({ s, prezzo: s.prezzo, ..._vocePerNome(s.nome, !_UNITA_MISURA.has(s.unit)) })).filter(x => x.w.length);
     _INV_INDICE.set(inv, voci);
   }
   return voci;
