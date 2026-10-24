@@ -3880,14 +3880,11 @@ function trovaLottiCandidati(keywords) {
   }));
 }
 // Lotti della SOLA sostanza `nome` (righe della formula libera, PA, eccipiente):
-// stessa ricerca a parole intere del prezzo; se non trova niente, i nomi che
-// contengono tutte le parole scritte a inizio parola ("Lattosio" → Lattosio
-// monoidrato). Mai per prima parola: "Acido salicilico" proponeva (e
-// prestampava, FEFO) il lotto di un altro acido.
-function trovaLottiSostanza(nome) {
-  const inv = invLoadMerged();
-  const lotti = invLottiSostanza(nome, inv);
-  return _candidatiLotto(lotti.length ? lotti : invVociPerRicerca(nome, inv));
+// invLottiPerRiga, la stessa funzione del prezzo col lotto ("Lattosio" →
+// Lattosio monoidrato; mai un altro olio per "Olio"). Mai per prima parola:
+// "Acido salicilico" proponeva (e prestampava, FEFO) il lotto di un altro acido.
+function trovaLottiSostanza(nome, inv) {
+  return _candidatiLotto(invLottiPerRiga(nome, inv || invLoadMerged()));
 }
 function _candidatiLotto(items) {
   const candidati = items.filter(item => {
@@ -3995,7 +3992,7 @@ function schedaLottoInput(i, v) {
   if (inp) inp.dataset.scad = '';
   // Prezzo della riga = prezzo del lotto usato: si ricalcola quando il codice è
   // vuoto o corrisponde a un lotto, non a metà digitazione.
-  if (!v || invLottiSostanza(liberaRighe[i].nome, invLoadMerged()).some(s => s.lottoInt === v || s.lotto === v)) calcPrep();
+  if (!v || invLottiPerRiga(liberaRighe[i].nome, invLoadMerged()).some(s => s.lottoInt === v || s.lotto === v)) calcPrep();
   if (sMesiAuto) ricalcolaScadenzaAuto(); else aggiornaScheda();
 }
 

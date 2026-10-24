@@ -605,6 +605,20 @@ function invLottiSostanza(nome, inv) {
   return e ? voci.filter(x => x.sostanza === e.sostanza).map(x => x.s) : [];
 }
 
+// Lotti per una riga (menu lotti della Scheda, codice scritto a mano, prezzo col
+// lotto): quelli della sostanza; se non ce ne sono, i nomi che contengono TUTTE
+// le parole scritte (parole intere), purché siano una sola sostanza: "Lattosio" →
+// Lattosio monoidrato sì; "Olio" (ricino, mandorle), "Vaselina" (bianca,
+// filante) e "Macrogol 400" (c'è solo il 4000) no.
+function invLottiPerRiga(nome, inv) {
+  const lotti = invLottiSostanza(nome, inv);
+  if (lotti.length || !Array.isArray(inv)) return lotti;
+  const qw = _parolePiene(_paroleNome(nome || ''));
+  if (!qw.length) return [];
+  const voci = _indiceInventario(inv).filter(x => qw.every(w => x.w.includes(w)));
+  return voci.length && new Set(voci.map(x => x.sostanza)).size === 1 ? voci.map(x => x.s) : [];
+}
+
 // Lotti ancora aperti (senza data di chiusura); se sono tutti chiusi, tutti.
 function _lottiAperti(lotti) {
   const aperti = lotti.filter(s => !s.dataCh);
@@ -620,16 +634,16 @@ function invLottiPrezziDiversi(nome, inv) {
 // Voce d'inventario per il PREZZO di un nome, o null. Con `lotto` (il lotto
 // usato nella preparazione, lottoInt o lotto del fornitore) vale quel lotto,
 // anche se chiuso; senza, va bene solo se i lotti aperti hanno tutti lo stesso prezzo.
-// Il lotto scelto vale anche se è di un nome più lungo con le stesse parole
-// ("Burro di karite" col lotto di "Burro di karite raffinato": è quello proposto
-// dalla Scheda); senza lotto, un nome scritto uguale a un lotto vale quel lotto
-// ("Talco 500 g" tra Talco 500 g e Talco 1 kg).
+// Il lotto scelto vale se è tra quelli della riga (invLottiPerRiga: "Burro di
+// karite" col lotto di "Burro di karite raffinato", l'unica sostanza così; mai
+// il lotto di un altro olio per "Olio"); senza lotto, un nome scritto uguale a un
+// lotto vale quel lotto ("Talco 500 g" tra Talco 500 g e Talco 1 kg).
 const _eLotto = lotto => s => s.lottoInt === lotto || s.lotto === lotto;
 function invTrovaPerPrezzo(nome, inv, lotto) {
   if (!nome || !Array.isArray(inv)) return null;
   const lotti = invLottiSostanza(nome, inv);
   if (lotto) {
-    const l = lotti.find(_eLotto(lotto)) || invVociPerRicerca(nome, inv).find(_eLotto(lotto));
+    const l = lotti.find(_eLotto(lotto)) || invLottiPerRiga(nome, inv).find(_eLotto(lotto));
     if (l) return l;
   }
   if (!lotti.length) return null;
@@ -833,7 +847,7 @@ const _exports = {
   fmt, invNominalizza, invMatchScore, hasHazard, getDensita, isEtanoloNome, isAcquaNome, tarNormalizza, tarCercaPA,
   isStupefacente, isDoping, getOpTecnologicheAuto,
   invFindBest, getHDaInventario, rigaHazardous, invGetPrezzo, trovaVoceAllegatoA, invTrovaPerPrezzo, vociAllegatoAPerRicerca,
-  invLottiSostanza, invLottiPrezziDiversi, invVociPerRicerca, invLottiAperti: _lottiAperti,
+  invLottiSostanza, invLottiPrezziDiversi, invVociPerRicerca, invLottiAperti: _lottiAperti, invLottiPerRiga,
   calcAllegatoB, calcAllegatoBVoce7, calcSupplementi, calcIvaTotale, calcCostoSpecialita,
 };
 Object.assign(globalThis, _exports);
