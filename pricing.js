@@ -519,8 +519,9 @@ function _soloAggiunteInnocue(extra, completamento, doseInnocua) {
     if (_UNITA.has(w)) continue;
     if (/^\d+(?:p\d+)?$/.test(w)) {
       // quantità con unità ("500 g", "1 l"); "5 mg" è una dose: altro prodotto
-      // d'inventario, ma non un'altra voce dell'Allegato A
-      if (_UNITA.has(extra[i + 1]) && (extra[i + 1] !== 'mg' || doseInnocua)) { i++; continue; }
+      // d'inventario, ma non un'altra voce dell'Allegato A. Due unità di fila
+      // ("20 mg/ml", "50 mg/g") sono una concentrazione: un'altra forma, come "2%".
+      if (_UNITA.has(extra[i + 1]) && !_UNITA.has(extra[i + 2]) && (extra[i + 1] !== 'mg' || doseInnocua)) { i++; continue; }
       const n = parseFloat(w.replace('p', '.'));
       if (n >= 90 && n <= 100) continue;   // purezza; oltre 100 è un grado (Macrogol 4000)
     }
