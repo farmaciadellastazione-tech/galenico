@@ -3881,8 +3881,8 @@ function isLottoDemo(item) {
 }
 
 // Trova lotti candidati per una sostanza: ritorna [{lotto, scad, nome, demo}], FEFO (scad asc).
-function trovaLottiCandidati(keywords) {
-  const inv = invLoadMerged();
+function trovaLottiCandidati(keywords, inv) {
+  inv = inv || invLoadMerged();
   const kw = (keywords||[]).filter(Boolean).map(k => String(k).toLowerCase());
   if (!kw.length) return [];
   return _candidatiLotto(inv.filter(item => {
@@ -4198,16 +4198,16 @@ function compilaScheda() {
   // PA ed eccipiente scritti: lotti della sola sostanza (non per prima parola,
   // che dava il lotto di un altro acido). Eccipiente non indicato: i soliti.
   const eccipNome = (document.getElementById('s-eccip') && document.getElementById('s-eccip').value.trim()) || '';
-  const candPA = nomePA ? trovaLottiSostanza(nomePA) : [];
-  const candET = trovaLottiCandidati(['etanolo','alcool etilico']);
-  const candAC = trovaLottiCandidati(['acqua']);
+  const _invEC = invLoadMerged(); // una volta per PA, etanolo, acqua ed eccipiente
+  const candPA = nomePA ? trovaLottiSostanza(nomePA, _invEC) : [];
+  const candET = trovaLottiCandidati(['etanolo','alcool etilico'], _invEC);
+  const candAC = trovaLottiCandidati(['acqua'], _invEC);
   // Eccipiente come testo libero ("Lattosio/talco", "Lattosio, talco"): i lotti di
   // ogni sostanza. La virgola decimale non divide ("Etanolo 99,9%").
-  const _invEC = invLoadMerged();
   const candEC = eccipNome
     ? eccipNome.split(/[\/+;]|,(?!\d)/).map(s => s.trim()).filter(Boolean).flatMap(s => trovaLottiSostanza(s, _invEC))
         .sort((a,b) => (a.scad||'9999-12').localeCompare(b.scad||'9999-12'))
-    : trovaLottiCandidati(['lattosio','cellulosa','amido','talco']);
+    : trovaLottiCandidati(['lattosio','cellulosa','amido','talco'], _invEC);
   popolaLottoSelect('s-lotto-as',    candPA);
   popolaLottoSelect('s-lotto-et',    candET);
   popolaLottoSelect('s-lotto-ac',    candAC);
