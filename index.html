@@ -1224,6 +1224,7 @@ let concRichiestaAvviso = '';
 // salva=false: modalità di una formula (snapshot, ricetta, esempio), che non
 // diventa la preferenza di questo browser.
 function setConcMode(m, salva = true) {
+  concRichiestaAvviso = '';
   concMode = (m === 'pv') ? 'pv' : 'pp';
   if (salva) { try { localStorage.setItem('gal_conc_mode', concMode); } catch {} }
   // Stesse quantità, altra misura: la richiesta diventa il valore nella nuova
@@ -1261,8 +1262,14 @@ function showPage(id, btn) {
 
 function setTipo(t, btn) {
   // Un'altra forma è un'altra preparazione: la concentrazione voluta non si
-  // porta dietro (in capsule/cartine la "dose" non è nemmeno una %).
-  if (concRichiesta != null && t !== tipoPrep) {
+  // porta dietro (in capsule/cartine la "dose" non è nemmeno una %). Tra forme
+  // liquide (soluzione, tintura, sospensione) p/p e p/v vogliono dire lo stesso: resta.
+  concRichiestaAvviso = '';
+  const _liquide = ['soluzione', 'tintura', 'sospensione'];
+  if (concRichiesta != null && t !== tipoPrep && tipoPrep === concRichiestaTipo
+      && _liquide.includes(t) && _liquide.includes(tipoPrep)) {
+    concRichiestaTipo = t;
+  } else if (concRichiesta != null && t !== tipoPrep) {
     concRichiesta = null;
     concRichiestaPA = null;
     concRichiestaToltaPv = false;
@@ -1765,7 +1772,7 @@ function liberaSetPa(i) {
     _liberaSetPaInAttesa = true;
     const mis = concRichiestaModo === 'pv' ? 'p/v' : 'p/p';
     // Ciò su cui si sta chiedendo: al clic su "Applica" deve essere ancora così.
-    const chiesto = { tipo: tipoPrep, nome: invNominalizza(r.nome || ''), conc: concRichiesta, modo: concRichiestaModo };
+    const chiesto = { tipo: tipoPrep, nome: invNominalizza(r.nome || ''), conc: concRichiesta, modo: concRichiestaModo, pa: _liberaPaMarcato() };
     // L'esecutore gira subito: la finestra si apre senza ritardo e un errore
     // diventa una promessa rifiutata (gestita sotto).
     return new Promise(res => res(showModal({
@@ -1775,14 +1782,18 @@ function liberaSetPa(i) {
         + 'Se hai premuto PA sulla riga sbagliata, scegli "Lascia": il PA non si accende e nulla cambia.',
       yesLabel: 'Applica',
       noLabel: 'Lascia ' + escHtml(numIt(r.qty)) + ' ' + escHtml(r.unit),
-    }))).then(applica => {
+    }))).catch(e => {
+      // Solo la finestra: se non si apre o fallisce vale come "Lascia".
+      console.warn('Bottone PA: la domanda non è riuscita', e);
+      return null;
+    }).then(applica => {
       if (applica !== true) return;
       // Cambiato qualcosa mentre la finestra era aperta (riga tolta o
       // rinominata, forma, concentrazione, modalità, PA già scelto): non si
       // applica ciò che la finestra mostrava, e la nota lo dice.
       const ancora = liberaRighe.includes(r) && tipoPrep === chiesto.tipo
         && invNominalizza(r.nome || '') === chiesto.nome && concRichiesta === chiesto.conc
-        && concRichiestaModo === chiesto.modo && !concRichiestaPA && !liberaRighe.some(x => x.isPa);
+        && concRichiestaModo === chiesto.modo && !concRichiestaPA && _liberaPaMarcato() === chiesto.pa;
       const prima = liberaRighe.map(x => x.isPa);
       if (ancora) liberaRighe.forEach(x => { x.isPa = (x === r); });
       // Ricalcolo sui dati di adesso, con gli stessi controlli e la stessa
@@ -1793,8 +1804,6 @@ function liberaSetPa(i) {
       }
       liberaRenderRighe();
       calcPrep();
-    }).catch(e => {
-      console.warn('Bottone PA: la domanda non è riuscita', e);
     }).finally(() => { _liberaSetPaInAttesa = false; });
   }
   liberaRighe.forEach((x, j) => { x.isPa = (j === i && accende); });
@@ -1853,6 +1862,7 @@ function showModal({title, body, yesLabel, noLabel}) {
 
 function liberaRemoveRiga(i) {
   if (liberaRighe.length <= 1) return;
+  concRichiestaAvviso = '';
   // Cancellato il PA: la concentrazione voluta era la sua. Non passa a un'altra
   // sostanza (riscriverebbe la dose, es. Finasteride 0,1 g → grammi).
   const eraPA = !!liberaRighe[i] && liberaRighe[i] === _liberaPaMarcato();
@@ -2045,6 +2055,7 @@ function liberaRenderRighe() {
 function liberaNomeInput(i, v) {
   const r = liberaRighe[i];
   if (!r) return;
+  concRichiestaAvviso = '';
   // Rinominare il PA = un'altra sostanza: la concentrazione voluta non vale più.
   if (concRichiestaPA && r === concRichiestaPA.riga) _concTogli();
   r.nome = v;
@@ -2595,6 +2606,7 @@ function _concTogli(nomePA) {
   const nome = nomePA || (concRichiestaPA && concRichiestaPA.nomeVisto) || '';
   concRichiestaTolta = nome ? 'era quella di ' + nome + ', che non è più il PA' : '';
   concRichiestaToltaPv = false;
+  concRichiestaAvviso = '';
   concRichiesta = null;
   concRichiestaPA = null;
 }
@@ -2614,7 +2626,11 @@ function _concNotaVoluta(concMisurata) {
   if (_concMantenibile()) {
     // Un cambio di unità converte e basta: se la % misurata si è spostata
     // (sostanza senza densità, mg), lo si dice invece di riscrivere la dose.
-    if (concMisurata > 0 && Math.abs(concMisurata - concRichiesta) > 0.005)
+    // Confronto sulla quantità del PA, non sulla %: in preparazioni minuscole
+    // l'arrotondamento a 4 decimali sposta la % anche subito dopo il calcolo.
+    const _pa = _liberaPaMarcato();
+    const _atteso = _concQtyPerPA(_pa);
+    if (concMisurata > 0 && _atteso != null && parseFloat(_atteso) !== (parseFloat(_pa.qty) || 0))
       return v + 'ora ' + fmt(concMisurata, 2) + '%, cambia una quantità o riscrivi la concentrazione per riallinearla';
     return ' · fissata (mantenuta se cambi grado, volume o un eccipiente)';
   }
@@ -2625,6 +2641,18 @@ function _concNotaVoluta(concMisurata) {
   if (concRichiestaPA && !concRichiestaAttiva()) return v + 'era per ' + concRichiestaPA.nomeVisto + ', che non è più il PA';
   if (_concPvSenzaVolume()) return v + 'in p/v serve almeno un liquido';
   return v + 'non si può mantenere con il PA in ' + pa.unit;
+}
+
+// Nessuna concentrazione voluta, nessuna nota: formula nuova (nuova ricetta,
+// import dal Formulario AI).
+function _concAzzera() {
+  concRichiesta = null;
+  concRichiestaModo = 'pp';
+  concRichiestaTipo = 'soluzione';
+  concRichiestaPA = null;
+  concRichiestaTolta = '';
+  concRichiestaToltaPv = false;
+  concRichiestaAvviso = '';
 }
 
 // Lega la concentrazione voluta a questa riga del PA (null = nessun legame).
@@ -2686,6 +2714,7 @@ function _qtyDaGrammi(g, r) {
 function liberaCambiaUnita(i, u) {
   const r = liberaRighe[i];
   if (!r) return;
+  concRichiestaAvviso = '';
   const conv = ['g', 'mg', 'ml'];
   if ((parseFloat(r.qty) || 0) > 0 && conv.includes(r.unit) && conv.includes(u)) {
     const g = liberaGrammiRiga(r);
@@ -2772,6 +2801,9 @@ function liberaScalaEccipienti() {
 // l'operatore sceglie se mantenerla (scala gli altri ingredienti) o tenere le
 // quantità (la concentrazione diventa quella nuova).
 async function liberaQtyChanged(i) {
+  // Un avviso "non applicato" vale fino alla modifica successiva: toglierlo e
+  // ridisegnare la nota anche se qui sotto si esce subito.
+  if (concRichiestaAvviso) { concRichiestaAvviso = ''; calcPrep(); }
   if (!concRichiestaAttiva() || !liberaRighe[i]) return;
   const pa = _liberaPaMarcato();
   if (liberaRighe[i] !== pa) {
@@ -5704,6 +5736,9 @@ function aiRenderImportCard(comps, daOrdinare, tipo) {
 
 function aiImportaTutti(comps, tipo) {
   if (!comps || !comps.length) return;
+  // Formula nuova: la concentrazione voluta di quella di prima non vale (né
+  // la sua nota). Prima di setTipo, che altrimenti la direbbe tolta per la forma.
+  _concAzzera();
   // 1) Vai in Preparazione
   const prepNavBtn = document.querySelector('.nav-btn[onclick*="preparazione"]');
   if (prepNavBtn) showPage('preparazione', prepNavBtn);
@@ -6899,13 +6934,7 @@ function azzeraRicetta() {
   _suppManRighe = [];
   tipoScheda = 'soluzione';
   gradoAlcSbloccato = false;
-  concRichiesta = null;
-  concRichiestaModo = 'pp';
-  concRichiestaTipo = 'soluzione';
-  concRichiestaPA = null;
-  concRichiestaTolta = '';
-  concRichiestaToltaPv = false;
-  concRichiestaAvviso = '';
+  _concAzzera();
   setEditingMode(null);
 
   const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
