@@ -83,9 +83,11 @@ describe('#5 la nota "p/v senza liquidi" non resta dopo', () => {
   });
 });
 
+// v179 (approvato dall'utente): annullato il volume delle righe in mg introdotto
+// in v178 — il calcolo dei costi le tratta come solide; in mg il volume resta 0.
 describe('#6 volume di una sostanza in mg con densità nota', () => {
-  it('Glicerolo 5000 mg ha lo stesso volume di 5 g', () => {
-    expect(ctx.volMlRiga(R('Glicerolo', '5000', 'mg'))).toBeCloseTo(ctx.volMlRiga(R('Glicerolo', '5', 'g')), 9);
+  it('Glicerolo 5000 mg non aggiunge volume (come il calcolo dei costi)', () => {
+    expect(ctx.volMlRiga(R('Glicerolo', '5000', 'mg'))).toBe(0);
   });
 });
 
