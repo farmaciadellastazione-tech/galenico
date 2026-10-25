@@ -183,9 +183,11 @@ describe('3. Concentrazione voluta salvata e importata', () => {
     expect(ctx.concRichiesta).toBe(null);
   });
 
+  // v174 (revisione #5): il PA si calcola solo se la ricetta non ne dà la quantità;
+  // una quantità che non torna non viene riscritta (tests/revisione-v174.test.js).
   it('ricetta importata con "concentrazione": 3 → voluta 3%, PA ricalcolato', () => {
     ctx.ricettaApplicaJson({ tipoPrep: 'soluzione', concMode: 'pp', concentrazione: 3,
-      ingredienti: [ { nome: 'Minoxidil', qty: 5, unit: 'g', isPa: true }, { nome: 'Etanolo 96°', qty: 97, unit: 'g' } ] });
+      ingredienti: [ { nome: 'Minoxidil', qty: '', unit: 'g', isPa: true }, { nome: 'Etanolo 96°', qty: 97, unit: 'g' } ] });
     expect(ctx.concRichiesta).toBe(3);
     expect(qty('Minoxidil')).toBeCloseTo(3, 3);
     expect(conc()).toBeCloseTo(3, 3);
