@@ -50,7 +50,7 @@ export function buildApp() {
   let m, inline = '';
   while ((m = re.exec(HTML))) inline += '\n' + m[1] + '\n';
   inline = inline.replace(/\/\/ ── INIT ──[\s\S]*$/, ''); // togli il boot di rete
-  ['tipoPrep','concMode','concRichiesta','liberaCostoExtra','liberaRigheExtra','liberaRighe',
+  ['tipoPrep','concMode','concRichiesta','concRichiestaToltaPv','liberaCostoExtra','liberaRigheExtra','liberaRighe',
    'tipoTariff','tipoScheda','tarPADaAllegatoA'].forEach(n => {
     inline = inline.replace(new RegExp('^let '+n+'(\\b)', 'm'), 'var '+n+'$1');
   });

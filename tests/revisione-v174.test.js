@@ -209,13 +209,17 @@ describe('#6 stesso PA per calcolo e ricalcolo', () => {
   });
 });
 
+// v180 (approvato dall'utente): cambiare unità converte e basta, non ricalcola
+// mai il PA; se la % misurata si sposta lo dice la nota.
 describe('#3 cambio unità in p/v di una sostanza senza densità', () => {
-  it('la concentrazione p/v resta quella voluta', () => {
+  it('il PA non cambia e la nota dice com\'è ora la concentrazione', () => {
     ctx.tipoPrep = 'soluzione';
     ctx.liberaRighe = [R('Minoxidil', '2', 'g', true), R('Estratto fluido di ortica', '50'), R('Etanolo 96°', '50', 'ml')];
     ctx.setConcMode('pv');
     ctx.concRichiestaChanged('2');
+    const pa = ctx.liberaRighe[0].qty;
     ctx.liberaCambiaUnita(1, 'ml');
-    expect(conc()).toBeCloseTo(2, 3);
+    expect(ctx.liberaRighe[0].qty).toBe(pa);
+    expect(byId('libera-conc-note').textContent).toMatch(/ora/);
   });
 });
