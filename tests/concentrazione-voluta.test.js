@@ -49,11 +49,14 @@ describe('1. Eccipienti modificati: il PA segue la concentrazione voluta', () =>
     expect(conc()).toBeCloseTo(5, 3);
   });
 
-  it('funziona anche se il PA non è marcato (riconosciuto: non è un solvente)', async () => {
+  // v176 (terza revisione, scelta dell'utente): il ricalcolo tocca solo il PA
+  // marcato; una riga indovinata poteva essere un eccipiente (Vaselina, Lattosio).
+  it('PA non marcato: nessun ricalcolo, la nota chiede di premere PA', async () => {
     ctx.liberaRighe[0].isPa = false;
     ctx.liberaRighe[3].qty = '10';
     await ctx.liberaQtyChanged(3);
-    expect(conc()).toBeCloseTo(5, 3);
+    expect(riga('Minoxidil').qty).toBe('');
+    expect(byId('libera-conc-note').textContent).toMatch(/premi PA/i);
   });
 
   it('modificare il PA invece chiede (Mantieni / Tieni)', async () => {
@@ -81,7 +84,8 @@ describe('1. Eccipienti modificati: il PA segue la concentrazione voluta', () =>
   });
 
   it('scegliere il PA dalla ricerca dopo gli eccipienti gli dà subito la quantità', () => {
-    ctx.liberaRighe = [R('Etanolo 96°', '50'), R('Glicole propilenico', '35'), R('Acqua purificata', '10'), R('', '')];
+    // v176: la riga del PA va marcata (bottone PA) per essere ricalcolata.
+    ctx.liberaRighe = [R('Etanolo 96°', '50'), R('Glicole propilenico', '35'), R('Acqua purificata', '10'), R('', '', 'g', true)];
     ctx.liberaSelComp(3, 'Minoxidil', 0.39, 'inv', '', '');
     expect(qty('Minoxidil')).toBeCloseTo(5 * 95 / 95, 3);
     expect(conc()).toBeCloseTo(5, 3);

@@ -201,7 +201,8 @@ describe('#6 stesso PA per calcolo e ricalcolo', () => {
 
   it('con la concentrazione voluta il PA calcolato è quello su cui si misura la %', async () => {
     ctx.tipoPrep = 'unguento';
-    ctx.liberaRighe = [R('Acido salicilico', ''), R('Resorcina', '2'), R('Vaselina filante bianca', '98')];
+    // v176: il PA ricalcolato è solo quello marcato.
+    ctx.liberaRighe = [R('Acido salicilico', '', 'g', true), R('Resorcina', '2'), R('Vaselina filante bianca', '98')];
     ctx.concRichiestaChanged('2');
     expect(qty('Acido salicilico')).toBeCloseTo(2 * 100 / 98, 3);
     expect(conc()).toBeCloseTo(2, 3);

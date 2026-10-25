@@ -47,7 +47,8 @@ describe('#2/#9 la concentrazione voluta è legata alla riga del PA', () => {
   it('il flusso normale funziona ancora: concentrazione prima, poi il nome del PA scritto a mano e scelto', async () => {
     ctx.azzeraRicetta();
     ctx.concRichiestaChanged('5');
-    ctx.liberaRighe = [R('', ''), R('Etanolo 96°', '50'), R('Glicole propilenico', '45')];
+    // v176: la riga del PA è marcata (bottone PA) prima di scriverne il nome.
+    ctx.liberaRighe = [R('', '', 'g', true), R('Etanolo 96°', '50'), R('Glicole propilenico', '45')];
     ctx.liberaNomeInput(0, 'Mino');
     ctx.liberaNomeInput(0, 'Minoxid');
     ctx.liberaSelComp(0, 'Minoxidil', 0.39, 'inv', '', '');

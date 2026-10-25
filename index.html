@@ -1717,6 +1717,10 @@ function liberaSetPa(i) {
   if (!liberaRighe[i]) return;
   const wasPa = !!liberaRighe[i].isPa;
   liberaRighe.forEach((r, j) => { r.isPa = (j === i && !wasPa); });
+  // PA spostato o tolto: la concentrazione voluta era del PA di prima.
+  // Marcato il primo PA con una concentrazione già scritta: si applica subito.
+  if (concRichiestaPA && _liberaPaMarcato() !== concRichiestaPA.riga) _concTogli();
+  else liberaRiallineaPA();
   liberaRenderRighe();
   calcPrep();
 }
@@ -1752,13 +1756,14 @@ function showModal({title, body, yesLabel, noLabel}) {
       </div>`;
     overlay.appendChild(box);
     document.body.appendChild(overlay);
+    // true = sì, false = no, null = chiusa senza scegliere (Esc, clic fuori).
     const cleanup = (val) => { try { document.body.removeChild(overlay); } catch(e){} document.removeEventListener('keydown', onKey); resolve(val); };
-    const onKey = (e) => { if (e.key === 'Escape') cleanup(false); };
+    const onKey = (e) => { if (e.key === 'Escape') cleanup(null); };
     document.addEventListener('keydown', onKey);
     box.querySelector('#modal-no').onclick = () => cleanup(false);
     const yesBtn = box.querySelector('#modal-yes');
     if (yesBtn) yesBtn.onclick = () => cleanup(true);
-    overlay.onclick = (e) => { if (e.target === overlay) cleanup(false); };
+    overlay.onclick = (e) => { if (e.target === overlay) cleanup(null); };
   });
 }
 
@@ -1768,10 +1773,10 @@ function liberaRemoveRiga(i) {
   if (liberaRighe.length <= 1) return;
   // Cancellato il PA: la concentrazione voluta era la sua. Non passa a un'altra
   // sostanza (riscriverebbe la dose, es. Finasteride 0,1 g → grammi).
-  const eraPA = !!liberaRighe[i] && liberaRighe[i] === _liberaPaRiga();
-  if (eraPA && concRichiesta != null) concRichiestaTolta = liberaRighe[i].nome;
+  const eraPA = !!liberaRighe[i] && liberaRighe[i] === _liberaPaMarcato();
+  const nomePA = eraPA ? liberaRighe[i].nome : '';
   liberaRighe.splice(i, 1);
-  if (eraPA) { concRichiesta = null; concRichiestaPA = null; }
+  if (eraPA) { if (concRichiesta != null) _concTogli(nomePA); }
   else liberaRiallineaPA();
   liberaRenderRighe();
   calcPrep();
@@ -1814,18 +1819,21 @@ function liberaRenderRighe() {
   if (volUnit) {
     // Unguento/polvere forzano g; tornando a una forma liquida si rimette
     // l'unità scelta per i liquidi (dataset.liquidi, default ml).
+    // L'unità dei liquidi si registra solo mentre la forma è liquida: un
+    // unguento riaperto (select ancora attivo, già su g) non la sovrascrive.
     const soloG = tipoPrep === 'unguento' || tipoPrep === 'polvere';
     if (soloG) {
-      if (!volUnit.disabled) volUnit.dataset.liquidi = volUnit.value || 'ml';
       volUnit.value = 'g';
     } else if (volUnit.disabled) {
       volUnit.value = volUnit.dataset.liquidi || 'ml';
+    } else {
+      volUnit.dataset.liquidi = volUnit.value || 'ml';
     }
     volUnit.disabled = soloG;
   }
   const container = document.getElementById('libera-righe');
   if (!container) return;
-  const paVoluto = concRichiestaAttiva() ? _liberaPaRiga() : null;
+  const paVoluto = _concMantenibile() ? _liberaPaMarcato() : null;
   // Ridisegna le righe solo se ne cambia la struttura (righe, nomi, unità, PA,
   // prezzi...); se cambiano solo le quantità aggiorna i valori sul posto. Un
   // ridisegno dopo il blur di una quantità distruggeva il bottone appena
@@ -1955,6 +1963,8 @@ function liberaRenderRighe() {
 function liberaNomeInput(i, v) {
   const r = liberaRighe[i];
   if (!r) return;
+  // Rinominare il PA = un'altra sostanza: la concentrazione voluta non vale più.
+  if (concRichiestaPA && r === concRichiestaPA.riga) _concTogli();
   r.nome = v;
   r.densita = null;
   r.lotto = '';
@@ -2045,7 +2055,7 @@ function liberaGetIngr() {
 // Calcola grado alcolico (% v/v etanolo puro) e densità del preparato.
 // Per la conversione ml↔g del Totale preparazione (soluzione).
 // Convenzione: "etanolo" / "alcool" è considerato 96° (0.96 v/v di etanolo puro, d=0.807).
-// Densità soluzione idroalcolica: approssimazione lineare d = 1.0 - 0.211 × (grado/100).
+// Densità soluzione idroalcolica: densitaIdroalcolica(grado), approssimazione lineare.
 // (isEtanoloNome — "questo nome è etanolo?" — è in pricing.js, condivisa.)
 function calcSoluzioneInfo(totalePrep, totalePrepUnit) {
   const ingr = liberaGetIngr();
@@ -2066,7 +2076,7 @@ function calcSoluzioneInfo(totalePrep, totalePrepUnit) {
   if (totalePrepUnit === 'ml') {
     volumeMl = totalePrep;
     grado = volumeMl > 0 ? (etanoloPuroMl / volumeMl * 100) : 0;
-    densita = 1.0 - 0.211 * (grado / 100);
+    densita = densitaIdroalcolica(grado);
     massaG = volumeMl * densita;
   } else {
     // Input in g: itera per convergere (densità ↔ volume sono interdipendenti via grado)
@@ -2074,7 +2084,7 @@ function calcSoluzioneInfo(totalePrep, totalePrepUnit) {
     for (let i = 0; i < 4; i++) {
       volumeMl = totalePrep / d;
       grado = volumeMl > 0 ? (etanoloPuroMl / volumeMl * 100) : 0;
-      d = 1.0 - 0.211 * (grado / 100);
+      d = densitaIdroalcolica(grado);
     }
     densita = d;
     massaG = totalePrep;
@@ -2199,6 +2209,19 @@ function _isRigaScalabile(r) {
   return !['flacon','barattol','contenitor','recipient','vasett','fiala','blister','tubo','capsul'].some(k => n.includes(k));
 }
 
+// Righe la cui quantità si moltiplica per scalare una massa (Quantità totale in
+// g, eccipienti per la concentrazione voluta): non i contenitori, e non le
+// righe in %, che sono già una frazione del Totale preparazione.
+function _scalaQty(r) {
+  return _isRigaScalabile(r) && r.unit !== '%';
+}
+
+// Densità di una soluzione idroalcolica al grado (% v/v): approssimazione
+// lineare, unica per tutte le conversioni g ↔ ml.
+function densitaIdroalcolica(grado) {
+  return 1.0 - 0.211 * (grado / 100);
+}
+
 // Scala tutte le righe (escluse contenitori/pz) per riportare il volume soluzione al valore inserito.
 // Analogo a capsScaleOnNCapsChange per le capsule. Se la formula non ha ancora
 // righe liquide ma "Grado alcolico" è già compilato, bootstrap diretto del
@@ -2214,7 +2237,7 @@ function volSoluzioneChanged() {
     // Niente liquidi ma grado impostato: crea il veicolo (volume stimato con
     // la densità idroalcolica), poi porta la formula ai grammi voluti.
     if (liberaSommaVolumeLiquidi() <= 0 && conGrado)
-      liberaApplyVolGrado(newVol / (1.0 - 0.211 * (grado / 100)), grado);
+      liberaApplyVolGrado(newVol / densitaIdroalcolica(grado), grado);
     liberaScalaTotaleG(newVol);
     // Anche se non applicabile: calcPrep rimette nel campo il totale vero.
     liberaRenderRighe();
@@ -2247,14 +2270,14 @@ function liberaScalaTotaleG(totG) {
   // Serve almeno un altro ingrediente oltre al PA: altrimenti "100 g" porterebbe
   // il PA da solo a 100 g.
   const pa = _liberaPaRiga();
-  if (!ingr.some(r => r !== pa && _isRigaScalabile(r) && liberaGrammiRiga(r) > 0)) return false;
+  if (!ingr.some(r => r !== pa && _scalaQty(r) && liberaGrammiRiga(r) > 0)) return false;
   let scalabili = 0, fissi = 0;
-  ingr.forEach(r => { if (_isRigaScalabile(r)) scalabili += liberaGrammiRiga(r); else fissi += liberaGrammiRiga(r); });
+  ingr.forEach(r => { if (_scalaQty(r)) scalabili += liberaGrammiRiga(r); else fissi += liberaGrammiRiga(r); });
   const ratio = scalabili > 0 ? (totG - fissi) / scalabili : 0;
   if (!(ratio > 0)) return false;
   if (Math.abs(ratio - 1) >= 1e-6) {
     ingr.forEach(r => {
-      if (!_isRigaScalabile(r)) return;
+      if (!_scalaQty(r)) return;
       r.qty = _qtyStr((parseFloat(r.qty) || 0) * ratio);
     });
   }
@@ -2335,7 +2358,7 @@ function gradoAlcChanged() {
   const totInG = volSol > 0 && qtaTotUnita() === 'g';
   let totMl;
   if (totInG) {
-    totMl = liberaSommaVolumeLiquidi() || volSol / (1.0 - 0.211 * (desiredGrado / 100));
+    totMl = liberaSommaVolumeLiquidi() || volSol / densitaIdroalcolica(desiredGrado);
   } else if (volSol > 0) {
     totMl = volSol;
   } else {
@@ -2345,7 +2368,7 @@ function gradoAlcChanged() {
     if (tot > 0) {
       if (totUnit === 'ml') totMl = tot;
       else {
-        const dApprox = 1.0 - 0.211 * (desiredGrado / 100);
+        const dApprox = densitaIdroalcolica(desiredGrado);
         totMl = tot / dApprox;
       }
     } else {
@@ -2451,34 +2474,60 @@ function liberaCalcTotale() {
       ? '% p/v — g PA / 100 ml di preparato'
       : '% p/p — g PA / 100 g preparato';
     else _concNote.textContent = '% p/p — g PA / 100 g preparato';
-    if (concRichiestaAttiva()) _concNote.textContent += ' · fissata (mantenuta se cambi unità, grado o volume)';
-    else if (concRichiesta != null && tipoPrep !== 'capsule' && tipoPrep !== 'cartine')
-      _concNote.textContent += ' · voluta ' + fmt(concRichiesta, 2) + '% ' + (concRichiestaModo === 'pv' ? 'p/v' : 'p/p') + ': non applicata in questa modalità';
-    else if (concRichiestaTolta)
-      _concNote.textContent += ' · concentrazione voluta tolta: era quella di ' + concRichiestaTolta + ', che non è più il PA';
+    _concNote.textContent += _concNotaVoluta();
   }
   aggiornaTotaleDerived();
   return {totG, paG, conc, ingr, volMl};
 }
 
 // ── Concentrazione richiesta (vedi concRichiesta) ──
-// Unico punto che verifica il legame con il PA: se il PA ora è un'altra riga
-// o la riga è stata rinominata, la concentrazione voluta si toglie qui (e la
-// nota lo dice), qualunque strada abbia cambiato il PA.
+// Il ricalcolo tocca solo la riga con il bottone PA acceso: una riga
+// indovinata può essere un eccipiente (Vaselina, Lattosio...).
+function _liberaPaMarcato() {
+  return liberaRighe.find(r => r.isPa && (r.nome || '').trim()) || null;
+}
+
+// Si applica la concentrazione voluta? Solo lettura, nessun effetto: la chiamano
+// anche Tariffazione e Scheda. Il legame con il PA lo sciolgono esplicitamente
+// liberaSetPa, liberaNomeInput e liberaRemoveRiga (_concTogli); qui, se il PA
+// non è più quello legato, semplicemente non si applica.
 function concRichiestaAttiva() {
   if (!(concRichiesta != null && concRichiesta > 0 && concRichiesta < 100
     && tipoPrep !== 'capsule' && tipoPrep !== 'cartine'
     && concRichiestaModo === _concModoScelto())) return false;
-  if (concRichiestaPA) {
-    const pa = _liberaPaRiga();
-    if (pa !== concRichiestaPA.riga || invNominalizza(pa.nome || '') !== concRichiestaPA.nome) {
-      concRichiestaTolta = concRichiestaPA.nomeVisto;
-      concRichiesta = null;
-      concRichiestaPA = null;
-      return false;
-    }
-  }
-  return true;
+  const pa = _liberaPaMarcato();
+  if (!pa) return false;
+  return !concRichiestaPA
+    || (pa === concRichiestaPA.riga && invNominalizza(pa.nome || '') === concRichiestaPA.nome);
+}
+
+// Attiva E mantenibile: PA in g/mg/ml e, in p/v, con un volume.
+function _concMantenibile() {
+  const pa = _liberaPaMarcato();
+  return concRichiestaAttiva() && ['g', 'mg', 'ml', ''].includes(pa.unit || '') && !_concPvSenzaVolume();
+}
+
+// Toglie la concentrazione voluta, ricordando di quale PA era (nota a video).
+function _concTogli(nomePA) {
+  concRichiestaTolta = nomePA || (concRichiestaPA && concRichiestaPA.nomeVisto) || '';
+  concRichiesta = null;
+  concRichiestaPA = null;
+}
+
+// Nota accanto alla Concentrazione: dice se quella voluta si sta mantenendo e,
+// se no, perché.
+function _concNotaVoluta() {
+  if (tipoPrep === 'capsule' || tipoPrep === 'cartine') return '';
+  if (concRichiesta == null)
+    return concRichiestaTolta ? ' · concentrazione voluta tolta: era quella di ' + concRichiestaTolta + ', che non è più il PA' : '';
+  if (_concMantenibile()) return ' · fissata (mantenuta se cambi unità, grado o volume)';
+  const v = ' · voluta ' + fmt(concRichiesta, 2) + '% ' + (concRichiestaModo === 'pv' ? 'p/v' : 'p/p') + ': ';
+  if (concRichiestaModo !== _concModoScelto()) return v + 'non applicata in questa modalità';
+  const pa = _liberaPaMarcato();
+  if (!pa) return v + 'premi PA sul principio attivo per mantenerla';
+  if (concRichiestaPA && !concRichiestaAttiva()) return v + 'era per ' + concRichiestaPA.nomeVisto + ', che non è più il PA';
+  if (_concPvSenzaVolume()) return v + 'in p/v serve almeno un liquido';
+  return v + 'non si può mantenere con il PA in ' + pa.unit;
 }
 
 // Lega la concentrazione voluta a questa riga del PA (null = nessun legame).
@@ -2505,7 +2554,7 @@ function concRichiestaImposta(c) {
   concRichiesta = (c > 0 && c < 100) ? c : null;
   concRichiestaModo = _concModoScelto();
   concRichiestaTolta = '';
-  const pa = _liberaPaRiga();
+  const pa = _liberaPaMarcato();
   _concLegaPA(pa && (parseFloat(pa.qty) || 0) > 0 ? pa : null);
 }
 
@@ -2544,18 +2593,17 @@ function liberaCambiaUnita(i, u) {
 // lasciando fermi gli altri ingredienti. p/p: PA = c·altri/(100−c);
 // p/v: PA = c/100·volume, e un PA liquido aggiunge anche il suo volume.
 function liberaRiallineaPA() {
-  if (!concRichiestaAttiva()) return false;
-  const pa = _liberaPaRiga();
-  if (!pa) return false;
+  if (!_concMantenibile()) return false;
+  const pa = _liberaPaMarcato();
   if (!pa.unit) pa.unit = 'g';
-  if (!['g', 'mg', 'ml'].includes(pa.unit)) return false;
   const altri = liberaGetIngr().filter(r => r !== pa);
   const c = concRichiesta;
   let paG;
   if (concRichiestaModo === 'pv') {
     // p/v senza ancora un volume: niente da calcolare (non ripiegare su p/p).
     const volAltri = altri.reduce((s, r) => s + volMlRiga(r), 0);
-    const d = getDensita(pa.nome || '');
+    // Il volume del PA conta: in ml senza densità nota vale 1 ml per g (come volMlRiga).
+    const d = getDensita(pa.nome || '') || (pa.unit === 'ml' ? 1 : null);
     paG = c / 100 * volAltri / (1 - (d ? c / (100 * d) : 0));
   } else {
     const altriG = altri.reduce((s, r) => s + liberaGrammiRiga(r), 0);
@@ -2571,7 +2619,7 @@ function liberaRiallineaPA() {
 // per tornare alla concentrazione richiesta.
 function liberaScalaEccipienti() {
   const ingr = liberaGetIngr();
-  const pa = _liberaPaRiga();
+  const pa = _liberaPaMarcato();
   if (!pa || !ingr.includes(pa)) return false;
   const pv = concRichiestaModo === 'pv';
   const misura = r => pv ? volMlRiga(r) : liberaGrammiRiga(r);
@@ -2581,12 +2629,12 @@ function liberaScalaEccipienti() {
   let scalabili = 0, fissi = 0;
   ingr.forEach(r => {
     if (r === pa) return;
-    if (_isRigaScalabile(r)) scalabili += misura(r); else fissi += misura(r);
+    if (_scalaQty(r)) scalabili += misura(r); else fissi += misura(r);
   });
   const ratio = scalabili > 0 ? (altriVoluti - fissi) / scalabili : 0;
   if (!(ratio > 0)) return false;
   ingr.forEach(r => {
-    if (r === pa || !_isRigaScalabile(r)) return;
+    if (r === pa || !_scalaQty(r)) return;
     r.qty = _qtyStr((parseFloat(r.qty) || 0) * ratio);
   });
   return true;
@@ -2599,8 +2647,7 @@ function liberaScalaEccipienti() {
 // quantità (la concentrazione diventa quella nuova).
 async function liberaQtyChanged(i) {
   if (!concRichiestaAttiva() || !liberaRighe[i]) return;
-  const pa = _liberaPaRiga();
-  if (!pa) return;
+  const pa = _liberaPaMarcato();
   if (liberaRighe[i] !== pa) {
     liberaRiallineaPA();
     liberaRenderRighe();
@@ -2621,8 +2668,11 @@ async function liberaQtyChanged(i) {
     yesLabel: 'Mantieni ' + fmt(concRichiesta, 2) + '%',
     noLabel: 'Tieni le quantità (' + fmt(nuova, 2) + '%)',
   });
-  const applicato = mantieni && liberaScalaEccipienti();
-  if (!applicato) concRichiesta = nuova;
+  // false = "Tieni le quantità": la concentrazione diventa quella nuova.
+  // true = "Mantieni": scala gli altri; se non si può, come chiusa senza
+  // scelta (null, Esc): la concentrazione resta e il PA torna al suo valore.
+  if (mantieni === false) concRichiesta = nuova;
+  else if (!(mantieni && liberaScalaEccipienti())) liberaRiallineaPA();
   liberaRenderRighe();
   calcPrep();
 }
@@ -6252,10 +6302,13 @@ function prepRestore(snap) {
   liberaCostoExtra   = +snap.liberaCostoExtra || 0;
   concRichiesta      = snap.concRichiesta > 0 ? +snap.concRichiesta : null; // assente negli snapshot prima della v173
   concRichiestaModo  = snap.concRichiestaModo === 'pv' ? 'pv' : 'pp';
-  concRichiestaPA    = null; // si lega di nuovo al primo ricalcolo (righe nuove)
   concRichiestaTolta = '';
   liberaRighe        = (snap.liberaRighe || []).map(r => ({...r}));
   liberaRigheExtra   = (snap.liberaRigheExtra || []).map(r => ({...r}));
+  // Righe nuove: la concentrazione voluta si lega subito al PA ripristinato,
+  // così rinominarlo o spostarlo dopo la riapertura viene riconosciuto.
+  const _paRip = _liberaPaMarcato();
+  _concLegaPA(concRichiesta != null && _paRip && (parseFloat(_paRip.qty) || 0) > 0 ? _paRip : null);
 
   // Segmento Tipo Preparazione (#tariff-card-tipo è naming legacy, container dei
   // seg-btn della Preparazione — ordine: soluzione,unguento,capsule,cartine,polvere,sospensione)
@@ -6963,9 +7016,10 @@ function ricettaApplicaJson(json) {
   // c'è e non torna con la concentrazione (lettura AI sbagliata, base diversa)
   // niente concentrazione fissata e un avviso da verificare.
   const _concJson = parseFloat(String(json.concentrazione ?? '').replace(',', '.'));
-  concRichiestaImposta(_concJson);
+  // Capsule/cartine: lì "concentrazione" è una dose per pezzo, non una %.
+  concRichiestaImposta(json.tipoPrep === 'capsule' || json.tipoPrep === 'cartine' ? NaN : _concJson);
   let _avvisoConc = '';
-  const _paJson = _liberaPaRiga();
+  const _paJson = _liberaPaMarcato();
   // Capsule/cartine: la concentrazione non si applica (dose per pezzo), niente
   // confronto. p/v senza liquidi: la % calcolata sarebbe un p/p.
   const _confrontabile = concRichiestaAttiva() && !_concPvSenzaVolume()
