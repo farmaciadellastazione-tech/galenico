@@ -5233,6 +5233,7 @@ function invInfoMobile(item, predefinita) {
   if (item.ddtNum || item.ddtData) p.push('DDT ' + [item.ddtNum, item.ddtData ? fmtGiorno(item.ddtData) : ''].filter(Boolean).join(' '));
   if (item.dataAp) p.push('ap. ' + fmtGiorno(item.dataAp));
   if (!predefinita && item.qty) p.push(item.qty + ' ' + (item.unit || ''));
+  if (item.prezzoBolla) p.push('€ ' + item.prezzoBolla.toFixed(2) + ' bolla');
   if (item.prezzo) p.push('€ ' + item.prezzo.toFixed(4) + '/' + (item.unit || 'g'));
   return p.length ? '<div class="inv-sub inv-solo-mobile">' + escHtml(p.join(' · ')) + '</div>' : '';
 }
@@ -5248,7 +5249,7 @@ function invModifica(lsIdx) {
   const tr = rows[lsIdx];
 
   tr.innerHTML = `
-    <td colspan="7" style="padding:10px 8px;background:var(--accent-light);border-radius:var(--radius)">
+    <td colspan="8" style="padding:10px 8px;background:var(--accent-light);border-radius:var(--radius)">
       <div class="inv-mod-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
         <div style="grid-column:1/-1">
           <label style="font-size:10px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:2px">Nome sostanza</label>
