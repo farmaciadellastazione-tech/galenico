@@ -327,17 +327,25 @@
      Se lo spazio non basta scorre il singolo elemento, non la pagina; con
      spazio sufficiente nessuna barra e nulla cambia. */
   .inv-table-wrap { overflow-x:auto; }
-  /* Header (logo + 7 voci nav + azioni + badge versione) e .seg (le 7 forme
-     farmaceutiche) sono righe flex senza wrap: fino a ~1170 px traboccavano a
-     destra. Scorrono orizzontalmente, ogni figlio mantiene la sua dimensione. */
-  header { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  header > * { flex-shrink: 0; }
-  .seg { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
-  .seg-btn { flex-shrink: 0; }
   .inv-form > div { min-width:0; }
-  /* Modulo inventario fra 600 e 900 px: i campi vanno a capo da soli (le
-     colonne fisse nello style dell'HTML, fino a 7, non ci stavano). */
-  @media (min-width:601px) and (max-width:900px) {
+  /* Header (logo + 7 voci nav + azioni + badge versione) è largo ~1234 px:
+     sul computer, sotto quella larghezza, va a capo su due righe invece di
+     tagliare gli ultimi pulsanti (body ha overflow-x:hidden). Con il mouse
+     va meglio che scorrere di lato. Sul cellulare scorre (media 600 px). */
+  @media (min-width:600.02px) and (max-width:1260px) {
+    header { flex-wrap: wrap; height: auto; min-height: 56px; row-gap: 4px; padding-top: 6px; padding-bottom: 6px; }
+    header nav { flex-wrap: wrap; row-gap: 4px; } /* da sola è ~607 px: sotto ~640 va a capo anche lei */
+  }
+  /* .seg (7 forme farmaceutiche) richiede almeno ~651 px: fra 601 e 759 px
+     "Tintura / Estratto" usciva a destra. Lì va a capo; dai 760 px resta su
+     una riga come prima. Sul cellulare scorre (media 600 px). */
+  @media (min-width:600.02px) and (max-width:759px) {
+    .seg { flex-wrap: wrap; row-gap: 6px; }
+  }
+  /* Modulo inventario fra 600 e 867 px (da 868 main è già largo 820 come sul
+     computer largo): i campi vanno a capo da soli, le colonne fisse nello
+     style dell'HTML (fino a 7) non ci stavano. */
+  @media (min-width:600.02px) and (max-width:867px) {
     .inv-form { grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)) !important; }
   }
 
@@ -378,11 +386,13 @@
        parte dei pulsanti. Su mobile diventa scorrevole orizzontalmente invece
        di traboccare: ogni figlio mantiene la sua dimensione (flex-shrink:0)
        e si scorre col dito per raggiungere i pulsanti fuori viewport. */
-    /* (regole per header e .seg spostate fuori dal media query: valgono anche
-       per una finestra stretta sul computer, vedi sotto "Finestre strette") */
+    header { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    header > * { flex-shrink: 0; }
     /* .seg (selettore forma farmaceutica: Soluzione/Unguento/Capsule/.../Tintura,
        usato in Preparazione, Tariffazione e Scheda) è anch'esso una riga flex
        senza wrap con 7 pillole: stesso problema dell'header, stesso rimedio. */
+    .seg { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+    .seg-btn { flex-shrink: 0; }
     /* .field-label è flex:1 + min-width:0 (per adattarsi a larghezze diverse):
        su una riga stretta con più elementi accanto (input + select + nota,
        es. "Concentrazione") viene schiacciata quasi a zero e il testo,
