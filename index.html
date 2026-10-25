@@ -1208,13 +1208,23 @@ let concRichiesta = null;
 // diventa un'altra (cambio forma, browser con un'altra preferenza) il
 // ricalcolo automatico si ferma invece di leggere il 5% p/v come 5% p/p.
 let concRichiestaModo = 'pp';
-function setConcMode(m) {
+// Riga e nome del PA a cui vale concRichiesta (legati al primo ricalcolo). Se
+// il PA diventa un'altra riga (bottone PA spostato, riga cancellata) o la riga
+// viene rinominata, la concentrazione voluta si toglie (concRichiestaAttiva):
+// non deve mai riscrivere la dose di un'altra sostanza.
+let concRichiestaPA = null;   // {riga, nome}
+let concRichiestaTolta = '';  // nome del PA di prima, per la nota a video
+// salva=false: modalità di una formula (snapshot, ricetta, esempio), che non
+// diventa la preferenza di questo browser.
+function setConcMode(m, salva = true) {
   concMode = (m === 'pv') ? 'pv' : 'pp';
-  try { localStorage.setItem('gal_conc_mode', concMode); } catch {}
-  // Stesse quantità, altra misura: la richiesta diventa il valore nella nuova modalità.
+  if (salva) { try { localStorage.setItem('gal_conc_mode', concMode); } catch {} }
+  // Stesse quantità, altra misura: la richiesta diventa il valore nella nuova
+  // modalità. In p/v senza ancora un volume il valore sarebbe un p/p: niente.
   if (concRichiesta != null && typeof liberaCalcTotale === 'function') {
     const c = liberaCalcTotale().conc;
-    concRichiesta = c > 0 ? c : null;
+    const pvSenzaVolume = _concModoScelto() === 'pv' && liberaSommaVolumeLiquidi() <= 0;
+    concRichiesta = (c > 0 && !pvSenzaVolume) ? c : null;
     concRichiestaModo = _concModoScelto();
   }
   if (typeof calcPrep === 'function') calcPrep();
@@ -1759,8 +1769,9 @@ function liberaRemoveRiga(i) {
   // Cancellato il PA: la concentrazione voluta era la sua. Non passa a un'altra
   // sostanza (riscriverebbe la dose, es. Finasteride 0,1 g → grammi).
   const eraPA = !!liberaRighe[i] && liberaRighe[i] === _liberaPaRiga();
+  if (eraPA && concRichiesta != null) concRichiestaTolta = liberaRighe[i].nome;
   liberaRighe.splice(i, 1);
-  if (eraPA) concRichiesta = null;
+  if (eraPA) { concRichiesta = null; concRichiestaPA = null; }
   else liberaRiallineaPA();
   liberaRenderRighe();
   calcPrep();
@@ -1774,9 +1785,15 @@ function _liberaNotaPA(r, paVoluto) {
 }
 
 function liberaRenderRighe() {
-  // Polvere/capsule/cartine: forza unità g se era ml (no ml per forme solide)
+  // Polvere/capsule/cartine: forza unità g se era ml (no ml per forme solide),
+  // convertendo con la densità come il cambio di unità (Etanolo 50 ml → 40,35 g).
   if (tipoPrep === 'polvere' || tipoPrep === 'capsule' || tipoPrep === 'cartine') {
-    liberaRighe.forEach(r => { if (r.unit === 'ml') r.unit = 'g'; });
+    liberaRighe.forEach(r => {
+      if (r.unit !== 'ml') return;
+      const g = liberaGrammiRiga(r);
+      r.unit = 'g';
+      if ((parseFloat(r.qty) || 0) > 0) r.qty = _qtyDaGrammi(g, r);
+    });
   }
   // Per capsule/cartine non ha senso % (input è per-singolo-pezzo, non frazione del totale)
   if (tipoPrep === 'cartine' || tipoPrep === 'capsule') {
@@ -2198,12 +2215,17 @@ function volSoluzioneChanged() {
     // la densità idroalcolica), poi porta la formula ai grammi voluti.
     if (liberaSommaVolumeLiquidi() <= 0 && conGrado)
       liberaApplyVolGrado(newVol / (1.0 - 0.211 * (grado / 100)), grado);
-    if (liberaScalaTotaleG(newVol)) { liberaRenderRighe(); calcPrep(); }
+    liberaScalaTotaleG(newVol);
+    // Anche se non applicabile: calcPrep rimette nel campo il totale vero.
+    liberaRenderRighe();
+    calcPrep();
     return;
   }
   const cur = liberaSommaVolumeLiquidi();
   if (cur <= 0) {
-    if (!isNaN(grado) && grado > 0) liberaApplyVolGrado(newVol, grado);
+    // Veicolo idroalcolico solo per soluzione/tintura (non in una sospensione
+    // con un grado rimasto da prima); altrimenti il campo torna al totale vero.
+    if (!(conGrado && liberaApplyVolGrado(newVol, grado))) calcPrep();
     return;
   }
   const ratio = newVol / cur;
@@ -2345,17 +2367,20 @@ function gradoAlcChanged() {
 }
 
 // Grammi di una riga (stesse regole del totale): % sul Totale preparazione,
-// mg/1000, ml × densità se nota, altrimenti la quantità così com'è.
+// mg/1000, ml × densità se nota, altrimenti la quantità così com'è. I pezzi
+// (Barattolo 1 pz) non pesano: prima contavano 1 g e un unguento da 100 g
+// arrivava in Tariffazione e Scheda come 101 g.
 function liberaGrammiRiga(r) {
   const q = parseFloat(r.qty)||0;
   const densita = getDensita(r.nome);
+  if (r.unit === 'pz') return 0;
   if (r.unit === '%') {
     const totalePrep = parseFloat(document.getElementById('totale-prep')?.value)||0;
     return totalePrep > 0 ? (totalePrep * q / 100) : 0;
   }
   if (r.unit === 'mg') return q / 1000;
   if (r.unit === 'ml' && densita) return q * densita;
-  return q; // g, ml senza densità, pz
+  return q; // g, ml senza densità
 }
 
 // ripiego=false: niente "prima riga" se non c'è un PA riconoscibile (marcato o
@@ -2429,16 +2454,44 @@ function liberaCalcTotale() {
     if (concRichiestaAttiva()) _concNote.textContent += ' · fissata (mantenuta se cambi unità, grado o volume)';
     else if (concRichiesta != null && tipoPrep !== 'capsule' && tipoPrep !== 'cartine')
       _concNote.textContent += ' · voluta ' + fmt(concRichiesta, 2) + '% ' + (concRichiestaModo === 'pv' ? 'p/v' : 'p/p') + ': non applicata in questa modalità';
+    else if (concRichiestaTolta)
+      _concNote.textContent += ' · concentrazione voluta tolta: era quella di ' + concRichiestaTolta + ', che non è più il PA';
   }
   aggiornaTotaleDerived();
   return {totG, paG, conc, ingr, volMl};
 }
 
 // ── Concentrazione richiesta (vedi concRichiesta) ──
+// Unico punto che verifica il legame con il PA: se il PA ora è un'altra riga
+// o la riga è stata rinominata, la concentrazione voluta si toglie qui (e la
+// nota lo dice), qualunque strada abbia cambiato il PA.
 function concRichiestaAttiva() {
-  return concRichiesta != null && concRichiesta > 0 && concRichiesta < 100
+  if (!(concRichiesta != null && concRichiesta > 0 && concRichiesta < 100
     && tipoPrep !== 'capsule' && tipoPrep !== 'cartine'
-    && concRichiestaModo === _concModoScelto();
+    && concRichiestaModo === _concModoScelto())) return false;
+  if (concRichiestaPA) {
+    const pa = _liberaPaRiga();
+    if (pa !== concRichiestaPA.riga || invNominalizza(pa.nome || '') !== concRichiestaPA.nome) {
+      concRichiestaTolta = concRichiestaPA.nomeVisto;
+      concRichiesta = null;
+      concRichiestaPA = null;
+      return false;
+    }
+  }
+  return true;
+}
+
+// Lega la concentrazione voluta a questa riga del PA (null = nessun legame).
+// Si lega quando il PA ha una quantità sua: ricalcolata da liberaRiallineaPA o
+// già scritta quando si imposta la concentrazione. Non mentre se ne scrive il
+// nome, che cambia a ogni tasto.
+function _concLegaPA(pa) {
+  concRichiestaPA = pa ? { riga: pa, nome: invNominalizza(pa.nome || ''), nomeVisto: pa.nome } : null;
+}
+
+// p/v ha bisogno di un volume: senza liquidi la concentrazione non si misura in p/v.
+function _concPvSenzaVolume() {
+  return concRichiestaModo === 'pv' && liberaSommaVolumeLiquidi() <= 0;
 }
 
 // Modalità in uso per questa forma: p/v solo per le forme liquide.
@@ -2451,11 +2504,9 @@ function _concModoScelto() {
 function concRichiestaImposta(c) {
   concRichiesta = (c > 0 && c < 100) ? c : null;
   concRichiestaModo = _concModoScelto();
-}
-
-// Stessa scelta di liberaCalcTotale: p/v solo per le forme liquide con un volume.
-function _concUsaPv(ingr) {
-  return _concModoScelto() === 'pv' && ingr.reduce((s, r) => s + volMlRiga(r), 0) > 0;
+  concRichiestaTolta = '';
+  const pa = _liberaPaRiga();
+  _concLegaPA(pa && (parseFloat(pa.qty) || 0) > 0 ? pa : null);
 }
 
 // Quantità come stringa a 4 decimali, senza zeri inutili ("50", "61.9579").
@@ -2512,6 +2563,7 @@ function liberaRiallineaPA() {
   }
   if (!(paG > 0)) return false;
   pa.qty = _qtyDaGrammi(paG, pa);
+  _concLegaPA(pa);
   return true;
 }
 
@@ -2555,7 +2607,8 @@ async function liberaQtyChanged(i) {
     calcPrep();
     return;
   }
-  const ingr = liberaGetIngr();
+  // p/v senza liquidi: la % mostrata è un p/p, non confrontabile con la voluta.
+  if (_concPvSenzaVolume()) return;
   const nuova = liberaCalcTotale().conc;
   if (!(nuova > 0) || Math.abs(nuova - concRichiesta) < 0.005) return;
   const mis = concRichiestaModo === 'pv' ? 'p/v' : 'p/p';
@@ -6199,6 +6252,8 @@ function prepRestore(snap) {
   liberaCostoExtra   = +snap.liberaCostoExtra || 0;
   concRichiesta      = snap.concRichiesta > 0 ? +snap.concRichiesta : null; // assente negli snapshot prima della v173
   concRichiestaModo  = snap.concRichiestaModo === 'pv' ? 'pv' : 'pp';
+  concRichiestaPA    = null; // si lega di nuovo al primo ricalcolo (righe nuove)
+  concRichiestaTolta = '';
   liberaRighe        = (snap.liberaRighe || []).map(r => ({...r}));
   liberaRigheExtra   = (snap.liberaRigheExtra || []).map(r => ({...r}));
 
@@ -6219,10 +6274,11 @@ function prepRestore(snap) {
   }
 
   // La formula è stata pensata in quella modalità: riaprendola in un browser
-  // rimasto sull'altra, si torna alla sua (come fa l'import ricetta con concMode).
+  // rimasto sull'altra, si torna alla sua (come fa l'import ricetta con
+  // concMode), senza cambiare la preferenza salvata del browser.
   if (concRichiesta != null && concMode !== concRichiestaModo) {
     const _c = concRichiesta;
-    setConcMode(concRichiestaModo);
+    setConcMode(concRichiestaModo, false);
     concRichiesta = _c;
     concRichiestaModo = concMode;
     const _cmSel = document.getElementById('libera-conc-mode');
@@ -6658,6 +6714,8 @@ function azzeraRicetta() {
   gradoAlcSbloccato = false;
   concRichiesta = null;
   concRichiestaModo = 'pp';
+  concRichiestaPA = null;
+  concRichiestaTolta = '';
   setEditingMode(null);
 
   const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
@@ -6878,7 +6936,12 @@ function ricettaApplicaJson(json) {
     if (btn) setTipo(json.tipoPrep, btn);
   }
   // 2. concMode
-  if (json.concMode === 'pp' || json.concMode === 'pv') setConcMode(json.concMode);
+  // Modalità della ricetta, non la preferenza del browser: non si salva.
+  if (json.concMode === 'pp' || json.concMode === 'pv') {
+    setConcMode(json.concMode, false);
+    const _cmSel = document.getElementById('libera-conc-mode');
+    if (_cmSel) _cmSel.value = concMode;
+  }
   // 3. Nome PA in campo hidden
   if (json.nomePA) {
     const el = document.getElementById('prep-pa-nome');
@@ -6903,15 +6966,20 @@ function ricettaApplicaJson(json) {
   concRichiestaImposta(_concJson);
   let _avvisoConc = '';
   const _paJson = _liberaPaRiga();
-  if (concRichiesta != null && _paJson && (parseFloat(_paJson.qty) || 0) > 0) {
+  // Capsule/cartine: la concentrazione non si applica (dose per pezzo), niente
+  // confronto. p/v senza liquidi: la % calcolata sarebbe un p/p.
+  const _confrontabile = concRichiestaAttiva() && !_concPvSenzaVolume()
+    && json.tipoPrep !== 'capsule' && json.tipoPrep !== 'cartine';
+  if (_confrontabile && _paJson && (parseFloat(_paJson.qty) || 0) > 0) {
     const _concQta = liberaCalcTotale().conc;
     if (Math.abs(_concQta - concRichiesta) > concRichiesta * 0.01) {
       _avvisoConc = '⚠ Verifica: la ricetta indica ' + fmt(concRichiesta, 2).replace(/,00$/, '')
         + '% ma le quantità danno ' + fmt(_concQta, 2) + '%. Quantità lasciate come nella ricetta; '
         + 'scrivi la concentrazione voluta nel campo Concentrazione per fissarla.';
       concRichiesta = null;
+      concRichiestaPA = null;
     }
-  } else {
+  } else if (_confrontabile) {
     liberaRiallineaPA();
   }
   // 5. Paziente in scheda
