@@ -92,34 +92,37 @@ describe('Quantità modificata a mano: scelta esplicita', () => {
     const i = ctx.liberaRighe.indexOf(riga('Etanolo 96°'));
     ctx.liberaRighe[i].qty = '60';
     await ctx.liberaQtyChanged(i);
-    expect(modalCalls.length).toBe(1);
+    // v173: un eccipiente cambiato non chiede più, il PA segue (concentrazione voluta)
+    expect(modalCalls.length).toBe(0);
     expect(riga('Etanolo 96°').qty).toBe('60');
     expect(parseFloat(riga('Minoxidil').qty)).toBeCloseTo(5 * 105 / 95, 3);
     expect(conc()).toBeCloseTo(5, 3);
   });
 
-  it('etanolo a 60 g, "tieni le quantità": la concentrazione diventa 4,545% e resta quella richiesta', async () => {
+  // v173: "Tieni le quantità" si raggiunge modificando il PA (gli eccipienti non chiedono più).
+  it('Minoxidil a 5,5 g, "tieni le quantità": la concentrazione diventa 5,473% e resta quella richiesta', async () => {
     rispondi(false);
-    const i = ctx.liberaRighe.indexOf(riga('Etanolo 96°'));
-    ctx.liberaRighe[i].qty = '60';
+    const i = ctx.liberaRighe.indexOf(riga('Minoxidil'));
+    ctx.liberaRighe[i].qty = '5.5';
     await ctx.liberaQtyChanged(i);
-    expect(riga('Minoxidil').qty).toBe('5');
-    expect(conc()).toBeCloseTo(5 / 110 * 100, 3);
-    expect(ctx.concRichiesta).toBeCloseTo(5 / 110 * 100, 6);
+    expect(modalCalls.length).toBe(1);
+    expect(riga('Etanolo 96°').qty).toBe('50');
+    expect(conc()).toBeCloseTo(5.5 / 100.5 * 100, 3);
+    expect(ctx.concRichiesta).toBeCloseTo(5.5 / 100.5 * 100, 6);
     // da qui in poi è la nuova concentrazione a restare fissa
     byId('grado-alc').value = '40';
     ctx.gradoAlcChanged();
-    expect(conc()).toBeCloseTo(5 / 110 * 100, 3);
+    expect(conc()).toBeCloseTo(5.5 / 100.5 * 100, 3);
   });
 
-  it('"tieni le quantità": il riquadro formula mostra 4,55% (non 4,00% da parseFloat("4,55"))', async () => {
+  it('"tieni le quantità": il riquadro formula mostra 5,47% (non 5,00% da parseFloat("5,47"))', async () => {
     rispondi(false);
-    const i = ctx.liberaRighe.indexOf(riga('Etanolo 96°'));
-    ctx.liberaRighe[i].qty = '60';
+    const i = ctx.liberaRighe.indexOf(riga('Minoxidil'));
+    ctx.liberaRighe[i].qty = '5.5';
     await ctx.liberaQtyChanged(i);
-    expect(byId('libera-conc').value).toBe('4,55');
-    expect(byId('formula-grid').innerHTML).toContain('4,55');
-    expect(byId('formula-grid').innerHTML).not.toContain('4,00');
+    expect(byId('libera-conc').value).toBe('5,47');
+    expect(byId('formula-grid').innerHTML).toContain('5,47');
+    expect(byId('formula-grid').innerHTML).not.toContain('5,00');
   });
 
   it('Minoxidil a 6 g, "mantieni": scala gli altri ingredienti, resta 5%', async () => {
