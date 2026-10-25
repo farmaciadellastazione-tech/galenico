@@ -1214,6 +1214,7 @@ let concRichiestaModo = 'pp';
 // non deve mai riscrivere la dose di un'altra sostanza.
 let concRichiestaPA = null;   // {riga, nome}
 let concRichiestaTolta = '';  // perché è stata tolta, per la nota a video
+const CONC_TOLTA_PV = 'in p/v serve almeno un liquido e la formula è senza liquidi';
 // salva=false: modalità di una formula (snapshot, ricetta, esempio), che non
 // diventa la preferenza di questo browser.
 function setConcMode(m, salva = true) {
@@ -1227,7 +1228,7 @@ function setConcMode(m, salva = true) {
     concRichiesta = (c > 0 && !pvSenzaVolume) ? c : null;
     concRichiestaModo = _concModoScelto();
     if (pvSenzaVolume) {
-      concRichiestaTolta = 'in p/v serve almeno un liquido e la formula è senza liquidi';
+      concRichiestaTolta = CONC_TOLTA_PV;
       concRichiestaPA = null;
     }
   }
@@ -1648,7 +1649,7 @@ function fornitoreCampoKeydown(ev) {
 }
 function fornitoriRender() {
   const forn = fornitoreSelezionato();
-  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  const esc = escHtml;
   const sel = document.getElementById('fornitore-sel');
   if (sel) {
     sel.innerHTML = fornitoriLoad().map(f =>
@@ -1717,47 +1718,46 @@ function updateThemeToggleLabel() {
   btn.title = m.title;
 }
 
-async function liberaSetPa(i) {
-  if (!liberaRighe[i]) return;
-  const wasPa = !!liberaRighe[i].isPa;
-  liberaRighe.forEach((r, j) => { r.isPa = (j === i && !wasPa); });
+// Bottone PA. Con una concentrazione voluta già scritta e non ancora legata a
+// un PA, accendere PA su una riga che ha una quantità diversa chiede PRIMA,
+// senza toccare nulla: "Applica" accende il PA e scrive la quantità; "Lascia"
+// o Esc annullano il clic (PA spento, quantità e 2% scritto intatti). Così un
+// PA premuto per sbaglio (es. sulla Vaselina) non può riscrivere niente, né
+// subito né alle modifiche successive. Restituisce la promessa solo se chiede.
+let _liberaSetPaInAttesa = false;
+function liberaSetPa(i) {
+  const r = liberaRighe[i];
+  if (!r || _liberaSetPaInAttesa) return; // finestra aperta: un altro clic non conta
+  const accende = !r.isPa;
+  const qPrima = parseFloat(r.qty) || 0;
+  const nuova = accende && concRichiesta != null && !concRichiestaPA ? _concQtyPerPA(r) : null;
+  if (nuova != null && qPrima > 0 && Math.abs(parseFloat(nuova) - qPrima) > qPrima * 1e-4) {
+    _liberaSetPaInAttesa = true;
+    const mis = concRichiestaModo === 'pv' ? 'p/v' : 'p/p';
+    return showModal({
+      title: 'Applicare la concentrazione voluta?',
+      body: 'Per il ' + fmt(concRichiesta, 2) + '% ' + mis + ' ' + escHtml(r.nome) + ' passerebbe da '
+        + escHtml(numIt(r.qty)) + ' a ' + numIt(nuova) + ' ' + escHtml(r.unit) + '.\n\n'
+        + 'Se hai premuto PA sulla riga sbagliata, scegli "Lascia": il PA non si accende e nulla cambia.',
+      yesLabel: 'Applica',
+      noLabel: 'Lascia ' + escHtml(numIt(r.qty)) + ' ' + escHtml(r.unit),
+    }).then(applica => {
+      _liberaSetPaInAttesa = false;
+      if (applica !== true) return;
+      liberaRighe.forEach(x => { x.isPa = (x === r); });
+      r.qty = nuova;
+      _concLegaPA(r);
+      liberaRenderRighe();
+      calcPrep();
+    });
+  }
+  liberaRighe.forEach((x, j) => { x.isPa = (j === i && accende); });
   // PA spostato o tolto: la concentrazione voluta era del PA di prima.
-  // Marcato il primo PA con una concentrazione già scritta: si applica.
+  // Primo PA marcato (senza quantità, o già giusta): si applica senza chiedere.
   if (concRichiestaPA && _liberaPaMarcato() !== concRichiestaPA.riga) _concTogli();
-  else await _concApplicaAlPA();
+  else liberaRiallineaPA();
   liberaRenderRighe();
   calcPrep();
-}
-
-// Applica la concentrazione voluta al PA appena marcato. Se la riga ha già una
-// quantità diversa chiede prima: un PA premuto per sbaglio (es. sulla Vaselina)
-// non deve riscriverne la quantità. "Lascia" o Esc: quantità invariate e la
-// concentrazione voluta diventa quella attuale di questa riga (spostando poi
-// il PA si toglie, senza aver rovinato nulla).
-async function _concApplicaAlPA() {
-  const pa = _liberaPaMarcato();
-  if (!pa || !_concMantenibile()) return;
-  const prima = pa.qty;
-  const qPrima = parseFloat(prima) || 0;
-  if (!liberaRiallineaPA() || qPrima <= 0) return; // senza quantità: si calcola e basta
-  const nuova = pa.qty;
-  if (Math.abs(parseFloat(nuova) - qPrima) <= qPrima * 1e-4) return;
-  pa.qty = prima;
-  concRichiestaPA = null;
-  const nomePA = String(pa.nome).replace(/&/g, '&amp;').replace(/</g, '&lt;');
-  const mis = concRichiestaModo === 'pv' ? 'p/v' : 'p/p';
-  const virgola = q => String(q).replace('.', ','); // decimali all'italiana nel testo
-  const applica = await showModal({
-    title: 'Applicare la concentrazione voluta?',
-    body: 'Per il ' + fmt(concRichiesta, 2) + '% ' + mis + ' ' + nomePA + ' passerebbe da '
-      + virgola(prima) + ' a ' + virgola(nuova) + ' ' + pa.unit + '.\n\nSe hai premuto PA sulla riga sbagliata, scegli "Lascia": la quantità non cambia.',
-    yesLabel: 'Applica',
-    noLabel: 'Lascia ' + virgola(prima) + ' ' + pa.unit,
-  });
-  if (applica === true) { pa.qty = nuova; _concLegaPA(pa); return; }
-  const attuale = liberaCalcTotale().conc;
-  concRichiesta = attuale > 0 && attuale < 100 ? attuale : null;
-  _concLegaPA(concRichiesta != null ? pa : null);
 }
 
 // Attiva/disattiva il ridosaggio da specialità medicinale per la riga i
@@ -1820,7 +1820,7 @@ function liberaRemoveRiga(i) {
 // Nota sulla riga del PA quando la sua quantità segue la concentrazione voluta.
 function _liberaNotaPA(r, paVoluto) {
   return r === paVoluto
-    ? 'calcolato per il ' + String(parseFloat(concRichiesta.toFixed(2))).replace('.', ',') + '%'
+    ? 'calcolato per il ' + numIt(parseFloat(concRichiesta.toFixed(2))) + '%'
     : '';
 }
 
@@ -2138,6 +2138,7 @@ function volMlRiga(r) {
   const densita = getDensita(r.nome);
   if (r.unit === 'ml') return q;
   if (r.unit === 'g' && densita) return q / densita;
+  if (r.unit === 'mg' && densita) return q / 1000 / densita; // stesso volume di q/1000 g
   return 0;
 }
 
@@ -2554,8 +2555,12 @@ function _concTogli(nomePA) {
 // se no, perché.
 function _concNotaVoluta() {
   if (tipoPrep === 'capsule' || tipoPrep === 'cartine') return '';
-  if (concRichiesta == null)
-    return concRichiestaTolta ? ' · concentrazione voluta tolta: ' + concRichiestaTolta : '';
+  if (concRichiesta == null) {
+    // Il motivo p/v vale solo finché si è in p/v senza liquidi.
+    const pvVale = _concModoScelto() === 'pv' && liberaSommaVolumeLiquidi() <= 0;
+    if (!concRichiestaTolta || (concRichiestaTolta === CONC_TOLTA_PV && !pvVale)) return '';
+    return ' · concentrazione voluta tolta: ' + concRichiestaTolta;
+  }
   if (_concMantenibile()) return ' · fissata (mantenuta se cambi unità, grado o volume)';
   const v = ' · voluta ' + fmt(concRichiesta, 2) + '% ' + (concRichiestaModo === 'pv' ? 'p/v' : 'p/p') + ': ';
   if (concRichiestaModo !== _concModoScelto()) return v + 'non applicata in questa modalità';
@@ -2599,6 +2604,17 @@ function _qtyStr(q) {
   return String(parseFloat(q.toFixed(4)));
 }
 
+// Numero memorizzato col punto → testo all'italiana con la virgola, senza
+// arrotondare ("61.9579" → "61,9579"); per i messaggi a video.
+function numIt(q) {
+  return String(q == null ? '' : q).replace('.', ',');
+}
+
+// Testo dell'utente dentro HTML (finestre, menu): niente tag né attributi.
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 // Grammi → quantità nell'unità della riga (mg, ml via densità se nota, g).
 function _qtyDaGrammi(g, r) {
   const d = getDensita(r.nome || '');
@@ -2631,25 +2647,37 @@ function liberaCambiaUnita(i, u) {
 function liberaRiallineaPA() {
   if (!_concMantenibile()) return false;
   const pa = _liberaPaMarcato();
+  const q = _concQtyPerPA(pa);
+  if (q == null) return false;
   if (!pa.unit) pa.unit = 'g';
+  pa.qty = q;
+  _concLegaPA(pa);
+  return true;
+}
+
+// Quantità che la riga pa dovrebbe avere per la concentrazione voluta, con
+// gli altri ingredienti fermi (null se non calcolabile). Non modifica nulla:
+// serve anche a liberaSetPa per chiedere prima di accendere il PA.
+function _concQtyPerPA(pa) {
+  if (!pa || concRichiesta == null || concRichiestaModo !== _concModoScelto()) return null;
+  const unit = pa.unit || 'g';
+  if (!['g', 'mg', 'ml'].includes(unit)) return null;
   const altri = liberaGetIngr().filter(r => r !== pa);
   const c = concRichiesta;
   let paG;
   if (concRichiestaModo === 'pv') {
     // p/v senza ancora un volume: niente da calcolare (non ripiegare su p/p).
     const volAltri = altri.reduce((s, r) => s + volMlRiga(r), 0);
-    // Il volume del PA conta: in ml senza densità nota vale 1 ml per g (come volMlRiga).
-    // In mg il volume non conta (volMlRiga dà 0): niente densità.
-    const d = pa.unit === 'mg' ? null : (getDensita(pa.nome || '') || (pa.unit === 'ml' ? 1 : null));
+    // Il volume del PA conta (come in volMlRiga): con la densità nota, o
+    // 1 ml per g se è in ml senza densità.
+    const d = getDensita(pa.nome || '') || (unit === 'ml' ? 1 : null);
     paG = c / 100 * volAltri / (1 - (d ? c / (100 * d) : 0));
   } else {
     const altriG = altri.reduce((s, r) => s + liberaGrammiRiga(r), 0);
     paG = c * altriG / (100 - c);
   }
-  if (!(paG > 0)) return false;
-  pa.qty = _qtyDaGrammi(paG, pa);
-  _concLegaPA(pa);
-  return true;
+  if (!(paG > 0)) return null;
+  return _qtyDaGrammi(paG, { nome: pa.nome, unit });
 }
 
 // Il PA è cambiato a mano: scala gli altri ingredienti (non contenitori/pz)
@@ -2696,7 +2724,7 @@ async function liberaQtyChanged(i) {
   const nuova = liberaCalcTotale().conc;
   if (!(nuova > 0) || Math.abs(nuova - concRichiesta) < 0.005) return;
   const mis = concRichiestaModo === 'pv' ? 'p/v' : 'p/p';
-  const nomePA = String(pa.nome).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const nomePA = escHtml(pa.nome);
   const mantieni = await showModal({
     title: 'Concentrazione voluta: ' + fmt(concRichiesta, 2) + '% ' + mis,
     body: 'Con questa quantità ' + nomePA + ' passa al ' + fmt(nuova, 2) + '% ' + mis + '.\n\n'
@@ -3554,7 +3582,8 @@ function formatMateriaRow(r) {
   }
   // Righe a pezzi (Barattolo 1 pz): quantità e prezzo per pezzo, non in grammi.
   const aPezzi = r.unit === 'pz';
-  const dispQty = aPezzi ? fmt(r.qty,0)+' pz'
+  // I pezzi su cui si calcola il costo (in cartine: per cartina × N°).
+  const dispQty = aPezzi ? fmt(r.grams,0)+' pz'
     : r.isLiquido ? fmt(r.unit==='ml'?r.qty:r.qty/(getDensita(r.nome)||1),1)+' ml' : fmt(r.grams,2)+' g';
   const dispUnit = aPezzi ? '/pz' : r.isLiquido ? '/ml' : '/g';
   return { name: titleCase(r.nome)+' — '+dispQty+' × '+fmtE(r.prezzo)+dispUnit, val: r.costo,
@@ -4417,7 +4446,7 @@ function schedaLottiRender(force, prefill) {
   // Non rubare il focus mentre l'operatore scrive (come liberaRenderRighe).
   const act = document.activeElement;
   if (!force && act && box.contains && box.contains(act)) return;
-  const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const esc = escHtml;
   box.innerHTML = righe.map(({ r, i }) =>
     '<div class="field-row"><span class="field-label">Lotto ' + esc(titleCase(_lottoNomeRiga(r))) + '</span>' +
     '<input type="text" id="s-lotto-r' + i + '" value="' + esc(r.lotto || '') + '" oninput="schedaLottoInput(' + i + ', this.value)" style="width:120px;">' +

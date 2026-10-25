@@ -37,7 +37,8 @@ describe('#1 premere PA con la concentrazione già scritta chiede prima di riscr
     risposta = true;
     await ctx.liberaSetPa(1);
     expect(riga('Vaselina filante bianca').qty).toBe('98');
-    expect(riga('Acido salicilico').qty).toBe('3');
+    // v178: "Lascia" annulla il clic e il 2% resta scritto; sull'acido "Applica" → 2 g.
+    expect(qty('Acido salicilico')).toBeCloseTo(2, 3);
   });
 
   it('"Applica" sull\'acido salicilico: 3 g → 2 g', async () => {
