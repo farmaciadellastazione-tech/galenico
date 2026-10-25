@@ -46,10 +46,11 @@ describe('#1 solo il PA marcato viene ricalcolato', () => {
     expect(conc()).toBeCloseTo(2, 3);
   });
 
-  it('premere PA applica subito la concentrazione voluta (la nota "fissata" non mente)', () => {
+  // v177: liberaSetPa chiede prima di riscrivere una quantità (risposta qui: sì) → async.
+  it('premere PA applica subito la concentrazione voluta (la nota "fissata" non mente)', async () => {
     ctx.liberaRighe[1].qty = '3';
     ctx.concRichiestaChanged('2');
-    ctx.liberaSetPa(1);
+    await ctx.liberaSetPa(1);
     expect(qty('Acido salicilico')).toBeCloseTo(2, 3);
     expect(conc()).toBeCloseTo(2, 3);
     expect(byId('libera-conc-note').textContent).toMatch(/fissata/);
