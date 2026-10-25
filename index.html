@@ -321,10 +321,25 @@
     /* Modulo ✏ aperto nella tabella: una colonna, Salva/Annulla visibili. */
     .inv-mod-grid { grid-template-columns:1fr !important; }
     .inv-mod-grid > div { min-width:0; }
-    /* Rete di sicurezza: se qualcosa resta più largo, scorre la tabella e non la pagina. */
-    .inv-table-wrap { overflow-x:auto; }
   }
   .inv-solo-mobile { display:none; }
+  /* ── Finestre strette (anche sul computer) ──
+     Se lo spazio non basta scorre il singolo elemento, non la pagina; con
+     spazio sufficiente nessuna barra e nulla cambia. */
+  .inv-table-wrap { overflow-x:auto; }
+  /* Header (logo + 7 voci nav + azioni + badge versione) e .seg (le 7 forme
+     farmaceutiche) sono righe flex senza wrap: fino a ~1170 px traboccavano a
+     destra. Scorrono orizzontalmente, ogni figlio mantiene la sua dimensione. */
+  header { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  header > * { flex-shrink: 0; }
+  .seg { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+  .seg-btn { flex-shrink: 0; }
+  .inv-form > div { min-width:0; }
+  /* Modulo inventario fra 600 e 900 px: i campi vanno a capo da soli (le
+     colonne fisse nello style dell'HTML, fino a 7, non ci stavano). */
+  @media (min-width:601px) and (max-width:900px) {
+    .inv-form { grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)) !important; }
+  }
 
   /* ── Modalità preventivo ───────────────────────────────────────────── */
   #prev-banner { display:none; background:#fde8d8; color:#7d3c0c; border-bottom:1px solid #c46d2c; padding:6px 16px; font-family:var(--mono); font-size:12px; text-align:center; letter-spacing:0.05em; }
@@ -363,13 +378,11 @@
        parte dei pulsanti. Su mobile diventa scorrevole orizzontalmente invece
        di traboccare: ogni figlio mantiene la sua dimensione (flex-shrink:0)
        e si scorre col dito per raggiungere i pulsanti fuori viewport. */
-    header { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    header > * { flex-shrink: 0; }
+    /* (regole per header e .seg spostate fuori dal media query: valgono anche
+       per una finestra stretta sul computer, vedi sotto "Finestre strette") */
     /* .seg (selettore forma farmaceutica: Soluzione/Unguento/Capsule/.../Tintura,
        usato in Preparazione, Tariffazione e Scheda) è anch'esso una riga flex
        senza wrap con 7 pillole: stesso problema dell'header, stesso rimedio. */
-    .seg { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
-    .seg-btn { flex-shrink: 0; }
     /* .field-label è flex:1 + min-width:0 (per adattarsi a larghezze diverse):
        su una riga stretta con più elementi accanto (input + select + nota,
        es. "Concentrazione") viene schiacciata quasi a zero e il testo,
