@@ -302,9 +302,18 @@
   .dymo-note { font-size:11px; color:var(--text-faint); font-family:var(--mono); margin-top:0.5rem; }
 
   @media (max-width:600px) {
-    .inv-form { grid-template-columns:1fr 1fr; }
+    /* !important: le righe del modulo inventario hanno le colonne nello
+       style dell'HTML, che altrimenti vincerebbe e le lascerebbe su una riga
+       (fino a 7 campi: la pagina usciva a destra). */
+    .inv-form { grid-template-columns:1fr 1fr !important; }
+    .inv-form > div { min-width:0; }
     .etiq-form { grid-template-columns:1fr; }
+    /* Tabella inventario: via DDT e Apertura (si vedono aprendo ✏); se serve
+       scorre solo la tabella, non la pagina. */
+    .inv-table th:nth-child(3), .inv-table td:nth-child(3),
+    .inv-table th:nth-child(4), .inv-table td:nth-child(4) { display:none; }
   }
+  .inv-table-wrap { overflow-x:auto; }
 
   /* ── Modalità preventivo ───────────────────────────────────────────── */
   #prev-banner { display:none; background:#fde8d8; color:#7d3c0c; border-bottom:1px solid #c46d2c; padding:6px 16px; font-family:var(--mono); font-size:12px; text-align:center; letter-spacing:0.05em; }
@@ -797,7 +806,7 @@
     <div style="margin-bottom:10px;padding:10px 12px;background:var(--accent-light);border:1px solid #c4d9c0;border-radius:var(--radius)">
       <label style="font-size:11px;font-family:var(--mono);color:var(--accent);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:4px">📷 Scansiona QR Farmalabor (penna ottica)</label>
       <div style="display:flex;gap:8px;align-items:center">
-        <input type="text" id="inv-qr-raw" placeholder="punta la penna sul QR e scansiona..." style="flex:1;font-family:var(--mono);font-size:13px;padding:5px 10px;border:1px solid var(--accent-border);border-radius:var(--radius);background:var(--surface)" oninput="invParseQR()">
+        <input type="text" id="inv-qr-raw" placeholder="punta la penna sul QR e scansiona..." style="flex:1;min-width:0;font-family:var(--mono);font-size:13px;padding:5px 10px;border:1px solid var(--accent-border);border-radius:var(--radius);background:var(--surface)" oninput="invParseQR()">
         <button onclick="invParseQR()" style="font-family:var(--sans);font-size:12px;padding:5px 12px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;white-space:nowrap">→ Estrai lotto</button>
         <button onclick="document.getElementById('inv-qr-raw').value='';invParseQR();" style="font-family:var(--sans);font-size:12px;padding:5px 10px;background:none;border:1px solid var(--border-strong);color:var(--text-muted);border-radius:var(--radius);cursor:pointer">✕</button>
       </div>
@@ -5378,7 +5387,7 @@ function invRender() {
   }
 
   if (!rows) { lista.innerHTML = '<div style="color:var(--text-faint);font-size:13px;padding:1rem 0;text-align:center">Nessuna sostanza registrata</div>'; return; }
-  lista.innerHTML = `<table class="inv-table"><thead><tr><th>Sostanza</th><th>Lotto fornitore / interno</th><th>DDT</th><th>Apertura</th><th>Scadenza</th><th>Qtà</th><th>Prezzo</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+  lista.innerHTML = `<div class="inv-table-wrap"><table class="inv-table"><thead><tr><th>Sostanza</th><th>Lotto fornitore / interno</th><th>DDT</th><th>Apertura</th><th>Scadenza</th><th>Qtà</th><th>Prezzo</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 function fmtMese(ym) {
@@ -6063,7 +6072,7 @@ function aiSolutiRender() {
     const concEsc = (s.conc||'').replace(/"/g,'&quot;');
     const sel = u => s.unit === u ? ' selected' : '';
     return '<div style="display:flex;gap:4px;align-items:center;margin-bottom:4px">'
-      + '<input type="text" value="'+nomeEsc+'" placeholder="es. Acido borico" oninput="aiSoluti['+i+'].nome=this.value" style="flex:1;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">'
+      + '<input type="text" value="'+nomeEsc+'" placeholder="es. Acido borico" oninput="aiSoluti['+i+'].nome=this.value" style="flex:1;min-width:0;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">'
       + '<input type="text" value="'+concEsc+'" placeholder="conc. o ss" title="numero o codice saturazione (ss, sat, saturo, saturazione)" oninput="aiSoluti['+i+'].conc=this.value" style="width:80px;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">'
       + '<select onchange="aiUnitChanged(\'soluti\','+i+',this.value)" title="Il valore viene convertito automaticamente al cambio unità" style="width:95px;font-family:var(--mono);font-size:13px;padding:4px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">'
         + '<option'+sel('% p/v')+'>% p/v</option>'
@@ -6086,7 +6095,7 @@ function aiSolventiRender() {
     const qtyEsc  = (s.qty||'').replace(/"/g,'&quot;');
     const sel = u => s.unit === u ? ' selected' : '';
     return '<div style="display:flex;gap:4px;align-items:center;margin-bottom:4px">'
-      + '<input type="text" value="'+nomeEsc+'" placeholder="es. Glicole propilenico" oninput="aiSolventi['+i+'].nome=this.value" style="flex:1;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">'
+      + '<input type="text" value="'+nomeEsc+'" placeholder="es. Glicole propilenico" oninput="aiSolventi['+i+'].nome=this.value" style="flex:1;min-width:0;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">'
       + '<input type="text" value="'+qtyEsc+'" placeholder="q.b." oninput="aiSolventi['+i+'].qty=this.value" style="width:70px;font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">'
       + '<select onchange="aiUnitChanged(\'solventi\','+i+',this.value)" title="Il valore viene convertito automaticamente fra % p/v ↔ % v/v ↔ mg/ml" style="width:95px;font-family:var(--mono);font-size:13px;padding:4px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg)">'
         + '<option'+sel('ml')+'>ml</option>'
