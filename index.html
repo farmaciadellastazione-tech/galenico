@@ -138,7 +138,9 @@
   .card-title { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); margin-bottom: 1rem; }
   .field-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border); }
   .field-row:last-child { border-bottom: none; }
-  .field-label { font-size: 14px; color: var(--text-muted); flex: 1; min-width: 0; }
+  /* min-width: con flex:1 (base 0) una nota lunga accanto si prendeva tutto lo
+     spazio e l'etichetta, schiacciata a zero, finiva sotto la casella. */
+  .field-label { font-size: 14px; color: var(--text-muted); flex: 1; min-width: min(40%, 11em); }
   .field-note { font-size: 12px; color: var(--text-faint); font-family: var(--mono); }
   input[type="number"], input[type="text"], input[type="date"] { font-family: var(--mono); font-size: 14px; padding: 5px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--bg); color: var(--text); transition: border-color 0.15s; -moz-appearance: textfield; }
   input[type="number"] { width: 110px; text-align: right; }
@@ -714,7 +716,7 @@
 
   <div class="card">
     <div class="card-title">Operazioni e supplementi</div>
-    <div class="field-row"><span class="field-label">Componenti aggiuntivi</span><input type="number" id="t-comp" value="0" step="1" min="0" max="20" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto: n° ingredienti − inclusi (2; capsule/cartine 1) — tetto 4 solo capsule/cartine</span></div>
+    <div class="field-row"><span class="field-label">Componenti aggiuntivi</span><input type="number" id="t-comp" value="0" step="1" min="0" max="20" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto: inclusi 2 (caps./cart. 1, max 4)</span></div>
     <div class="field-row"><span class="field-label">Op. tecnologiche aggiuntive</span><input type="number" id="t-op" value="0" step="1" min="0" max="10" oninput="opOnManualEdit(this.value)" style="background:var(--bg);width:64px"><button type="button" onclick="opRipristinaAuto()" title="Ripristina il valore automatico" style="margin-left:6px;font-size:11px;padding:2px 7px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);cursor:pointer;color:var(--text-faint)">↺ auto</button><span class="field-note">modificabile — ×€2,30 cad.</span></div>
     <div class="field-row"><span class="field-label">Supplemento stupefacenti (Art. 8b)</span><input type="number" id="t-stupp" value="0" step="1" min="0" max="3" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto da formula (×€2,50 cad.)</span></div>
     <div class="field-row"><span class="field-label">Supplemento doping (Art. 8c)</span><input type="number" id="t-dop" value="0" step="1" min="0" max="1" readonly style="background:var(--accent-light);cursor:not-allowed"><span class="field-note">auto da formula (×€2,50)</span></div>
