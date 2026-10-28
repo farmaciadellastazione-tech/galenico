@@ -7374,16 +7374,23 @@ function segnalaMailto(tipo, pagina) {
   const etichetta = tipo === 'richiesta' ? 'Richiesta / idea' : 'Errore';
   const subject = 'Benadù v' + APP_VERSION + ' – ' + etichetta;
   const sc = (typeof screen !== 'undefined' && screen) ? screen : {};
-  const corpo =
+  const intro =
     (tipo === 'richiesta' ? 'Cosa vorresti:\n\n\n' : 'Cosa è successo (e cosa ti aspettavi):\n\n\n') +
     '--- Dati tecnici (compilati in automatico) ---\n' +
     'Versione: v' + APP_VERSION + '\n' +
     'Pagina: ' + (SEGNALA_PAGINE[pagina] || pagina || '?') + '\n' +
     'Preventivo: ' + (modPreventivo ? 'sì' : 'no') + '\n' +
     'Schermo: ' + (sc.width || '?') + '×' + (sc.height || '?') + ' (finestra ' + (window.innerWidth || '?') + '×' + (window.innerHeight || '?') + ')\n' +
-    'Browser: ' + ((typeof navigator !== 'undefined' && navigator.userAgent) || '?') + '\n' +
-    'Ultimi errori: ' + (SEGNALA_ERRORI.length ? '\n' + SEGNALA_ERRORI.map(e => '- ' + e).join('\n') : 'nessuno') + '\n';
-  return 'mailto:' + SEGNALA_EMAIL + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(corpo);
+    'Browser: ' + ((typeof navigator !== 'undefined' && navigator.userAgent) || '?').slice(0, 250) + '\n';
+  const link = (errori, tolti) => 'mailto:' + SEGNALA_EMAIL + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(intro +
+    'Ultimi errori: ' + (errori.length ? '\n' + errori.map(e => '- ' + e).join('\n') : 'nessuno') + '\n' +
+    (tolti ? '(' + tolti + ' errori più vecchi tolti per lunghezza)\n' : ''));
+  // Il limite (~2000) vale sul link codificato, dove spazi, a capo e accenti
+  // pesano 3–6 caratteri: si tolgono gli errori più vecchi finché ci sta.
+  const errori = SEGNALA_ERRORI.slice();
+  let url = link(errori, 0);
+  while (url.length > 1900 && errori.length) { errori.shift(); url = link(errori, SEGNALA_ERRORI.length - errori.length); }
+  return url;
 }
 function segnalaApri() {
   document.getElementById('segnala-email').textContent = SEGNALA_EMAIL;
