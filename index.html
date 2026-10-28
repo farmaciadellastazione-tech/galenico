@@ -37,6 +37,28 @@
     } catch(e) {}
   }
 
+  // Ultimi errori JavaScript della sessione, solo in memoria: finiscono
+  // nell'email "Segnala" della demo (segnalaMailto). Max 5, accorciati a 150
+  // caratteri perché il link mailto: oltre ~2000 caratteri viene tagliato.
+  // Sta qui, nel primo <script>, per vedere anche gli errori dell'avvio.
+  const SEGNALA_ERRORI = [];
+  function segnalaRegistraErrore(msg) {
+    const s = String(msg == null ? '' : msg).replace(/\s+/g, ' ').trim().slice(0, 150);
+    if (!s) return;
+    SEGNALA_ERRORI.push(s);
+    if (SEGNALA_ERRORI.length > 5) SEGNALA_ERRORI.shift();
+  }
+  if (DEMO_MODE && typeof window.addEventListener === 'function') {
+    window.addEventListener('error', (e) => {
+      const file = (e.filename || '').split('/').pop().split('?')[0];
+      segnalaRegistraErrore((e.message || 'Errore') + (file ? ' (' + file + ':' + e.lineno + ')' : ''));
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+      const r = e.reason;
+      segnalaRegistraErrore('Promise: ' + (r && r.message ? r.message : r));
+    });
+  }
+
   // Applica subito il tema salvato per evitare flash di tema sbagliato
   try {
     const t = localStorage.getItem('gal_theme');
