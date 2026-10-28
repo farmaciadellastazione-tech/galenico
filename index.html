@@ -48,14 +48,23 @@
     SEGNALA_ERRORI.push(s);
     if (SEGNALA_ERRORI.length > 5) SEGNALA_ERRORI.shift();
   }
+  // Motivo di un Promise rifiutato come testo: un Error ha nome/messaggio, una
+  // risposta o un oggetto qualsiasi darebbe "[object Object]".
+  function segnalaDescriviMotivo(r) {
+    if (r && typeof r === 'object') {
+      if (r.message) return (r.name ? r.name + ': ' : '') + r.message;
+      if (r.name) return String(r.name);
+      try { const j = JSON.stringify(r); if (j && j !== '{}') return j; } catch(e) {}
+    }
+    return String(r);
+  }
   if (DEMO_MODE && typeof window.addEventListener === 'function') {
     window.addEventListener('error', (e) => {
       const file = (e.filename || '').split('/').pop().split('?')[0];
       segnalaRegistraErrore((e.message || 'Errore') + (file ? ' (' + file + ':' + e.lineno + ')' : ''));
     });
     window.addEventListener('unhandledrejection', (e) => {
-      const r = e.reason;
-      segnalaRegistraErrore('Promise: ' + (r && r.message ? r.message : r));
+      segnalaRegistraErrore('Promise: ' + segnalaDescriviMotivo(e.reason));
     });
   }
 
