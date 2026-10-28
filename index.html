@@ -1266,8 +1266,8 @@
       <button onclick="segnalaChiudi()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text-muted);padding:0 6px">✕</button>
     </div>
     <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:0.8rem">
-      <label style="cursor:pointer"><input type="radio" name="segnala-tipo" value="errore" checked> Errore</label>
-      <label style="cursor:pointer"><input type="radio" name="segnala-tipo" value="richiesta"> Richiesta / idea</label>
+      <label style="cursor:pointer"><input type="radio" name="segnala-tipo" id="segnala-tipo-errore" value="errore" checked> Errore</label>
+      <label style="cursor:pointer"><input type="radio" name="segnala-tipo" id="segnala-tipo-richiesta" value="richiesta"> Richiesta / idea</label>
     </div>
     <div style="font-size:13px;color:var(--text-muted);margin-bottom:0.8rem">Si apre la tua email già pronta: scrivi cosa è successo o cosa vorresti. Versione, pagina, browser ed eventuali errori del programma sono aggiunti in automatico: prima di inviare puoi rileggere e togliere quello che vuoi. Non scrivere dati dei pazienti.</div>
     <button onclick="segnalaInvia()" style="padding:8px 16px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:var(--radius);cursor:pointer;font-size:14px;font-weight:500">Apri email</button>
@@ -7392,20 +7392,24 @@ function segnalaMailto(tipo, pagina) {
   while (url.length > 1900 && errori.length) { errori.shift(); url = link(errori, SEGNALA_ERRORI.length - errori.length); }
   return url;
 }
+function segnalaEsc(e) { if (e.key === 'Escape') segnalaChiudi(); }
 function segnalaApri() {
   document.getElementById('segnala-email').textContent = SEGNALA_EMAIL;
   document.getElementById('segnala-copia').textContent = 'Copia';
+  document.getElementById('segnala-tipo-errore').checked = true;
+  document.getElementById('segnala-tipo-richiesta').checked = false;
   document.getElementById('segnala-dialog').style.display = 'flex';
+  document.addEventListener('keydown', segnalaEsc);
 }
 function segnalaChiudi() {
   document.getElementById('segnala-dialog').style.display = 'none';
+  document.removeEventListener('keydown', segnalaEsc);
 }
 // location.href e non window.open: niente scheda vuota né blocco popup. La
 // finestra resta aperta: se non c'è un programma di posta non succede nulla
 // e l'indirizzo da copiare deve restare lì.
 function segnalaInvia() {
-  const r = document.querySelector('input[name="segnala-tipo"]:checked');
-  location.href = segnalaMailto(r ? r.value : 'errore');
+  location.href = segnalaMailto(document.getElementById('segnala-tipo-richiesta').checked ? 'richiesta' : 'errore');
 }
 function segnalaCopiaEmail() {
   const btn = document.getElementById('segnala-copia');
