@@ -1271,7 +1271,7 @@
     </div>
     <div style="font-size:13px;color:var(--text-muted);margin-bottom:0.8rem">Si apre la tua email già pronta: scrivi cosa è successo o cosa vorresti. Versione, pagina e browser sono aggiunti in automatico, i dati delle ricette no.</div>
     <button onclick="segnalaInvia()" style="padding:8px 16px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:var(--radius);cursor:pointer;font-size:14px;font-weight:500">Apri email</button>
-    <div style="margin-top:1rem;font-size:12px;color:var(--text-muted)">Se non si apre niente, scrivi a:</div>
+    <div style="margin-top:1rem;font-size:12px;color:var(--text-muted)">Se la tua email non si apre, scrivi a:</div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px">
       <span id="segnala-email" style="font-family:var(--mono);font-size:13px;word-break:break-all"></span>
       <button onclick="segnalaCopiaEmail()" id="segnala-copia" style="font-size:12px;padding:3px 10px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);cursor:pointer">Copia</button>
@@ -7393,10 +7393,12 @@ function segnalaApri() {
 function segnalaChiudi() {
   document.getElementById('segnala-dialog').style.display = 'none';
 }
+// location.href e non window.open: niente scheda vuota né blocco popup. La
+// finestra resta aperta: se non c'è un programma di posta non succede nulla
+// e l'indirizzo da copiare deve restare lì.
 function segnalaInvia() {
   const r = document.querySelector('input[name="segnala-tipo"]:checked');
-  window.open(segnalaMailto(r ? r.value : 'errore'));
-  segnalaChiudi();
+  location.href = segnalaMailto(r ? r.value : 'errore');
 }
 function segnalaCopiaEmail() {
   const btn = document.getElementById('segnala-copia');
